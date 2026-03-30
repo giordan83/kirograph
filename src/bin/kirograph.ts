@@ -68,6 +68,30 @@ program
     }
     fs.rmSync(dir, { recursive: true, force: true });
     console.log('Removed .kirograph/');
+
+    // Remove .kiro hooks created by kirograph
+    const kiroHooks = [
+      'kirograph-mark-dirty-on-save.json',
+      'kirograph-mark-dirty-on-create.json',
+      'kirograph-sync-on-delete.json',
+      'kirograph-sync-if-dirty.json',
+      'kirograph-sync-on-save.json',
+      'kirograph-sync-on-create.json',
+    ];
+    const hooksDir = path.join(target, '.kiro', 'hooks');
+    let removedHooks = 0;
+    for (const hook of kiroHooks) {
+      const p = path.join(hooksDir, hook);
+      if (fs.existsSync(p)) { fs.unlinkSync(p); removedHooks++; }
+    }
+    if (removedHooks > 0) console.log(`Removed ${removedHooks} hook(s) from .kiro/hooks/`);
+
+    // Remove .kiro/steering/kirograph.md
+    const steeringPath = path.join(target, '.kiro', 'steering', 'kirograph.md');
+    if (fs.existsSync(steeringPath)) {
+      fs.unlinkSync(steeringPath);
+      console.log('Removed .kiro/steering/kirograph.md');
+    }
   });
 
 // ── index ─────────────────────────────────────────────────────────────────────
