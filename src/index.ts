@@ -6,6 +6,8 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
+import { execFileSync } from 'child_process';
 import { GraphDatabase } from './db/database';
 import { extractFile } from './extraction/extractor';
 import { detectLanguage } from './extraction/languages';
@@ -70,6 +72,11 @@ function buildFileTree(files: import('./types').FileRecord[], maxDepth?: number)
 
 const KIROGRAPH_DIR = '.kirograph';
 const CONFIG_FILE = 'config.json';
+const LOCK_FILE = 'kirograph.lock';
+const DIRTY_FILE = 'dirty';
+const FILE_IO_BATCH_SIZE = 10;
+// Timeout after which a lock is considered stale (5 minutes)
+const LOCK_STALE_MS = 5 * 60 * 1000;
 
 export interface KiroGraphConfig {
   version: number;
@@ -106,6 +113,14 @@ function extractTokens(query: string): string[] {
   // snake_case
   for (const m of query.matchAll(/\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b/gi))
     if (m[1].length >= 3) tokens.add(m[1]);
+  // SCREAMING_SNAKE
+  for (const m of query.matchAll(/\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/g))
+    if (m[1].length >= 3) tokens.add(m[1]);
+  // dot.notation — add both full and parts
+  for (const m of query.matchAll(/\b([a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)+)\b/g)) {
+    tokens.add(m[1]);
+    for (const part of m[1].split('.')) tokens.add(part);
+  }
   // plain words >= 4 chars
   for (const m of query.matchAll(/\b([a-zA-Z]{4,})\b/g))
     if (!STOP_WORDS.has(m[1].toLowerCase())) tokens.add(m[1]);
@@ -155,136 +170,271 @@ export default class KiroGraph {
     return fs.existsSync(path.join(path.resolve(projectRoot), KIROGRAPH_DIR));
   }
 
+  // ── File Locking ───────────────────────────────────────────────────────────
+
+  private lockFilePath(): string {
+    return path.join(this.projectRoot, KIROGRAPH_DIR, LOCK_FILE);
+  }
+
+  private acquireLock(): void {
+    const lockPath = this.lockFilePath();
+    if (fs.existsSync(lockPath)) {
+      try {
+        const content = fs.readFileSync(lockPath, 'utf8').trim();
+        const [pidStr, tsStr] = content.split(':');
+        const pid = parseInt(pidStr, 10);
+        const ts = parseInt(tsStr, 10);
+
+        if (!isNaN(pid) && pid !== process.pid) {
+          const isStale = !isNaN(ts) && Date.now() - ts > LOCK_STALE_MS;
+          if (!isStale) {
+            try {
+              process.kill(pid, 0);
+              // Process is alive — lock is valid
+              throw new Error(`KiroGraph is locked by PID ${pid}. Use 'kirograph unlock' to force-release.`);
+            } catch (e: any) {
+              if (e.message.includes('KiroGraph is locked')) throw e;
+              // Process not found — stale lock, override it
+            }
+          }
+        }
+      } catch (e: any) {
+        if (e.message.includes('KiroGraph is locked')) throw e;
+        // Could not read lock file — override
+      }
+    }
+    fs.writeFileSync(lockPath, `${process.pid}:${Date.now()}`);
+  }
+
+  private releaseLock(): void {
+    try { fs.unlinkSync(this.lockFilePath()); } catch { /* ignore */ }
+  }
+
+  /** Force-remove the lock file. Used by `kirograph unlock`. */
+  unlockForce(): void {
+    this.releaseLock();
+  }
+
+  // ── Dirty Marker ──────────────────────────────────────────────────────────
+
+  private dirtyFilePath(): string {
+    return path.join(this.projectRoot, KIROGRAPH_DIR, DIRTY_FILE);
+  }
+
+  markDirty(): void {
+    fs.writeFileSync(this.dirtyFilePath(), String(Date.now()));
+  }
+
+  clearDirty(): void {
+    try { fs.unlinkSync(this.dirtyFilePath()); } catch { /* ignore */ }
+  }
+
+  isDirty(): boolean {
+    return fs.existsSync(this.dirtyFilePath());
+  }
+
+  async syncIfDirty(): Promise<SyncResult | null> {
+    if (!this.isDirty()) return null;
+    return this.sync();
+  }
+
   // ── Indexing ───────────────────────────────────────────────────────────────
 
   async indexAll(opts?: { onProgress?: (p: IndexProgress) => void; force?: boolean }): Promise<IndexResult> {
+    this.acquireLock();
     const start = Date.now();
     const errors: string[] = [];
     let filesIndexed = 0;
     let nodesCreated = 0;
     let edgesCreated = 0;
 
-    const files = this.scanFiles();
-    opts?.onProgress?.({ phase: 'scanning', current: files.length, total: files.length });
+    try {
+      const files = this.scanFiles();
+      opts?.onProgress?.({ phase: 'scanning', current: files.length, total: files.length });
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      opts?.onProgress?.({ phase: 'parsing', current: i + 1, total: files.length, currentFile: file });
-
-      try {
-        const stat = fs.statSync(file);
-        if (stat.size > this.config.maxFileSize) continue;
-
-        const existing = this.db.getFile(path.relative(this.projectRoot, file).replace(/\\/g, '/'));
-        if (!opts?.force && existing) {
-          // Skip unchanged files
-          const hash = require('crypto').createHash('sha1').update(fs.readFileSync(file)).digest('hex');
-          if (hash === existing.contentHash) continue;
+      // Batch read files in parallel (FILE_IO_BATCH_SIZE at a time)
+      const contentMap = new Map<string, Buffer>();
+      for (let b = 0; b < files.length; b += FILE_IO_BATCH_SIZE) {
+        const batch = files.slice(b, b + FILE_IO_BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(f => fs.promises.readFile(f).catch(() => null))
+        );
+        for (let i = 0; i < batch.length; i++) {
+          if (results[i]) contentMap.set(batch[i], results[i]!);
         }
-
-        const extracted = await extractFile(file, this.projectRoot);
-        if (!extracted) continue;
-
-        this.db.transaction(() => {
-          this.db.deleteNodesByFile(extracted.filePath);
-          this.db.upsertFile({
-            path: extracted.filePath,
-            contentHash: extracted.contentHash,
-            language: extracted.language,
-            fileSize: extracted.fileSize,
-            symbolCount: extracted.nodes.length,
-            indexedAt: Date.now(),
-          });
-          for (const node of extracted.nodes) {
-            this.db.upsertNode(node);
-            nodesCreated++;
-          }
-          for (const edge of extracted.edges) {
-            this.db.insertEdge(edge);
-            edgesCreated++;
-          }
-        });
-
-        filesIndexed++;
-      } catch (err) {
-        errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
       }
-    }
 
-    return { success: errors.length === 0, filesIndexed, nodesCreated, edgesCreated, errors, duration: Date.now() - start };
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        opts?.onProgress?.({ phase: 'parsing', current: i + 1, total: files.length, currentFile: file });
+
+        try {
+          const content = contentMap.get(file);
+          if (!content) continue;
+          if (content.length > this.config.maxFileSize) continue;
+
+          const relPath = path.relative(this.projectRoot, file).replace(/\\/g, '/');
+
+          if (!opts?.force) {
+            const existing = this.db.getFile(relPath);
+            if (existing) {
+              const hash = crypto.createHash('sha256').update(content).digest('hex');
+              if (hash === existing.contentHash) continue;
+            }
+          }
+
+          const extracted = await extractFile(file, this.projectRoot, content);
+          if (!extracted) continue;
+
+          this.db.transaction(() => {
+            this.db.deleteNodesByFile(extracted.filePath);
+            this.db.deleteUnresolvedRefsByFile(extracted.filePath);
+            this.db.upsertFile({
+              path: extracted.filePath,
+              contentHash: extracted.contentHash,
+              language: extracted.language,
+              fileSize: extracted.fileSize,
+              symbolCount: extracted.nodes.length,
+              indexedAt: Date.now(),
+            });
+            for (const node of extracted.nodes) {
+              this.db.upsertNode(node);
+              nodesCreated++;
+            }
+            for (const edge of extracted.edges) {
+              this.db.insertEdge(edge);
+              edgesCreated++;
+            }
+            for (const ref of extracted.unresolvedCalls) {
+              this.db.insertUnresolvedRef(ref.sourceId, ref.calleeName, 'function', extracted.filePath, ref.line, ref.column);
+            }
+          });
+
+          filesIndexed++;
+        } catch (err) {
+          errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // Resolve cross-file call edges
+      opts?.onProgress?.({ phase: 'resolving', current: 0, total: 1 });
+      const resolved = this.db.resolveCallEdges();
+      edgesCreated += resolved;
+
+      this.clearDirty();
+      return { success: errors.length === 0, filesIndexed, nodesCreated, edgesCreated, errors, duration: Date.now() - start };
+    } finally {
+      this.releaseLock();
+    }
   }
 
   async sync(changedFiles?: string[]): Promise<SyncResult> {
+    this.acquireLock();
     const start = Date.now();
     const result: SyncResult = { added: [], modified: [], removed: [], nodesCreated: 0, nodesRemoved: 0, errors: [], duration: 0 };
 
-    const filesToProcess = changedFiles
-      ? changedFiles.map(f => path.resolve(this.projectRoot, f))
-      : this.scanFiles();
-
-    // Detect removed files
-    const indexed = new Set(this.db.getAllFiles().map(f => f.path));
-    const current = new Set(this.scanFiles().map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/')));
-    for (const p of indexed) {
-      if (!current.has(p)) {
-        this.db.deleteFile(p);
-        result.removed.push(p);
+    try {
+      // Use git fast-path for change detection if no explicit files provided
+      let filesToProcess: string[];
+      if (changedFiles) {
+        filesToProcess = changedFiles.map(f => path.resolve(this.projectRoot, f));
+      } else {
+        const gitChanged = this.getGitChangedFiles();
+        if (gitChanged) {
+          // Process git-detected changes
+          for (const p of gitChanged.deleted) {
+            const rel = path.relative(this.projectRoot, p).replace(/\\/g, '/');
+            this.db.deleteFile(rel);
+            this.db.deleteUnresolvedRefsByFile(rel);
+            result.removed.push(rel);
+          }
+          filesToProcess = gitChanged.modified;
+        } else {
+          // Fallback: full scan + detect removed files
+          const indexed = new Set(this.db.getAllFiles().map(f => f.path));
+          const current = new Set(this.scanFiles().map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/')));
+          for (const p of indexed) {
+            if (!current.has(p)) {
+              this.db.deleteFile(p);
+              this.db.deleteUnresolvedRefsByFile(p);
+              result.removed.push(p);
+            }
+          }
+          filesToProcess = this.scanFiles();
+        }
       }
-    }
 
-    for (const file of filesToProcess) {
-      if (!fs.existsSync(file)) {
-        const rel = path.relative(this.projectRoot, file).replace(/\\/g, '/');
-        this.db.deleteFile(rel);
-        result.removed.push(rel);
-        continue;
-      }
+      for (const file of filesToProcess) {
+        if (!fs.existsSync(file)) {
+          const rel = path.relative(this.projectRoot, file).replace(/\\/g, '/');
+          this.db.deleteFile(rel);
+          this.db.deleteUnresolvedRefsByFile(rel);
+          result.removed.push(rel);
+          continue;
+        }
 
-      try {
-        const extracted = await extractFile(file, this.projectRoot);
-        if (!extracted) continue;
+        try {
+          const extracted = await extractFile(file, this.projectRoot);
+          if (!extracted) continue;
 
-        const existing = this.db.getFile(extracted.filePath);
-        const isNew = !existing;
+          const existing = this.db.getFile(extracted.filePath);
+          const isNew = !existing;
 
-        if (!isNew && existing!.contentHash === extracted.contentHash) continue;
+          if (!isNew && existing!.contentHash === extracted.contentHash) continue;
 
-        this.db.transaction(() => {
-          const oldNodes = this.db.getNodesByFile(extracted.filePath);
-          result.nodesRemoved += oldNodes.length;
-          this.db.deleteNodesByFile(extracted.filePath);
-          this.db.upsertFile({
-            path: extracted.filePath,
-            contentHash: extracted.contentHash,
-            language: extracted.language,
-            fileSize: extracted.fileSize,
-            symbolCount: extracted.nodes.length,
-            indexedAt: Date.now(),
+          this.db.transaction(() => {
+            const oldNodes = this.db.getNodesByFile(extracted.filePath);
+            result.nodesRemoved += oldNodes.length;
+            this.db.deleteNodesByFile(extracted.filePath);
+            this.db.deleteUnresolvedRefsByFile(extracted.filePath);
+            this.db.upsertFile({
+              path: extracted.filePath,
+              contentHash: extracted.contentHash,
+              language: extracted.language,
+              fileSize: extracted.fileSize,
+              symbolCount: extracted.nodes.length,
+              indexedAt: Date.now(),
+            });
+            for (const node of extracted.nodes) {
+              this.db.upsertNode(node);
+              result.nodesCreated++;
+            }
+            for (const edge of extracted.edges) {
+              this.db.insertEdge(edge);
+            }
+            for (const ref of extracted.unresolvedCalls) {
+              this.db.insertUnresolvedRef(ref.sourceId, ref.calleeName, 'function', extracted.filePath, ref.line, ref.column);
+            }
           });
-          for (const node of extracted.nodes) {
-            this.db.upsertNode(node);
-            result.nodesCreated++;
-          }
-          for (const edge of extracted.edges) {
-            this.db.insertEdge(edge);
-          }
-        });
 
-        if (isNew) result.added.push(extracted.filePath);
-        else result.modified.push(extracted.filePath);
-      } catch (err) {
-        result.errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+          if (isNew) result.added.push(extracted.filePath);
+          else result.modified.push(extracted.filePath);
+        } catch (err) {
+          result.errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-    }
 
-    result.duration = Date.now() - start;
-    return result;
+      // Re-resolve call edges for changed files
+      this.db.resolveCallEdges();
+
+      this.clearDirty();
+      result.duration = Date.now() - start;
+      return result;
+    } finally {
+      this.releaseLock();
+    }
   }
 
   // ── Query API ──────────────────────────────────────────────────────────────
 
   searchNodes(query: string, kind?: NodeKind, limit = 20): SearchResult[] {
-    // Try FTS first, fall back to LIKE
+    // Try exact name match first (highest precision)
+    const exact = this.db.findNodesByExactName(query, kind, limit);
+    if (exact.length > 0) {
+      return exact.map(n => ({ node: n, score: 1, matchType: 'exact' as const }));
+    }
+
+    // Try FTS, fall back to LIKE
     let nodes: Node[] = [];
     try {
       nodes = this.db.searchNodes(query, kind, limit);
@@ -307,6 +457,22 @@ export default class KiroGraph {
 
   getImpactRadius(nodeId: string, depth = 2): Node[] {
     return this.db.getImpactRadius(nodeId, depth);
+  }
+
+  findDeadCode(limit = 50): Node[] {
+    return this.db.findDeadCode(limit);
+  }
+
+  findCircularDependencies(): string[][] {
+    return this.db.findCircularDependencies();
+  }
+
+  findPath(fromId: string, toId: string, maxDepth = 10): Node[] {
+    return this.db.findPath(fromId, toId, maxDepth);
+  }
+
+  getTypeHierarchy(nodeId: string, direction: 'up' | 'down' | 'both' = 'both'): Node[] {
+    return this.db.getTypeHierarchy(nodeId, direction);
   }
 
   getNode(id: string): Node | null {
@@ -444,18 +610,63 @@ export default class KiroGraph {
   }
 
   close(): void {
+    this.releaseLock();
     this.db.close();
   }
 
-  // ── File scanning ──────────────────────────────────────────────────────────
+  // ── File Scanning ──────────────────────────────────────────────────────────
 
+  /**
+   * Try to use git ls-files for fast, .gitignore-aware file discovery.
+   * Falls back to filesystem walk if git is unavailable.
+   */
   private scanFiles(): string[] {
+    // Try git fast-path
+    try {
+      const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+        cwd: this.projectRoot,
+        encoding: 'utf8',
+        timeout: 10_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const relPaths = output.split('\n').filter(Boolean);
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const picomatch = require('picomatch');
+      const excludeMatchers = this.buildExcludeMatchers(picomatch);
+      return relPaths
+        .filter(rel => !excludeMatchers.some((m: (s: string) => boolean) => m(rel) || m(rel + '/')))
+        .map(rel => path.join(this.projectRoot, rel))
+        .filter(abs => {
+          const lang = detectLanguage(abs);
+          return lang !== 'unknown';
+        });
+    } catch {
+      // Fall through to filesystem walk
+    }
+
+    return this.scanFilesWalk();
+  }
+
+  /**
+   * Filesystem walk fallback. Respects .kirographignore files.
+   */
+  private scanFilesWalk(): string[] {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const picomatch = require('picomatch');
-    const excludeMatchers = this.config.exclude.map((p: string) => picomatch(p));
-
+    const excludeMatchers = this.buildExcludeMatchers(picomatch);
     const results: string[] = [];
+    const visitedDirs = new Set<string>();
+
     const walk = (dir: string) => {
+      let realDir: string;
+      try { realDir = fs.realpathSync(dir); } catch { return; }
+      if (visitedDirs.has(realDir)) return; // symlink cycle protection
+      visitedDirs.add(realDir);
+
+      // Check for .kirographignore in this directory
+      const ignoreFile = path.join(dir, '.kirographignore');
+      if (fs.existsSync(ignoreFile)) return;
+
       let entries: fs.Dirent[];
       try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
       for (const entry of entries) {
@@ -472,6 +683,58 @@ export default class KiroGraph {
     };
     walk(this.projectRoot);
     return results;
+  }
+
+  private buildExcludeMatchers(picomatch: any): ((s: string) => boolean)[] {
+    const patterns = [...this.config.exclude];
+
+    // Also load .kirographignore from project root
+    const rootIgnore = path.join(this.projectRoot, '.kirographignore');
+    if (fs.existsSync(rootIgnore)) {
+      const lines = fs.readFileSync(rootIgnore, 'utf8')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('#'));
+      patterns.push(...lines);
+    }
+
+    return patterns.map((p: string) => picomatch(p));
+  }
+
+  /**
+   * Use `git status --porcelain` to detect changed/deleted files since last commit.
+   * Returns null if git is unavailable.
+   */
+  private getGitChangedFiles(): { modified: string[]; deleted: string[] } | null {
+    try {
+      const output = execFileSync('git', ['status', '--porcelain', '--no-renames'], {
+        cwd: this.projectRoot,
+        encoding: 'utf8',
+        timeout: 10_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+
+      const modified: string[] = [];
+      const deleted: string[] = [];
+
+      for (const line of output.split('\n').filter(Boolean)) {
+        const status = line.slice(0, 2).trim();
+        const relPath = line.slice(3).trim();
+        const absPath = path.join(this.projectRoot, relPath);
+        const lang = detectLanguage(absPath);
+        if (lang === 'unknown') continue;
+
+        if (status === 'D') {
+          deleted.push(absPath);
+        } else {
+          modified.push(absPath);
+        }
+      }
+
+      return { modified, deleted };
+    } catch {
+      return null;
+    }
   }
 }
 

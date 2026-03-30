@@ -41,6 +41,13 @@ async function getGrammar(language: Language): Promise<any | null> {
   }
 }
 
+export interface UnresolvedCall {
+  sourceId: string;
+  calleeName: string;
+  line: number;
+  column: number;
+}
+
 export interface ExtractedFile {
   filePath: string;
   language: Language;
@@ -48,27 +55,34 @@ export interface ExtractedFile {
   fileSize: number;
   nodes: Node[];
   edges: Edge[];
+  unresolvedCalls: UnresolvedCall[];
 }
 
-function makeNodeId(filePath: string, kind: string, name: string, line: number): string {
-  return crypto.createHash('sha1').update(`${filePath}:${kind}:${name}:${line}`).digest('hex').slice(0, 16);
+export function makeNodeId(filePath: string, kind: string, name: string, line: number): string {
+  const hash = crypto.createHash('sha256').update(`${filePath}:${kind}:${name}:${line}`).digest('hex').slice(0, 32);
+  return `${kind}:${hash}`;
 }
 
 /**
  * Extract symbols from a single file.
+ * Optionally accepts pre-read content for batch I/O efficiency.
  */
-export async function extractFile(filePath: string, projectRoot: string): Promise<ExtractedFile | null> {
+export async function extractFile(filePath: string, projectRoot: string, content?: Buffer | string): Promise<ExtractedFile | null> {
   const language = detectLanguage(filePath);
   if (!isSupportedLanguage(language)) return null;
 
   let source: string;
   try {
-    source = fs.readFileSync(filePath, 'utf8');
+    if (content !== undefined) {
+      source = typeof content === 'string' ? content : content.toString('utf8');
+    } else {
+      source = fs.readFileSync(filePath, 'utf8');
+    }
   } catch {
     return null;
   }
 
-  const contentHash = crypto.createHash('sha1').update(source).digest('hex');
+  const contentHash = crypto.createHash('sha256').update(source).digest('hex');
   const fileSize = Buffer.byteLength(source, 'utf8');
   const relPath = path.relative(projectRoot, filePath).replace(/\\/g, '/');
 
@@ -82,6 +96,7 @@ export async function extractFile(filePath: string, projectRoot: string): Promis
       fileSize,
       nodes: [],
       edges: [],
+      unresolvedCalls: [],
     };
   }
 
@@ -92,12 +107,13 @@ export async function extractFile(filePath: string, projectRoot: string): Promis
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
+  const unresolvedCalls: UnresolvedCall[] = [];
   const now = Date.now();
 
   // Walk the AST and extract symbols
-  walkTree(tree.rootNode, source, relPath, language, nodes, edges, now);
+  walkTree(tree.rootNode, source, relPath, language, nodes, edges, unresolvedCalls, now);
 
-  return { filePath: relPath, language, contentHash, fileSize, nodes, edges };
+  return { filePath: relPath, language, contentHash, fileSize, nodes, edges, unresolvedCalls };
 }
 
 function walkTree(
@@ -107,6 +123,7 @@ function walkTree(
   language: Language,
   nodes: Node[],
   edges: Edge[],
+  unresolvedCalls: UnresolvedCall[],
   now: number,
   parentId?: string
 ): void {
@@ -114,7 +131,7 @@ function walkTree(
   const transparent = new Set(['export_statement', 'program', 'source_file', 'module', 'translation_unit']);
   if (transparent.has(node.type)) {
     for (let i = 0; i < node.childCount; i++) {
-      walkTree(node.child(i), source, filePath, language, nodes, edges, now, parentId);
+      walkTree(node.child(i), source, filePath, language, nodes, edges, unresolvedCalls, now, parentId);
     }
     return;
   }
@@ -135,6 +152,7 @@ function walkTree(
         endLine: node.endPosition.row + 1,
         startColumn: node.startPosition.column,
         endColumn: node.endPosition.column,
+        docstring: extractDocstring(node, source),
         signature: extractSignature(node, source),
         isExported: isExported(node, source),
         isAsync: isAsync(node),
@@ -147,12 +165,12 @@ function walkTree(
         edges.push({ source: parentId, target: id, kind: 'contains' });
       }
 
-      // Extract call edges within this node
-      extractCalls(node, source, filePath, id, edges, now);
+      // Collect unresolved call references within this node
+      collectCalls(node, source, id, unresolvedCalls);
 
       // Recurse into children with this node as parent
       for (let i = 0; i < node.childCount; i++) {
-        walkTree(node.child(i), source, filePath, language, nodes, edges, now, id);
+        walkTree(node.child(i), source, filePath, language, nodes, edges, unresolvedCalls, now, id);
       }
       return;
     }
@@ -160,7 +178,7 @@ function walkTree(
 
   // No symbol at this node — recurse without changing parent
   for (let i = 0; i < node.childCount; i++) {
-    walkTree(node.child(i), source, filePath, language, nodes, edges, now, parentId);
+    walkTree(node.child(i), source, filePath, language, nodes, edges, unresolvedCalls, now, parentId);
   }
 }
 
@@ -208,6 +226,7 @@ function extractName(node: any, source: string, _lang: Language): string | null 
   }
   return null;
 }
+
 function extractSignature(node: any, source: string): string | undefined {
   // Grab first line as signature approximation
   const text = source.slice(node.startIndex, node.endIndex);
@@ -215,7 +234,39 @@ function extractSignature(node: any, source: string): string | undefined {
   return firstLine.length > 120 ? firstLine.slice(0, 120) + '…' : firstLine;
 }
 
+/**
+ * Extract a docstring by walking previousNamedSibling through comment nodes.
+ */
+function extractDocstring(node: any, source: string): string | undefined {
+  const commentTypes = new Set(['comment', 'block_comment', 'line_comment', 'documentation_comment']);
+  const commentLines: string[] = [];
+
+  let sibling = node.previousNamedSibling;
+  while (sibling && commentTypes.has(sibling.type)) {
+    commentLines.unshift(source.slice(sibling.startIndex, sibling.endIndex));
+    sibling = sibling.previousNamedSibling;
+  }
+
+  if (commentLines.length === 0) return undefined;
+
+  const cleaned = commentLines.join('\n')
+    .replace(/^\/\*+\s*/gm, '')
+    .replace(/\s*\*+\/\s*$/gm, '')
+    .replace(/^\s*\*\s?/gm, '')
+    .replace(/^\/\/\s?/gm, '')
+    .trim();
+
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 function isExported(node: any, source: string): boolean {
+  // Walk up to check for export_statement ancestor
+  let current = node.parent;
+  while (current) {
+    if (current.type === 'export_statement') return true;
+    current = current.parent;
+  }
+  // Fallback: check if first token is 'export'
   const text = source.slice(node.startIndex, Math.min(node.startIndex + 20, node.endIndex));
   return text.startsWith('export');
 }
@@ -234,30 +285,34 @@ function isStatic(node: any): boolean {
   return false;
 }
 
-function extractCalls(node: any, source: string, filePath: string, sourceId: string, edges: Edge[], _now: number): void {
-  // Find call_expression nodes within this node
-  findCallExpressions(node, source, filePath, sourceId, edges);
+/**
+ * Collect call expressions within a node as unresolved references.
+ * Uses only the final segment of dotted names (e.g., "a.b.c" → "c").
+ */
+function collectCalls(node: any, source: string, sourceId: string, unresolvedCalls: UnresolvedCall[]): void {
+  findCallExpressions(node, source, sourceId, unresolvedCalls);
 }
 
-function findCallExpressions(node: any, source: string, filePath: string, sourceId: string, edges: Edge[]): void {
+function findCallExpressions(node: any, source: string, sourceId: string, unresolvedCalls: UnresolvedCall[]): void {
   if (node.type === 'call_expression') {
     const funcNode = node.child(0);
     if (funcNode) {
-      const calleeName = source.slice(funcNode.startIndex, funcNode.endIndex).split('(')[0].trim();
-      if (calleeName && calleeName.length < 100) {
-        // We store as unresolved — will be resolved in a later pass
-        const targetId = makeNodeId(filePath, 'function', calleeName, 0);
-        edges.push({
-          source: sourceId,
-          target: targetId,
-          kind: 'calls',
-          line: node.startPosition.row + 1,
-          column: node.startPosition.column,
-        });
+      const rawName = source.slice(funcNode.startIndex, funcNode.endIndex).split('(')[0].trim();
+      if (rawName && rawName.length < 100) {
+        // Use only the final segment of dotted/chained names
+        const calleeName = rawName.split('.').pop()!.trim();
+        if (calleeName && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(calleeName)) {
+          unresolvedCalls.push({
+            sourceId,
+            calleeName,
+            line: node.startPosition.row + 1,
+            column: node.startPosition.column,
+          });
+        }
       }
     }
   }
   for (let i = 0; i < node.childCount; i++) {
-    findCallExpressions(node.child(i), source, filePath, sourceId, edges);
+    findCallExpressions(node.child(i), source, sourceId, unresolvedCalls);
   }
 }

@@ -2,6 +2,9 @@
  * KiroGraph MCP Tool Definitions + Handlers
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import KiroGraph, { findNearestKiroGraphRoot } from '../index';
 import type { NodeKind } from '../types';
 
@@ -9,6 +12,14 @@ const MAX_OUTPUT = 15_000;
 
 function truncate(s: string): string {
   return s.length > MAX_OUTPUT ? s.slice(0, MAX_OUTPUT) + '\n…[truncated]' : s;
+}
+
+/** Write a session marker so hooks can detect MCP was consulted. */
+function writeSessionMarker(projectRoot: string): void {
+  try {
+    const hash = crypto.createHash('sha256').update(projectRoot).digest('hex').slice(0, 16);
+    fs.writeFileSync(`/tmp/kirograph-consulted-${hash}`, String(Date.now()));
+  } catch { /* best-effort */ }
 }
 
 export interface ToolDefinition {
@@ -35,6 +46,7 @@ export const tools: ToolDefinition[] = [
           enum: ['function', 'method', 'class', 'interface', 'type_alias', 'variable', 'route', 'component'],
         },
         limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
+        projectPath: { type: 'string', description: 'Project root path (optional, defaults to current project)' },
       },
       required: ['query'],
     },
@@ -48,6 +60,7 @@ export const tools: ToolDefinition[] = [
         task: { type: 'string', description: 'Description of the task, bug, or feature to build context for' },
         maxNodes: { type: 'number', description: 'Max symbols to include (default: 20)', default: 20 },
         includeCode: { type: 'boolean', description: 'Include code snippets (default: true)', default: true },
+        projectPath: { type: 'string', description: 'Project root path (optional, defaults to current project)' },
       },
       required: ['task'],
     },
@@ -60,6 +73,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to find callers for' },
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['symbol'],
     },
@@ -72,6 +86,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to find callees for' },
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['symbol'],
     },
@@ -84,6 +99,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to analyze impact for' },
         depth: { type: 'number', description: 'Traversal depth (default: 2)', default: 2 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['symbol'],
     },
@@ -96,6 +112,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to look up' },
         includeCode: { type: 'boolean', description: 'Include source code (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['symbol'],
     },
@@ -105,20 +122,109 @@ export const tools: ToolDefinition[] = [
     description: 'Check index health and statistics.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_files',
+    description: 'List the indexed file structure of the project. Supports filtering by path prefix, glob pattern, or depth.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filterPath: { type: 'string', description: 'Filter by directory path prefix (e.g., "src/")' },
+        pattern: { type: 'string', description: 'Filter by glob pattern (e.g., "**/*.ts")' },
+        maxDepth: { type: 'number', description: 'Limit tree depth' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_dead_code',
+    description: 'Find symbols with no incoming references (potential dead code).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max results (default: 50)', default: 50 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_circular_deps',
+    description: 'Find circular import dependencies in the codebase.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_path',
+    description: 'Find the shortest path between two symbols in the graph.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Source symbol name' },
+        to: { type: 'string', description: 'Target symbol name' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['from', 'to'],
+    },
+  },
+  {
+    name: 'kirograph_type_hierarchy',
+    description: 'Traverse the type hierarchy of a class or interface (base types and derived types).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Class or interface name' },
+        direction: {
+          type: 'string',
+          description: 'Direction: "up" for base types, "down" for derived types, "both" for all (default)',
+          enum: ['up', 'down', 'both'],
+          default: 'both',
+        },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['symbol'],
     },
   },
 ];
 
 export class ToolHandler {
-  private cg: KiroGraph | null;
+  private defaultCg: KiroGraph | null;
+  private connections = new Map<string, KiroGraph>();
 
   constructor(cg: KiroGraph | null) {
-    this.cg = cg;
+    this.defaultCg = cg;
   }
 
   setDefaultKiroGraph(cg: KiroGraph): void {
-    this.cg = cg;
+    this.defaultCg = cg;
+  }
+
+  /** Close all cached cross-project connections. */
+  closeAll(): void {
+    for (const cg of this.connections.values()) {
+      try { cg.close(); } catch { /* ignore */ }
+    }
+    this.connections.clear();
+  }
+
+  private async getConnection(projectPath?: string): Promise<KiroGraph | null> {
+    if (!projectPath) return this.defaultCg;
+    const resolved = path.resolve(projectPath);
+    if (this.connections.has(resolved)) return this.connections.get(resolved)!;
+    try {
+      const cg = await KiroGraph.open(resolved);
+      this.connections.set(resolved, cg);
+      return cg;
+    } catch {
+      return null;
+    }
   }
 
   async handle(toolName: string, args: Record<string, unknown>): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
@@ -127,11 +233,15 @@ export class ToolHandler {
   }
 
   private async dispatch(toolName: string, args: Record<string, unknown>): Promise<string> {
-    if (!this.cg) return 'KiroGraph not initialized. Run `kirograph init` in your project first.';
+    const cg = await this.getConnection(args.projectPath as string | undefined);
+    if (!cg) return 'KiroGraph not initialized. Run `kirograph init` in your project first.';
+
+    // Write session marker so hooks can detect MCP was consulted
+    writeSessionMarker(cg.getProjectRoot());
 
     switch (toolName) {
       case 'kirograph_search': {
-        const results = this.cg.searchNodes(
+        const results = cg.searchNodes(
           args.query as string,
           args.kind as NodeKind | undefined,
           (args.limit as number) ?? 10
@@ -143,7 +253,7 @@ export class ToolHandler {
       }
 
       case 'kirograph_context': {
-        const ctx = await this.cg.buildContext(args.task as string, {
+        const ctx = await cg.buildContext(args.task as string, {
           maxNodes: (args.maxNodes as number) ?? 20,
           includeCode: (args.includeCode as boolean) ?? true,
         });
@@ -165,10 +275,10 @@ export class ToolHandler {
       }
 
       case 'kirograph_callers': {
-        const results = this.cg.searchNodes(args.symbol as string, undefined, 5);
+        const results = cg.searchNodes(args.symbol as string, undefined, 5);
         if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
         const node = results[0].node;
-        const callers = this.cg.getCallers(node.id, (args.limit as number) ?? 20);
+        const callers = cg.getCallers(node.id, (args.limit as number) ?? 20);
         if (callers.length === 0) return `No callers found for \`${node.name}\`.`;
         return `Callers of \`${node.name}\`:\n` + callers.map(n =>
           `- ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`
@@ -176,10 +286,10 @@ export class ToolHandler {
       }
 
       case 'kirograph_callees': {
-        const results = this.cg.searchNodes(args.symbol as string, undefined, 5);
+        const results = cg.searchNodes(args.symbol as string, undefined, 5);
         if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
         const node = results[0].node;
-        const callees = this.cg.getCallees(node.id, (args.limit as number) ?? 20);
+        const callees = cg.getCallees(node.id, (args.limit as number) ?? 20);
         if (callees.length === 0) return `\`${node.name}\` doesn't call any indexed symbols.`;
         return `\`${node.name}\` calls:\n` + callees.map(n =>
           `- ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`
@@ -187,17 +297,17 @@ export class ToolHandler {
       }
 
       case 'kirograph_impact': {
-        const results = this.cg.searchNodes(args.symbol as string, undefined, 5);
+        const results = cg.searchNodes(args.symbol as string, undefined, 5);
         if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
         const node = results[0].node;
-        const affected = this.cg.getImpactRadius(node.id, (args.depth as number) ?? 2);
+        const affected = cg.getImpactRadius(node.id, (args.depth as number) ?? 2);
         if (affected.length === 0) return `No dependents found for \`${node.name}\`.`;
         return `Changing \`${node.name}\` may affect ${affected.length} symbol(s):\n` +
           affected.map(n => `- ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
       }
 
       case 'kirograph_node': {
-        const results = this.cg.searchNodes(args.symbol as string, undefined, 5);
+        const results = cg.searchNodes(args.symbol as string, undefined, 5);
         if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
         const node = results[0].node;
         const lines = [
@@ -208,22 +318,84 @@ export class ToolHandler {
           node.docstring ? `Docs: ${node.docstring}` : '',
         ].filter(Boolean);
         if (args.includeCode) {
-          const src = this.cg.getNodeSource(node);
+          const src = cg.getNodeSource(node);
           if (src) lines.push('', '```', src, '```');
         }
         return lines.join('\n');
       }
 
       case 'kirograph_status': {
-        const stats = this.cg.getStats();
+        const stats = cg.getStats();
         return [
           `KiroGraph Status`,
-          `  Project: ${this.cg.getProjectRoot()}`,
+          `  Project: ${cg.getProjectRoot()}`,
           `  Files indexed: ${stats.files}`,
           `  Symbols: ${stats.nodes}`,
           `  Relationships: ${stats.edges}`,
           `  By kind: ${Object.entries(stats.nodesByKind).map(([k, v]) => `${k}=${v}`).join(', ')}`,
         ].join('\n');
+      }
+
+      case 'kirograph_files': {
+        const tree = cg.getFiles({
+          filterPath: args.filterPath as string | undefined,
+          pattern: args.pattern as string | undefined,
+          maxDepth: args.maxDepth as number | undefined,
+        });
+        const lines: string[] = [];
+        function renderTree(nodes: import('../index').FileTreeNode[], prefix: string): void {
+          for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            const isLast = i === nodes.length - 1;
+            const connector = isLast ? '└── ' : '├── ';
+            const childPrefix = prefix + (isLast ? '    ' : '│   ');
+            const meta = node.type === 'file' && node.language
+              ? `  [${node.language}${node.symbolCount ? ` · ${node.symbolCount} symbols` : ''}]`
+              : '';
+            lines.push(`${prefix}${connector}${node.name}${meta}`);
+            if (node.children?.length) renderTree(node.children, childPrefix);
+          }
+        }
+        renderTree(tree, '');
+        return lines.length > 0 ? lines.join('\n') : 'No indexed files found.';
+      }
+
+      case 'kirograph_dead_code': {
+        const dead = cg.findDeadCode((args.limit as number) ?? 50);
+        if (dead.length === 0) return 'No dead code detected.';
+        return `Potential dead code (${dead.length} symbols with no incoming references):\n` +
+          dead.map(n => `- ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
+      }
+
+      case 'kirograph_circular_deps': {
+        const cycles = cg.findCircularDependencies();
+        if (cycles.length === 0) return 'No circular dependencies found.';
+        return `Found ${cycles.length} circular dependency cycle(s):\n` +
+          cycles.map((cycle, i) => `Cycle ${i + 1}: ${cycle.join(' → ')}`).join('\n');
+      }
+
+      case 'kirograph_path': {
+        const fromResults = cg.searchNodes(args.from as string, undefined, 3);
+        const toResults = cg.searchNodes(args.to as string, undefined, 3);
+        if (fromResults.length === 0) return `Symbol "${args.from}" not found in index.`;
+        if (toResults.length === 0) return `Symbol "${args.to}" not found in index.`;
+        const fromNode = fromResults[0].node;
+        const toNode = toResults[0].node;
+        const pathNodes = cg.findPath(fromNode.id, toNode.id);
+        if (pathNodes.length === 0) return `No path found between \`${fromNode.name}\` and \`${toNode.name}\`.`;
+        return `Path from \`${fromNode.name}\` to \`${toNode.name}\` (${pathNodes.length} nodes):\n` +
+          pathNodes.map((n, i) => `${i + 1}. ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
+      }
+
+      case 'kirograph_type_hierarchy': {
+        const results = cg.searchNodes(args.symbol as string, undefined, 5);
+        if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
+        const node = results[0].node;
+        const direction = (args.direction as 'up' | 'down' | 'both') ?? 'both';
+        const hierarchy = cg.getTypeHierarchy(node.id, direction);
+        if (hierarchy.length === 0) return `No type hierarchy found for \`${node.name}\`.`;
+        return `Type hierarchy for \`${node.name}\` (direction: ${direction}):\n` +
+          hierarchy.map(n => `- ${n.kind} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
       }
 
       default:

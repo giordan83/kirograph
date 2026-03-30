@@ -3,7 +3,7 @@
  *
  * Wires up:
  *  1. .kiro/settings/mcp.json  — registers the MCP server
- *  2. .kiro/hooks/*.json       — auto-sync on file save/create/delete
+ *  2. .kiro/hooks/*.json       — auto-sync on file save/create/delete (via mark-dirty + sync-if-dirty)
  *  3. .kiro/steering/kirograph.md — teaches Kiro to use the graph tools
  */
 
@@ -48,6 +48,11 @@ function writeMcpConfig(kiroDir: string): void {
       'kirograph_impact',
       'kirograph_node',
       'kirograph_status',
+      'kirograph_files',
+      'kirograph_dead_code',
+      'kirograph_circular_deps',
+      'kirograph_path',
+      'kirograph_type_hierarchy',
     ],
   };
   writeJson(mcpPath, existing);
@@ -56,36 +61,43 @@ function writeMcpConfig(kiroDir: string): void {
 
 // ── Kiro Hooks ────────────────────────────────────────────────────────────────
 
+const FILE_PATTERNS = [
+  '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx',
+  '**/*.py', '**/*.go', '**/*.rs', '**/*.java',
+  '**/*.cs', '**/*.rb', '**/*.php', '**/*.swift',
+  '**/*.kt', '**/*.dart',
+];
+
 const HOOKS: Array<{ filename: string; hook: object }> = [
   {
-    filename: 'kirograph-sync-on-save.json',
+    filename: 'kirograph-mark-dirty-on-save.json',
     hook: {
-      name: 'KiroGraph Sync on Save',
+      name: 'KiroGraph Mark Dirty on Save',
       version: '1.0.0',
-      description: 'Incrementally sync the KiroGraph index when source files are saved.',
+      description: 'Mark the KiroGraph index as dirty when source files are saved. Sync is deferred to agent idle.',
       when: {
         type: 'fileEdited',
-        patterns: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.py', '**/*.go', '**/*.rs', '**/*.java', '**/*.cs', '**/*.rb', '**/*.php'],
+        patterns: FILE_PATTERNS,
       },
       then: {
         type: 'runCommand',
-        command: 'kirograph sync --quiet 2>/dev/null || true',
+        command: 'kirograph mark-dirty 2>/dev/null || true',
       },
     },
   },
   {
-    filename: 'kirograph-sync-on-create.json',
+    filename: 'kirograph-mark-dirty-on-create.json',
     hook: {
-      name: 'KiroGraph Sync on Create',
+      name: 'KiroGraph Mark Dirty on Create',
       version: '1.0.0',
-      description: 'Index newly created source files.',
+      description: 'Mark the KiroGraph index as dirty when source files are created.',
       when: {
         type: 'fileCreated',
-        patterns: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.py', '**/*.go', '**/*.rs', '**/*.java', '**/*.cs', '**/*.rb', '**/*.php'],
+        patterns: FILE_PATTERNS,
       },
       then: {
         type: 'runCommand',
-        command: 'kirograph sync --quiet 2>/dev/null || true',
+        command: 'kirograph mark-dirty 2>/dev/null || true',
       },
     },
   },
@@ -94,14 +106,29 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
     hook: {
       name: 'KiroGraph Sync on Delete',
       version: '1.0.0',
-      description: 'Remove deleted files from the KiroGraph index.',
+      description: 'Remove deleted files from the KiroGraph index immediately.',
       when: {
         type: 'fileDeleted',
-        patterns: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.py', '**/*.go', '**/*.rs', '**/*.java', '**/*.cs', '**/*.rb', '**/*.php'],
+        patterns: FILE_PATTERNS,
       },
       then: {
         type: 'runCommand',
-        command: 'kirograph sync --quiet 2>/dev/null || true',
+        command: 'kirograph sync-if-dirty 2>/dev/null || true',
+      },
+    },
+  },
+  {
+    filename: 'kirograph-sync-if-dirty.json',
+    hook: {
+      name: 'KiroGraph Deferred Sync',
+      version: '1.0.0',
+      description: 'Sync the KiroGraph index when the agent is idle and a dirty marker is present. Batches multiple rapid saves into one sync.',
+      when: {
+        type: 'onIdle',
+      },
+      then: {
+        type: 'runCommand',
+        command: 'kirograph sync-if-dirty --quiet 2>/dev/null || true',
       },
     },
   },
@@ -110,6 +137,17 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
 function writeHooks(kiroDir: string): void {
   const hooksDir = path.join(kiroDir, 'hooks');
   ensureDir(hooksDir);
+
+  // Remove old sync hooks that are now replaced
+  const oldHooks = [
+    'kirograph-sync-on-save.json',
+    'kirograph-sync-on-create.json',
+  ];
+  for (const old of oldHooks) {
+    const p = path.join(hooksDir, old);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+
   for (const { filename, hook } of HOOKS) {
     writeJson(path.join(hooksDir, filename), hook);
   }
@@ -139,6 +177,11 @@ Use KiroGraph MCP tools for exploration instead of grep/glob/file reads:
 | \`kirograph_impact\` | See what's affected by changing a symbol |
 | \`kirograph_node\` | Get details + source code for a symbol |
 | \`kirograph_status\` | Check index health and statistics |
+| \`kirograph_files\` | List the indexed file structure |
+| \`kirograph_dead_code\` | Find symbols with no incoming references |
+| \`kirograph_circular_deps\` | Detect circular import dependencies |
+| \`kirograph_path\` | Find the shortest path between two symbols |
+| \`kirograph_type_hierarchy\` | Traverse class/interface inheritance |
 
 ### Workflow
 
@@ -146,6 +189,8 @@ Use KiroGraph MCP tools for exploration instead of grep/glob/file reads:
 2. Use \`kirograph_search\` instead of grep for finding symbols.
 3. Use \`kirograph_callers\`/\`kirograph_callees\` to trace code flow.
 4. Use \`kirograph_impact\` before making changes to understand blast radius.
+5. Use \`kirograph_files\` to explore the project structure.
+6. Use \`kirograph_dead_code\` to identify unused code before refactoring.
 
 ### If \`.kirograph/\` does NOT exist
 
@@ -201,7 +246,7 @@ export async function runInstaller(): Promise<void> {
         onProgress: p => process.stdout.write(`\r    ${p.phase} ${p.current}/${p.total}   `),
       });
       process.stdout.write('\n');
-      console.log(`  ✓ Indexed ${result.filesIndexed} files, ${result.nodesCreated} symbols`);
+      console.log(`  ✓ Indexed ${result.filesIndexed} files, ${result.nodesCreated} symbols, ${result.edgesCreated} edges`);
       cg.close();
     }
 

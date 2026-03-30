@@ -76,7 +76,9 @@ CREATE TABLE IF NOT EXISTS unresolved_refs (
   source_id TEXT NOT NULL,
   ref_name TEXT NOT NULL,
   ref_kind TEXT NOT NULL,
-  file_path TEXT NOT NULL
+  file_path TEXT NOT NULL,
+  line INTEGER,
+  column INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_unresolved_source ON unresolved_refs(source_id);

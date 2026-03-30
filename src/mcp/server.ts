@@ -88,6 +88,7 @@ export class MCPServer {
 
   private stop(): void {
     this.cg?.close();
+    this.toolHandler.closeAll();
     process.exit(0);
   }
 }

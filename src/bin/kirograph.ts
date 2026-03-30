@@ -311,6 +311,55 @@ program
     cg.close();
   });
 
+// ── mark-dirty ────────────────────────────────────────────────────────────────
+program
+  .command('mark-dirty [projectPath]')
+  .description('Write a dirty marker to trigger deferred sync')
+  .action(async (projectPath: string | undefined) => {
+    const KiroGraph = (await import('../index')).default;
+    const target = path.resolve(projectPath ?? process.cwd());
+    if (!KiroGraph.isInitialized(target)) { process.exit(0); }
+    const cg = await KiroGraph.open(target);
+    cg.markDirty();
+    cg.close();
+  });
+
+// ── sync-if-dirty ─────────────────────────────────────────────────────────────
+program
+  .command('sync-if-dirty [projectPath]')
+  .description('Sync only if a dirty marker is present')
+  .option('-q, --quiet', 'Suppress output')
+  .action(async (projectPath: string | undefined, opts: { quiet?: boolean }) => {
+    const KiroGraph = (await import('../index')).default;
+    const target = path.resolve(projectPath ?? process.cwd());
+    if (!KiroGraph.isInitialized(target)) { process.exit(0); }
+    const cg = await KiroGraph.open(target);
+    const result = await cg.syncIfDirty();
+    if (!opts.quiet) {
+      if (result) {
+        console.log(`Sync: +${result.added.length} ~${result.modified.length} -${result.removed.length} (${result.duration}ms)`);
+      } else {
+        console.log('Not dirty, skipped.');
+      }
+    }
+    cg.close();
+  });
+
+// ── unlock ────────────────────────────────────────────────────────────────────
+program
+  .command('unlock [projectPath]')
+  .description('Force-release a stale KiroGraph lock file')
+  .action(async (projectPath: string | undefined) => {
+    const lockPath = path.join(path.resolve(projectPath ?? process.cwd()), '.kirograph', 'kirograph.lock');
+    if (!fs.existsSync(lockPath)) {
+      console.log('No lock file found.');
+      return;
+    }
+    const content = fs.readFileSync(lockPath, 'utf8').trim();
+    fs.unlinkSync(lockPath);
+    console.log(`Lock released (was held by: ${content}).`);
+  });
+
 // ── install ───────────────────────────────────────────────────────────────────
 program
   .command('install')

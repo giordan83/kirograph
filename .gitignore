@@ -8,6 +8,9 @@ dist/
 .kirograph/
 .kiro
 
+# claude
+.claude
+
 # map
 *.js.map
 
