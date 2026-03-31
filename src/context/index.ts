@@ -11,6 +11,7 @@ import type { GraphDatabase } from '../db/database';
 import type { ReferenceResolver } from '../resolution/index';
 import type { VectorManager } from '../vectors/index';
 import { logDebug } from '../errors';
+import { extractSearchTerms } from '../search/query-utils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ export class ContextBuilder {
   async findRelevantContext(query: string, opts?: ContextOptions): Promise<Node[]> {
     const maxNodes = opts?.maxNodes ?? DEFAULT_MAX_NODES;
 
-    const tokens = extractTokens(query);
+    const tokens = extractSearchTerms(query);
     logDebug('ContextBuilder.findRelevantContext', { query, tokens });
 
     const ranked: RankedNode[] = [];
@@ -182,16 +183,6 @@ export class ContextBuilder {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Extract symbol tokens from a query string.
- * Splits on non-alphanumeric characters and filters out short tokens.
- */
-function extractTokens(query: string): string[] {
-  return query
-    .split(/[^a-zA-Z0-9_$]+/)
-    .filter(t => t.length >= 2);
-}
 
 /**
  * Get the best available snippet for a node, truncated to maxSize.

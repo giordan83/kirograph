@@ -6,11 +6,10 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import * as crypto from 'crypto';
-import { execFileSync } from 'child_process';
 import { GraphDatabase } from './db/database';
+import { scanDirectory, hashContent, getChangedFiles } from './sync/index';
+import { extractSearchTerms, scorePathRelevance, kindBonus, STOP_WORDS } from './search/query-utils';
 import { extractFile } from './extraction/extractor';
-import { detectLanguage } from './extraction/languages';
 import type {
   Node, NodeKind, IndexResult, IndexProgress, SyncResult, TaskContext, SearchResult,
   SearchOptions, NodeContext, NodeMetrics,
@@ -91,41 +90,10 @@ const LOCK_STALE_MS = 5 * 60 * 1000;
 
 // KiroGraphConfig is imported from ./config
 
-const STOP_WORDS = new Set([
-  'the','and','for','with','from','this','that','have','been','will','would',
-  'could','should','does','done','make','made','use','used','using','work',
-  'works','find','found','show','call','called','get','set','add','all','any',
-  'how','what','when','where','which','who','why','fix','bug','code','file',
-  'files','function','method','class','type','build','run','test','a','an','in',
-  'of','to','is','it','by','on','at','as','or','be','do','if','no','so','up',
-]);
-
 const FEATURE_REQUEST_WORDS = new Set([
   'add','create','implement','build','make','new','feature','support','enable','allow',
   'introduce','generate','write','develop','design','extend',
 ]);
-
-function extractTokens(query: string): string[] {
-  const tokens = new Set<string>();
-  // CamelCase / PascalCase
-  for (const m of query.matchAll(/\b([A-Z][a-z]+(?:[A-Z][a-z]*)*|[a-z]+(?:[A-Z][a-z]*)+)\b/g))
-    if (m[1].length >= 2) tokens.add(m[1]);
-  // snake_case
-  for (const m of query.matchAll(/\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b/gi))
-    if (m[1].length >= 3) tokens.add(m[1]);
-  // SCREAMING_SNAKE
-  for (const m of query.matchAll(/\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/g))
-    if (m[1].length >= 3) tokens.add(m[1]);
-  // dot.notation — add both full and parts
-  for (const m of query.matchAll(/\b([a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)+)\b/g)) {
-    tokens.add(m[1]);
-    for (const part of m[1].split('.')) tokens.add(part);
-  }
-  // plain words >= 4 chars
-  for (const m of query.matchAll(/\b([a-zA-Z]{4,})\b/g))
-    if (!STOP_WORDS.has(m[1].toLowerCase())) tokens.add(m[1]);
-  return [...tokens];
-}
 
 function isFeatureRequest(task: string): boolean {
   const words = task.toLowerCase().split(/\s+/);
@@ -257,7 +225,7 @@ export default class KiroGraph {
 
   // ── Indexing ───────────────────────────────────────────────────────────────
 
-  async indexAll(opts?: { onProgress?: (p: IndexProgress) => void; force?: boolean }): Promise<IndexResult> {
+  async indexAll(opts?: { onProgress?: (p: IndexProgress) => void; force?: boolean; signal?: AbortSignal }): Promise<IndexResult> {
     const release = await this.mutex.acquire();
     this.acquireLock();
     const start = Date.now();
@@ -267,7 +235,7 @@ export default class KiroGraph {
     let edgesCreated = 0;
 
     try {
-      const files = this.scanFiles();
+      const files = await scanDirectory(this.projectRoot, this.config, opts?.signal);
       opts?.onProgress?.({ phase: 'scanning', current: files.length, total: files.length });
 
       // Batch read files in parallel (FILE_IO_BATCH_SIZE at a time)
@@ -296,7 +264,7 @@ export default class KiroGraph {
           if (!opts?.force) {
             const existing = this.db.getFile(relPath);
             if (existing) {
-              const hash = crypto.createHash('sha256').update(content).digest('hex');
+              const hash = hashContent(content);
               if (hash === existing.contentHash) continue;
             }
           }
@@ -366,20 +334,21 @@ export default class KiroGraph {
       if (changedFiles) {
         filesToProcess = changedFiles.map(f => path.resolve(this.projectRoot, f));
       } else {
-        const gitChanged = this.getGitChangedFiles();
-        if (gitChanged) {
+        const gitChanged = await getChangedFiles(this.projectRoot, this.config);
+        const hasChanges = gitChanged.added.length > 0 || gitChanged.modified.length > 0 || gitChanged.removed.length > 0;
+        if (hasChanges) {
           // Process git-detected changes
-          for (const p of gitChanged.deleted) {
+          for (const p of gitChanged.removed) {
             const rel = path.relative(this.projectRoot, p).replace(/\\/g, '/');
             this.db.deleteFile(rel);
             this.db.deleteUnresolvedRefsByFile(rel);
             result.removed.push(rel);
           }
-          filesToProcess = gitChanged.modified;
+          filesToProcess = [...gitChanged.added, ...gitChanged.modified];
         } else {
           // Fallback: full scan + detect removed files
           const indexed = new Set(this.db.getAllFiles().map(f => f.path));
-          const current = new Set(this.scanFiles().map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/')));
+          const current = new Set((await scanDirectory(this.projectRoot, this.config)).map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/')));
           for (const p of indexed) {
             if (!current.has(p)) {
               this.db.deleteFile(p);
@@ -387,7 +356,7 @@ export default class KiroGraph {
               result.removed.push(p);
             }
           }
-          filesToProcess = this.scanFiles();
+          filesToProcess = await scanDirectory(this.projectRoot, this.config);
         }
       }
 
@@ -651,142 +620,6 @@ export default class KiroGraph {
   close(): void {
     this.releaseLock();
     this.db.close();
-  }
-
-  // ── File Scanning ──────────────────────────────────────────────────────────
-
-  /**
-   * Try to use git ls-files for fast, .gitignore-aware file discovery.
-   * Falls back to filesystem walk if git is unavailable.
-   */
-  private scanFiles(): string[] {
-    // Try git fast-path
-    try {
-      const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-        cwd: this.projectRoot,
-        encoding: 'utf8',
-        timeout: 10_000,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
-      const relPaths = output.split('\n').filter(Boolean);
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const picomatch = require('picomatch');
-      const excludeMatchers = this.buildExcludeMatchers(picomatch);
-      const includeMatcher = this.buildIncludeMatcher(picomatch);
-      return relPaths
-        .filter(rel => {
-          if (excludeMatchers.some((m: (s: string) => boolean) => m(rel) || m(rel + '/'))) return false;
-          if (includeMatcher && !includeMatcher(rel)) return false;
-          return true;
-        })
-        .map(rel => path.join(this.projectRoot, rel))
-        .filter(abs => {
-          const lang = detectLanguage(abs);
-          return lang !== 'unknown';
-        });
-    } catch {
-      // Fall through to filesystem walk
-    }
-
-    return this.scanFilesWalk();
-  }
-
-  /**
-   * Filesystem walk fallback. Respects .kirographignore files.
-   */
-  private scanFilesWalk(): string[] {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const picomatch = require('picomatch');
-    const excludeMatchers = this.buildExcludeMatchers(picomatch);
-    const includeMatcher = this.buildIncludeMatcher(picomatch);
-    const results: string[] = [];
-    const visitedDirs = new Set<string>();
-
-    const walk = (dir: string) => {
-      let realDir: string;
-      try { realDir = fs.realpathSync(dir); } catch { return; }
-      if (visitedDirs.has(realDir)) return; // symlink cycle protection
-      visitedDirs.add(realDir);
-
-      // Check for .kirographignore in this directory
-      const ignoreFile = path.join(dir, '.kirographignore');
-      if (fs.existsSync(ignoreFile)) return;
-
-      let entries: fs.Dirent[];
-      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-      for (const entry of entries) {
-        const full = path.join(dir, entry.name);
-        const rel = path.relative(this.projectRoot, full).replace(/\\/g, '/');
-        if (excludeMatchers.some((m: (s: string) => boolean) => m(rel) || m(rel + '/'))) continue;
-        if (entry.isDirectory()) {
-          walk(full);
-        } else if (entry.isFile()) {
-          if (includeMatcher && !includeMatcher(rel)) continue;
-          const lang = detectLanguage(full);
-          if (lang !== 'unknown') results.push(full);
-        }
-      }
-    };
-    walk(this.projectRoot);
-    return results;
-  }
-
-  private buildExcludeMatchers(picomatch: any): ((s: string) => boolean)[] {
-    const patterns = [...this.config.exclude];
-
-    // Also load .kirographignore from project root
-    const rootIgnore = path.join(this.projectRoot, '.kirographignore');
-    if (fs.existsSync(rootIgnore)) {
-      const lines = fs.readFileSync(rootIgnore, 'utf8')
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l && !l.startsWith('#'));
-      patterns.push(...lines);
-    }
-
-    return patterns.map((p: string) => picomatch(p));
-  }
-
-  private buildIncludeMatcher(picomatch: any): ((s: string) => boolean) | null {
-    if (!this.config.include || this.config.include.length === 0) return null;
-    const matchers = this.config.include.map((p: string) => picomatch(p));
-    return (s: string) => matchers.some((m: (s: string) => boolean) => m(s));
-  }
-
-  /**
-   * Use `git status --porcelain` to detect changed/deleted files since last commit.
-   * Returns null if git is unavailable.
-   */
-  private getGitChangedFiles(): { modified: string[]; deleted: string[] } | null {
-    try {
-      const output = execFileSync('git', ['status', '--porcelain', '--no-renames'], {
-        cwd: this.projectRoot,
-        encoding: 'utf8',
-        timeout: 10_000,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
-
-      const modified: string[] = [];
-      const deleted: string[] = [];
-
-      for (const line of output.split('\n').filter(Boolean)) {
-        const status = line.slice(0, 2).trim();
-        const relPath = line.slice(3).trim();
-        const absPath = path.join(this.projectRoot, relPath);
-        const lang = detectLanguage(absPath);
-        if (lang === 'unknown') continue;
-
-        if (status === 'D') {
-          deleted.push(absPath);
-        } else {
-          modified.push(absPath);
-        }
-      }
-
-      return { modified, deleted };
-    } catch {
-      return null;
-    }
   }
 }
 

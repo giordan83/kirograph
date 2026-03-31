@@ -8,50 +8,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { Node, Edge, NodeKind, Language } from '../types';
-import { detectLanguage, GRAMMAR_MAP, isSupportedLanguage } from './languages';
-
-// Lazy-loaded tree-sitter — initialized once, sequentially to avoid WASM race on Node 20+
-let parserLib: any = null;
-let parserInitPromise: Promise<void> | null = null;
-const loadedGrammars = new Map<string, any>();
-
-async function initParser(): Promise<void> {
-  if (parserLib) return;
-  if (parserInitPromise) return parserInitPromise;
-  parserInitPromise = (async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const TreeSitter = require('web-tree-sitter');
-    await TreeSitter.Parser.init();
-    parserLib = TreeSitter;
-  })();
-  return parserInitPromise;
-}
-
-// Grammar loads are serialized to prevent WASM race condition on Node 20+
-let grammarLoadChain = Promise.resolve();
-
-async function getGrammar(language: Language): Promise<any | null> {
-  if (loadedGrammars.has(language)) return loadedGrammars.get(language)!;
-  const grammarName = GRAMMAR_MAP[language];
-  if (!grammarName) return null;
-
-  return new Promise((resolve) => {
-    grammarLoadChain = grammarLoadChain.then(async () => {
-      if (loadedGrammars.has(language)) { resolve(loadedGrammars.get(language)!); return; }
-      try {
-        await initParser();
-        const wasmDir = path.join(require.resolve('tree-sitter-wasms/package.json'), '..', 'out');
-        const wasmPath = path.join(wasmDir, `${grammarName}.wasm`);
-        if (!fs.existsSync(wasmPath)) { resolve(null); return; }
-        const lang = await parserLib.Language.load(wasmPath);
-        loadedGrammars.set(language, lang);
-        resolve(lang);
-      } catch {
-        resolve(null);
-      }
-    });
-  });
-}
+import { detectLanguage, isSupportedLanguage } from './languages';
+import { initGrammars, getParser } from './grammars';
 
 export interface UnresolvedRef {
   sourceId: string;
@@ -115,8 +73,9 @@ export async function extractFile(filePath: string, projectRoot: string, content
   const fileSize = Buffer.byteLength(source, 'utf8');
   const relPath = path.relative(projectRoot, filePath).replace(/\\/g, '/');
 
-  const grammar = await getGrammar(language);
-  if (!grammar) {
+  await initGrammars();
+  const parser = await getParser(language);
+  if (!parser) {
     // Pascal, Liquid, or missing grammar — track file but no AST extraction
     return {
       filePath: relPath,
@@ -129,9 +88,6 @@ export async function extractFile(filePath: string, projectRoot: string, content
     };
   }
 
-  await initParser();
-  const parser = new parserLib.Parser();
-  parser.setLanguage(grammar);
   const tree = parser.parse(source);
 
   const nodes: Node[] = [];
