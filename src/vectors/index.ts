@@ -20,6 +20,7 @@ import type { Node } from '../types';
 import type { GraphDatabase } from '../db/database';
 import { VecIndex } from './vec-index';
 import { OramaIndex } from './orama-index';
+import { PGliteIndex } from './pglite-index';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export class VectorManager {
   private _initialized = false;
   private vecIndex: VecIndex | null = null;
   private oramaIndex: OramaIndex | null = null;
+  private pgliteIndex: PGliteIndex | null = null;
 
   constructor(
     private readonly db: GraphDatabase,
@@ -162,6 +164,12 @@ export class VectorManager {
         logDebug(this.oramaIndex.isAvailable()
           ? 'VectorManager: Orama hybrid index ready'
           : 'VectorManager: Orama unavailable, falling back to in-process cosine');
+      } else if (engine === 'pglite') {
+        this.pgliteIndex = new PGliteIndex(kirographDir, EMBEDDING_DIM);
+        await this.pgliteIndex.initialize();
+        logDebug(this.pgliteIndex.isAvailable()
+          ? 'VectorManager: PGlite+pgvector hybrid index ready'
+          : 'VectorManager: PGlite unavailable, falling back to in-process cosine');
       }
     }
   }
@@ -182,9 +190,13 @@ export class VectorManager {
       const text = `search_document: ${nodeToText(node)}`;
       const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
       const embedding = toFloat32Array(output.data);
-      this.db.storeEmbedding(node.id, embedding, this.config.embeddingModel || DEFAULT_MODEL);
+      // pglite is the sole store of record when active — skip the SQLite vectors table
+      if (!this.pgliteIndex?.isAvailable()) {
+        this.db.storeEmbedding(node.id, embedding, this.config.embeddingModel || DEFAULT_MODEL);
+      }
       this.vecIndex?.upsert(node.id, embedding);
       if (this.oramaIndex?.isAvailable()) await this.oramaIndex.upsert(node, embedding);
+      if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
     } catch (err) {
       logWarn('Failed to embed node', { nodeId: node.id, error: String(err) });
     }
@@ -194,18 +206,21 @@ export class VectorManager {
   async vecIndexCount(): Promise<number> {
     if (this.vecIndex?.isAvailable()) return this.vecIndex.count();
     if (this.oramaIndex?.isAvailable()) return this.oramaIndex.count();
+    if (this.pgliteIndex?.isAvailable()) return this.pgliteIndex.count();
     return 0;
   }
 
   /**
-   * Remove embeddings for the given node IDs from the vec index.
-   * The `vectors` table in the main DB is cleaned up automatically via FK cascade
-   * when nodes are deleted; this only needs to handle the sqlite-vec side.
+   * Remove embeddings for the given node IDs from the active index.
+   * For cosine/sqlite-vec/orama the `vectors` SQLite table is cleaned up automatically
+   * via FK cascade when nodes are deleted. For pglite, pglite itself is the store
+   * of record so we delete from it explicitly here.
    */
   async deleteEmbeddings(nodeIds: string[]): Promise<void> {
     for (const id of nodeIds) {
       this.vecIndex?.delete(id);
       if (this.oramaIndex?.isAvailable()) await this.oramaIndex.delete(id);
+      if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.delete(id);
     }
   }
 
@@ -218,7 +233,12 @@ export class VectorManager {
 
     const modelId = this.config.embeddingModel || DEFAULT_MODEL;
     const allNodes = this.db.getAllNodes().filter(n => EMBEDDABLE_KINDS.has(n.kind));
-    const existingIds = new Set(this.db.getEmbeddedNodeIds());
+    // When pglite is active it is the sole store — query it directly instead of SQLite
+    const existingIds = new Set(
+      this.pgliteIndex?.isAvailable()
+        ? await this.pgliteIndex.getEmbeddedNodeIds()
+        : this.db.getEmbeddedNodeIds()
+    );
     const pending = allNodes.filter(n => !existingIds.has(n.id));
 
     if (pending.length === 0) {
@@ -241,9 +261,13 @@ export class VectorManager {
         for (let j = 0; j < batch.length; j++) {
           const node = batch[j]!;
           const embedding = flat.slice(j * dim, (j + 1) * dim);
-          this.db.storeEmbedding(node.id, embedding, modelId);
+          // pglite is the sole store of record when active — skip the SQLite vectors table
+          if (!this.pgliteIndex?.isAvailable()) {
+            this.db.storeEmbedding(node.id, embedding, modelId);
+          }
           this.vecIndex?.upsert(node.id, embedding);
           if (this.oramaIndex?.isAvailable()) await this.oramaIndex.upsert(node, embedding);
+          if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
         }
       } catch (err) {
         logWarn('VectorManager: batch embedding failed', { batchStart: i, error: String(err) });
@@ -277,7 +301,10 @@ export class VectorManager {
 
       let nodeIds: string[];
 
-      if (this.oramaIndex?.isAvailable()) {
+      if (this.pgliteIndex?.isAvailable()) {
+        // Hybrid search via PGlite+pgvector — exact vector + full-text in one SQL query
+        nodeIds = await this.pgliteIndex.search(query, queryVec, topN);
+      } else if (this.oramaIndex?.isAvailable()) {
         // Hybrid search via Orama — full-text + vector combined
         nodeIds = await this.oramaIndex.search(query, queryVec, topN);
       } else if (this.vecIndex?.isAvailable()) {

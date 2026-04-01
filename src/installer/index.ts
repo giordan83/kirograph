@@ -77,6 +77,7 @@ async function askString(
 import { KiroGraphConfig, updateConfig } from '../config';
 
 type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'extractDocstrings' | 'trackCallSites'> & { embeddingModel?: string };
+type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
 
@@ -108,14 +109,16 @@ async function promptConfigOptions(rl: readline.Interface): Promise<ConfigPatch>
     console.log(`\n  ${dim}Choose the semantic search engine:${reset}`);
     console.log(`  ${dim}  1) cosine     — in-process cosine similarity. No extra deps. Best for small/medium projects.${reset}`);
     console.log(`  ${dim}  2) sqlite-vec — ANN index. Sub-linear search. Best for large codebases. Needs native deps (better-sqlite3, sqlite-vec).${reset}`);
-    console.log(`  ${dim}  3) orama      — Hybrid search (full-text + vector). Best result quality. Pure JS. Needs @orama/orama, @orama/plugin-data-persistence.${reset}`);
-    let semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' = 'cosine';
+    console.log(`  ${dim}  3) orama      — Hybrid search (full-text + vector). Pure JS. Needs @orama/orama, @orama/plugin-data-persistence.${reset}`);
+    console.log(`  ${dim}  4) pglite     — Hybrid search via PostgreSQL + pgvector. Exact results. Pure WASM. Needs @electric-sql/pglite.${reset}`);
+    let semanticEngine: SemanticEngine = 'cosine';
     while (true) {
-      const raw = (await ask(rl, `  ${violet}Engine [1/2/3]:${reset} ${dim}(1)${reset} `)).trim();
+      const raw = (await ask(rl, `  ${violet}Engine [1/2/3/4]:${reset} ${dim}(1)${reset} `)).trim();
       if (raw === '' || raw === '1') { semanticEngine = 'cosine'; break; }
       if (raw === '2') { semanticEngine = 'sqlite-vec'; break; }
       if (raw === '3') { semanticEngine = 'orama'; break; }
-      console.log(`  Please enter 1, 2, or 3.`);
+      if (raw === '4') { semanticEngine = 'pglite'; break; }
+      console.log(`  Please enter 1, 2, 3, or 4.`);
     }
     patch.semanticEngine = semanticEngine;
     patch.useVecIndex = semanticEngine === 'sqlite-vec'; // keep legacy field in sync
@@ -411,6 +414,18 @@ export async function runInstaller(): Promise<void> {
           } else {
             console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
             console.warn(`    npm install @orama/orama @orama/plugin-data-persistence`);
+          }
+        } else if (patch.semanticEngine === 'pglite') {
+          console.log(`\n  Installing PGlite dependencies...`);
+          const result = spawnSync('npm', ['install', '@electric-sql/pglite'], {
+            stdio: 'inherit',
+            shell: true,
+          });
+          if (result.status === 0) {
+            console.log(`  ✓ @electric-sql/pglite installed`);
+          } else {
+            console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
+            console.warn(`    npm install @electric-sql/pglite`);
           }
         }
       }

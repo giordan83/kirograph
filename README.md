@@ -363,7 +363,7 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `trackCallSites` | boolean | `true` | Record line/column for call edges |
 | `enableEmbeddings` | boolean | `false` | Generate semantic embeddings (opt-in, ~130MB model) |
 | `embeddingModel` | string | `nomic-ai/nomic-embed-text-v1.5` | HuggingFace model for embeddings |
-| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, or `orama` (see below) |
+| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, or `pglite` (see below) |
 | `useVecIndex` | boolean | `false` | Deprecated alias for `semanticEngine: "sqlite-vec"` |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 | `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
@@ -390,7 +390,8 @@ Use `kirograph install` to be guided through engine selection interactively, or 
 |--------|---------|-------|------------|----------|
 | `cosine` *(default)* | good | linear scan | none | small / medium projects |
 | `sqlite-vec` | good | sub-linear ANN | `better-sqlite3`, `sqlite-vec` (native) | large codebases |
-| `orama` | **best** | fast | `@orama/orama`, `@orama/plugin-data-persistence` (pure JS) | best result quality |
+| `orama` | **best** | fast | `@orama/orama`, `@orama/plugin-data-persistence` (pure JS) | best result quality, no native deps |
+| `pglite` | **best** | fast (HNSW) | `@electric-sql/pglite` (pure WASM) | exact results, no native deps, PostgreSQL semantics |
 
 #### cosine (default)
 
@@ -436,6 +437,29 @@ npm install @orama/orama @orama/plugin-data-persistence
 ```
 
 If the dependencies are not installed, KiroGraph silently falls back to `cosine`.
+
+#### pglite
+
+Hybrid search powered by [PGlite](https://github.com/electric-sql/pglite) — a WASM-compiled PostgreSQL with the [pgvector](https://github.com/pgvector/pgvector) extension. Combines exact nearest-neighbour vector search with full-text ranking (`ts_rank`) in a **single SQL query**. The database is persisted to `.kirograph/pglite/` using PostgreSQL's WAL-based storage. Pure WASM — no native compilation required.
+
+```json
+{
+  "enableEmbeddings": true,
+  "semanticEngine": "pglite"
+}
+```
+
+```bash
+npm install @electric-sql/pglite
+```
+
+Key advantages over other engines:
+- **Exact** vector results (not approximate) — deterministic and reproducible
+- Native SQL `ON CONFLICT` upsert — no remove+insert workaround
+- HNSW index (`vector_cosine_ops`) keeps search fast as the index grows
+- Single dependency, zero native binaries
+
+If the dependency is not installed, KiroGraph silently falls back to `cosine`.
 
 ## Supported Languages
 

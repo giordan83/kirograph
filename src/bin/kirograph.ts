@@ -200,6 +200,7 @@ program
       const engineLabel =
         stats.semanticEngine === 'sqlite-vec' ? `sqlite-vec  ${dim}(${stats.vecIndexCount} entries in ANN index)${reset}` :
         stats.semanticEngine === 'orama'      ? `orama  ${dim}(hybrid — ${stats.vecIndexCount} docs in index)${reset}` :
+        stats.semanticEngine === 'pglite'     ? `pglite+pgvector  ${dim}(hybrid — ${stats.vecIndexCount} rows in DB)${reset}` :
         `in-process cosine`;
       const coverage = stats.nodes > 0 ? Math.round((stats.embeddingCount / stats.nodes) * 100) : 0;
       console.log(`  ${label('Status')}     ${green}${bold}enabled${reset}`);

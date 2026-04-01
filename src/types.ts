@@ -104,7 +104,7 @@ export interface GraphStats {
   embeddingsEnabled: boolean;
   embeddingModel: string;
   useVecIndex: boolean;
-  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama';
+  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' | 'pglite';
   vecIndexCount: number;
   frameworks: string[];
 }

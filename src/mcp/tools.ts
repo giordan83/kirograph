@@ -370,6 +370,7 @@ export class ToolHandler {
               `  Semantic engine: ${
                 stats.semanticEngine === 'sqlite-vec' ? `sqlite-vec (${stats.vecIndexCount} entries in ANN index)` :
                 stats.semanticEngine === 'orama'      ? `orama hybrid (${stats.vecIndexCount} docs in index)` :
+                stats.semanticEngine === 'pglite'     ? `pglite+pgvector (${stats.vecIndexCount} rows in DB)` :
                 'in-process cosine'
               }`,
               `  Embeddings:      ${stats.embeddingCount} / ${stats.nodes} symbols`,

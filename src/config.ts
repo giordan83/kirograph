@@ -25,7 +25,7 @@ export interface KiroGraphConfig {
   embeddingModel: string;
   /** @deprecated Use semanticEngine instead. Kept for backwards compatibility. */
   useVecIndex: boolean;
-  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama';
+  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' | 'pglite';
   minLogLevel: 'debug' | 'info' | 'warn' | 'error';
   frameworkHints: string[];
   fuzzyResolutionThreshold: number; // 0.0–1.0
@@ -121,7 +121,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
   const useVecIndex = typeof raw.useVecIndex === 'boolean'
     ? raw.useVecIndex
     : defaults.useVecIndex;
-  const SEMANTIC_ENGINES = new Set(['cosine', 'sqlite-vec', 'orama']);
+  const SEMANTIC_ENGINES = new Set(['cosine', 'sqlite-vec', 'orama', 'pglite']);
   // useVecIndex is a legacy alias: if set and no explicit semanticEngine, map it
   const rawEngine = typeof raw.semanticEngine === 'string' && SEMANTIC_ENGINES.has(raw.semanticEngine)
     ? (raw.semanticEngine as KiroGraphConfig['semanticEngine'])

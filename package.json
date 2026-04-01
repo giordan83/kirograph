@@ -38,6 +38,7 @@
     "web-tree-sitter": "^0.25.3"
   },
   "optionalDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@orama/orama": "^3.1.18",
     "@orama/plugin-data-persistence": "^3.1.18",
     "better-sqlite3": "^11.10.0",
