@@ -208,14 +208,16 @@ program
         stats.semanticEngine === 'orama'      ? `orama  ${dim}(hybrid — ${stats.vecIndexCount} docs in index)${reset}` :
         stats.semanticEngine === 'pglite'     ? `pglite+pgvector  ${dim}(hybrid — ${stats.vecIndexCount} rows in DB)${reset}` :
         `in-process cosine`;
-      const coverage = stats.nodes > 0 ? Math.round((stats.embeddingCount / stats.nodes) * 100) : 0;
+      const total = stats.embeddableNodeCount > 0 ? stats.embeddableNodeCount : stats.nodes;
+      const displayed = Math.min(stats.embeddingCount, total);
+      const coverage = total > 0 ? Math.min(100, Math.round((stats.embeddingCount / total) * 100)) : 0;
       console.log(`  ${label('Status')}     ${green}${bold}enabled${reset}`);
       console.log(`  ${label('Model')}      ${value(stats.embeddingModel)}`);
       console.log(`  ${label('Engine')}     ${violet}${engineLabel}${reset}`);
       if (stats.engineFallback) {
         console.log(`  ${'\x1b[33m'}⚠ engine fallback: ${stats.engineFallback}${reset}`);
       }
-      console.log(`  ${label('Indexed')}    ${value(`${stats.embeddingCount} / ${stats.nodes}`)}  ${dim}(${coverage}%)${reset}`);
+      console.log(`  ${label('Indexed')}    ${value(`${displayed} / ${total}`)}  ${dim}(${coverage}%)${reset}`);
     } else {
       console.log(`  ${label('Status')}     ${dim}disabled${reset}`);
     }

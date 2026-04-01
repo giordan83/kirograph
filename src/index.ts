@@ -272,6 +272,11 @@ export default class KiroGraph {
           const extracted = await extractFile(file, this.projectRoot, content);
           if (!extracted) continue;
 
+          const oldNodes = this.db.getNodesByFile(extracted.filePath);
+          if (oldNodes.length > 0) {
+            await this.vectors.deleteEmbeddings(oldNodes.map(n => n.id));
+          }
+
           this.db.transaction(() => {
             this.db.deleteNodesByFile(extracted.filePath);
             this.db.deleteUnresolvedRefsByFile(extracted.filePath);
@@ -620,13 +625,22 @@ export default class KiroGraph {
 
   async getStats() {
     const stats = this.db.getStats();
+    const vecIndexCount = await this.vectors.vecIndexCount();
+    // For non-cosine engines the SQLite vectors table is never written to,
+    // so use the engine's own count as the authoritative embedding count.
+    const embeddingCount = vecIndexCount > 0 ? vecIndexCount : stats.embeddingCount;
+    // Only a subset of node kinds are embedded — show coverage against that subset, not all nodes.
+    const EMBEDDABLE = ['function', 'method', 'class', 'interface', 'type_alias', 'component', 'module'];
+    const embeddableNodeCount = EMBEDDABLE.reduce((sum, k) => sum + (stats.nodesByKind[k] ?? 0), 0);
     return {
       ...stats,
+      embeddingCount,
+      embeddableNodeCount,
       embeddingsEnabled: this.config.enableEmbeddings ?? false,
       embeddingModel: this.config.embeddingModel,
       useVecIndex: this.config.useVecIndex ?? false,
       semanticEngine: this.config.semanticEngine ?? 'cosine',
-      vecIndexCount: await this.vectors.vecIndexCount(),
+      vecIndexCount,
       engineFallback: this.vectors.getEngineFallback(),
       frameworks: this.config.frameworkHints ?? [],
     };

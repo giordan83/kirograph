@@ -373,7 +373,7 @@ export class ToolHandler {
                 stats.semanticEngine === 'pglite'     ? `pglite+pgvector (${stats.vecIndexCount} rows in DB)` :
                 'in-process cosine'
               }`,
-              `  Embeddings:      ${stats.embeddingCount} / ${stats.nodes} symbols`,
+              `  Embeddings:      ${stats.embeddingCount} / ${stats.embeddableNodeCount || stats.nodes} embeddable symbols`,
               ...(stats.engineFallback ? [`  ⚠ Engine fallback: ${stats.engineFallback}`] : []),
             ]
           : [`  Semantic search: disabled`];

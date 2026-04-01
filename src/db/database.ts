@@ -692,7 +692,7 @@ export class GraphDatabase {
     let dbSizeBytes = 0;
     try { dbSizeBytes = fs.statSync(dbPath).size; } catch { /* ignore */ }
     const embeddingCount = this.getEmbeddingCount();
-    return { files, nodes, edges, nodesByKind, filesByLanguage, dbSizeBytes, embeddingCount, embeddingsEnabled: false, embeddingModel: '', useVecIndex: false, semanticEngine: 'cosine' as const, vecIndexCount: 0, engineFallback: null, frameworks: [] };
+    return { files, nodes, edges, nodesByKind, filesByLanguage, dbSizeBytes, embeddingCount, embeddingsEnabled: false, embeddingModel: '', useVecIndex: false, semanticEngine: 'cosine' as const, vecIndexCount: 0, engineFallback: null, embeddableNodeCount: 0, frameworks: [] };
   }
 
   // ── Transactions ──────────────────────────────────────────────────────────

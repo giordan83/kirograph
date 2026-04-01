@@ -101,6 +101,7 @@ export interface GraphStats {
   filesByLanguage: Record<string, number>;
   dbSizeBytes: number;
   embeddingCount: number;
+  embeddableNodeCount: number;
   embeddingsEnabled: boolean;
   embeddingModel: string;
   useVecIndex: boolean;
