@@ -190,8 +190,8 @@ export class VectorManager {
       const text = `search_document: ${nodeToText(node)}`;
       const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
       const embedding = toFloat32Array(output.data);
-      // pglite is the sole store of record when active — skip the SQLite vectors table
-      if (!this.pgliteIndex?.isAvailable()) {
+      // sqlite-vec and pglite are sole stores of record when active — skip the SQLite vectors table
+      if (!this.vecIndex?.isAvailable() && !this.pgliteIndex?.isAvailable()) {
         this.db.storeEmbedding(node.id, embedding, this.config.embeddingModel || DEFAULT_MODEL);
       }
       this.vecIndex?.upsert(node.id, embedding);
@@ -233,11 +233,13 @@ export class VectorManager {
 
     const modelId = this.config.embeddingModel || DEFAULT_MODEL;
     const allNodes = this.db.getAllNodes().filter(n => EMBEDDABLE_KINDS.has(n.kind));
-    // When pglite is active it is the sole store — query it directly instead of SQLite
+    // When sqlite-vec or pglite is active it is the sole store — query it directly instead of SQLite
     const existingIds = new Set(
       this.pgliteIndex?.isAvailable()
         ? await this.pgliteIndex.getEmbeddedNodeIds()
-        : this.db.getEmbeddedNodeIds()
+        : this.vecIndex?.isAvailable()
+          ? this.vecIndex.getEmbeddedNodeIds()
+          : this.db.getEmbeddedNodeIds()
     );
     const pending = allNodes.filter(n => !existingIds.has(n.id));
 
@@ -261,8 +263,8 @@ export class VectorManager {
         for (let j = 0; j < batch.length; j++) {
           const node = batch[j]!;
           const embedding = flat.slice(j * dim, (j + 1) * dim);
-          // pglite is the sole store of record when active — skip the SQLite vectors table
-          if (!this.pgliteIndex?.isAvailable()) {
+          // sqlite-vec and pglite are sole stores of record when active — skip the SQLite vectors table
+          if (!this.vecIndex?.isAvailable() && !this.pgliteIndex?.isAvailable()) {
             this.db.storeEmbedding(node.id, embedding, modelId);
           }
           this.vecIndex?.upsert(node.id, embedding);

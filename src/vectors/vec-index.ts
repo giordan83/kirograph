@@ -181,6 +181,17 @@ export class VecIndex {
     }
   }
 
+  /** Return all node IDs currently stored in the index. */
+  getEmbeddedNodeIds(): string[] {
+    if (!this._available || !this.db) return [];
+    try {
+      const rows = this.db.prepare('SELECT node_id FROM vec_nodes_map').all();
+      return rows.map((r: any) => r.node_id as string);
+    } catch {
+      return [];
+    }
+  }
+
   /** Returns the number of entries currently in the vec index. */
   count(): number {
     if (!this._available || !this.db) return 0;
