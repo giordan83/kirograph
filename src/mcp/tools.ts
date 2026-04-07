@@ -373,6 +373,7 @@ export class ToolHandler {
                 stats.semanticEngine === 'pglite'     ? `pglite+pgvector (${stats.vecIndexCount} rows in DB)` :
                 stats.semanticEngine === 'lancedb'    ? `lancedb (${stats.vecIndexCount} entries in ANN index)` :
                 stats.semanticEngine === 'qdrant'     ? `qdrant (${stats.vecIndexCount} points in collection)` :
+                stats.semanticEngine === 'typesense'  ? `typesense (${stats.vecIndexCount} documents in collection)` :
                 'in-process cosine'
               }`,
               `  Embeddings:      ${stats.embeddingCount} / ${stats.embeddableNodeCount || stats.nodes} embeddable symbols`,

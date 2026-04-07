@@ -49,6 +49,7 @@ These embeddings power natural-language search in `kirograph_context` and act as
 | `pglite` | `.kirograph/pglite/` | Hybrid (full-text + vector), exact | `@electric-sql/pglite` (WASM) |
 | `lancedb` | `.kirograph/lancedb/` | ANN (approximate), sub-linear | `@lancedb/lancedb` (pure JS) |
 | `qdrant` | `.kirograph/qdrant/` | ANN (HNSW), sub-linear | `qdrant-local` (embedded binary) |
+| `typesense` | `.kirograph/typesense/` | ANN (HNSW), sub-linear | `typesense` (auto-downloaded binary) |
 
 Each engine owns its embedding store exclusively — nothing is written to the SQLite `vectors` table when a non-cosine engine is active. If an engine's optional dependency is not installed, KiroGraph silently falls back to `cosine`.
 
@@ -397,6 +398,31 @@ if [ -n "$AFFECTED" ]; then
 fi
 ```
 
+### Typesense Engine
+
+When `semanticEngine` is set to `typesense`, use these commands to manage the background server and dashboard.
+
+```bash
+kirograph typesense start [path]   # Start server (if not running) and open local dashboard
+kirograph typesense stop [path]    # Stop the Typesense server
+```
+
+**`typesense start`**
+
+- If the Typesense server is already running for this project, reconnects to it.
+- If not running, downloads the binary (first time only, ~37 MB, cached at `~/.kirograph/bin/`) and starts it.
+- Downloads the [Typesense Dashboard](https://github.com/bfritscher/typesense-dashboard) static UI on first use (cached at `.kirograph/typesense/dashboard/`).
+- Serves the dashboard locally and opens it in your browser.
+- Prints the Node URL and API key to use in the dashboard connection form.
+- Keep the process running while using the dashboard; press Ctrl+C to stop the dashboard server (the Typesense server keeps running as a background daemon).
+
+**`typesense stop`**
+
+- Sends SIGTERM to the Typesense background process and removes the state file.
+- Does nothing if no server is running.
+
+The Typesense server runs as a background daemon — it persists across `kg` commands. The state file (`.kirograph/typesense-server.json`) tracks the PID and port so every command can reconnect instantly without restarting.
+
 ### MCP Server
 
 ```bash
@@ -418,7 +444,7 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `trackCallSites` | boolean | `true` | Record line/column for call edges |
 | `enableEmbeddings` | boolean | `false` | Generate semantic embeddings (opt-in, ~130MB model) |
 | `embeddingModel` | string | `nomic-ai/nomic-embed-text-v1.5` | HuggingFace model for embeddings |
-| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, or `qdrant` (see below) |
+| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, `qdrant`, or `typesense` (see below) |
 | `useVecIndex` | boolean | `false` | Deprecated alias for `semanticEngine: "sqlite-vec"` |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 | `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
@@ -451,6 +477,7 @@ Each engine owns its embedding store exclusively — there is no redundant write
 | `pglite` | `kirograph.db` (SQLite) | `.kirograph/pglite/` (PGlite+pgvector) |
 | `lancedb` | `kirograph.db` (SQLite) | `.kirograph/lancedb/` (Apache Lance) |
 | `qdrant` | `kirograph.db` (SQLite) | `.kirograph/qdrant/` (Qdrant embedded) |
+| `typesense` | `kirograph.db` (SQLite) | `.kirograph/typesense/` (Typesense embedded) |
 
 The graph store (`kirograph.db`) always holds nodes, edges, files, and all structural data regardless of which engine is active.
 
@@ -464,6 +491,7 @@ The graph store (`kirograph.db`) always holds nodes, edges, files, and all struc
 | `pglite` | Hybrid (full-text + vector), exact | `@electric-sql/pglite` | no (pure WASM) | Exact results, no native deps, PostgreSQL semantics |
 | `lancedb` | ANN (approximate), sub-linear | `@lancedb/lancedb` | no (pure JS) | Fast ANN search, no native compilation required |
 | `qdrant` | ANN (HNSW), sub-linear | `qdrant-local` | yes (binary) | Full Qdrant feature set, HNSW index, embedded binary |
+| `typesense` | ANN (HNSW), sub-linear | `typesense` | yes (binary) | Fast ANN search, auto-downloaded binary, no manual install |
 
 All non-cosine engines fall back silently to `cosine` if their optional dependencies are not installed.
 
@@ -580,6 +608,39 @@ Key characteristics:
 - Data persists across restarts in `.kirograph/qdrant/`
 
 If not installed, falls back to `cosine`.
+
+#### typesense
+
+ANN vector search powered by [Typesense](https://github.com/typesense/typesense) running in embedded mode. The engine automatically downloads the Typesense server binary (~37 MB, cached at `~/.kirograph/bin/`) on first use and spawns it as a managed child process. Uses the official [`typesense`](https://www.npmjs.com/package/typesense) Node.js client.
+
+```json
+{
+  "enableEmbeddings": true,
+  "semanticEngine": "typesense"
+}
+```
+
+```bash
+npm install typesense
+```
+
+Key characteristics:
+- **HNSW index** — high-quality ANN search with Typesense's native indexing
+- **Auto-downloaded binary** — no manual server setup; the binary is fetched and cached at `~/.kirograph/bin/` on first run
+- **Persistent daemon** — the server stays running between `kg` commands; state tracked in `.kirograph/typesense-server.json`
+- **Local dashboard** — run `kg typesense start` to open the built-in Typesense Dashboard UI (served locally, cached at `.kirograph/typesense/dashboard/`)
+- **Async startup** — polls `/health` instead of blocking with a fixed sleep
+- **Cosine distance** metric
+- Data persists across restarts in `.kirograph/typesense/`
+
+Manage the server:
+
+```bash
+kirograph typesense start   # start server + open dashboard
+kirograph typesense stop    # stop server
+```
+
+If not installed (or binary download fails), falls back to `cosine`.
 
 ## Supported Languages
 

@@ -23,6 +23,7 @@ import { OramaIndex } from './orama-index';
 import { PGliteIndex } from './pglite-index';
 import { LanceDBIndex } from './lancedb-index';
 import { QdrantIndex } from './qdrant-index';
+import { TypesenseIndex } from './typesense-index';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ export class VectorManager {
   private pgliteIndex: PGliteIndex | null = null;
   private lancedbIndex: LanceDBIndex | null = null;
   private qdrantIndex: QdrantIndex | null = null;
+  private typesenseIndex: TypesenseIndex | null = null;
   private _engineFallback: string | null = null;
 
   constructor(
@@ -207,6 +209,18 @@ export class VectorManager {
           this._engineFallback = 'qdrant unavailable — run: npm install qdrant-local';
           logDebug('VectorManager: Qdrant unavailable, falling back to in-process cosine');
         }
+      } else if (engine === 'typesense') {
+        this.typesenseIndex = new TypesenseIndex(kirographDir, EMBEDDING_DIM);
+        await this.typesenseIndex.initialize();
+        if (this.typesenseIndex.isAvailable()) {
+          logDebug('VectorManager: Typesense ANN index ready');
+        } else {
+          const reason = this.typesenseIndex.getFailReason();
+          this._engineFallback = reason
+            ? `typesense initialization failed: ${reason}`
+            : 'typesense unavailable — run: npm install typesense';
+          logDebug('VectorManager: Typesense unavailable, falling back to in-process cosine');
+        }
       }
     }
   }
@@ -228,7 +242,7 @@ export class VectorManager {
       const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
       const embedding = toFloat32Array(output.data);
       // non-cosine engines are sole stores of record when active — skip the SQLite vectors table
-      if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable()) {
+      if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable() && !this.typesenseIndex?.isAvailable()) {
         this.db.storeEmbedding(node.id, embedding, this.config.embeddingModel || DEFAULT_MODEL);
       }
       this.vecIndex?.upsert(node.id, embedding);
@@ -236,6 +250,7 @@ export class VectorManager {
       if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
       if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.upsert(node, embedding);
       if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.upsert(node, embedding);
+      if (this.typesenseIndex?.isAvailable()) await this.typesenseIndex.upsert(node, embedding);
     } catch (err) {
       logWarn('Failed to embed node', { nodeId: node.id, error: String(err) });
     }
@@ -248,6 +263,7 @@ export class VectorManager {
     if (this.pgliteIndex?.isAvailable()) return this.pgliteIndex.count();
     if (this.lancedbIndex?.isAvailable()) return this.lancedbIndex.count();
     if (this.qdrantIndex?.isAvailable()) return this.qdrantIndex.count();
+    if (this.typesenseIndex?.isAvailable()) return this.typesenseIndex.count();
     return 0;
   }
 
@@ -264,6 +280,7 @@ export class VectorManager {
       if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.delete(id);
       if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.delete(id);
       if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.delete(id);
+      if (this.typesenseIndex?.isAvailable()) await this.typesenseIndex.delete(id);
     }
   }
 
@@ -278,7 +295,9 @@ export class VectorManager {
     const allNodes = this.db.getAllNodes().filter(n => EMBEDDABLE_KINDS.has(n.kind));
     // When a non-cosine engine is active it is the sole store — query it directly instead of SQLite
     const existingIds = new Set(
-      this.qdrantIndex?.isAvailable()
+      this.typesenseIndex?.isAvailable()
+        ? await this.typesenseIndex.getEmbeddedNodeIds()
+        : this.qdrantIndex?.isAvailable()
         ? await this.qdrantIndex.getEmbeddedNodeIds()
         : this.lancedbIndex?.isAvailable()
         ? await this.lancedbIndex.getEmbeddedNodeIds()
@@ -309,11 +328,15 @@ export class VectorManager {
         const dim = dims[1] ?? EMBEDDING_DIM;
         const flat = toFloat32Array(outputs.data);
 
+        // Collect Typesense batch for bulk import (one HTTP request per batch)
+        const tsNodes: Node[] = [];
+        const tsEmbeddings: Float32Array[] = [];
+
         for (let j = 0; j < batch.length; j++) {
           const node = batch[j]!;
           const embedding = flat.slice(j * dim, (j + 1) * dim);
           // non-cosine engines are sole stores of record when active — skip the SQLite vectors table
-          if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable()) {
+          if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable() && !this.typesenseIndex?.isAvailable()) {
             this.db.storeEmbedding(node.id, embedding, modelId);
           }
           this.vecIndex?.upsert(node.id, embedding);
@@ -321,7 +344,10 @@ export class VectorManager {
           if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
           if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.upsert(node, embedding);
           if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.upsert(node, embedding);
+          if (this.typesenseIndex?.isAvailable()) { tsNodes.push(node); tsEmbeddings.push(embedding); }
         }
+
+        if (tsNodes.length > 0) await this.typesenseIndex!.bulkUpsert(tsNodes, tsEmbeddings);
       } catch (err) {
         logWarn('VectorManager: batch embedding failed', { batchStart: i, error: String(err) });
       }
@@ -366,6 +392,9 @@ export class VectorManager {
       } else if (this.qdrantIndex?.isAvailable()) {
         // ANN search via Qdrant — HNSW index, cosine metric
         nodeIds = await this.qdrantIndex.search(queryVec, topN);
+      } else if (this.typesenseIndex?.isAvailable()) {
+        // ANN search via Typesense — HNSW index, cosine metric
+        nodeIds = await this.typesenseIndex.search(queryVec, topN);
       } else if (this.vecIndex?.isAvailable()) {
         // ANN search via sqlite-vec — fast, sub-linear
         nodeIds = this.vecIndex.search(queryVec, topN);
@@ -395,5 +424,6 @@ export class VectorManager {
   /** Release engine resources (e.g. kill Qdrant child process). */
   close(): void {
     this.qdrantIndex?.close();
+    this.typesenseIndex?.close();
   }
 }

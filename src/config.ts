@@ -25,7 +25,8 @@ export interface KiroGraphConfig {
   embeddingModel: string;
   /** @deprecated Use semanticEngine instead. Kept for backwards compatibility. */
   useVecIndex: boolean;
-  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' | 'pglite' | 'lancedb' | 'qdrant';
+  semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' | 'pglite' | 'lancedb' | 'qdrant' | 'typesense';
+  typesenseDashboard: boolean;
   minLogLevel: 'debug' | 'info' | 'warn' | 'error';
   frameworkHints: string[];
   fuzzyResolutionThreshold: number; // 0.0–1.0
@@ -39,7 +40,7 @@ const CONFIG_FILE = 'config.json';
 const KNOWN_FIELDS = new Set<string>([
   'version', 'languages', 'include', 'exclude', 'maxFileSize',
   'extractDocstrings', 'trackCallSites', 'enableEmbeddings', 'embeddingModel', 'useVecIndex', 'semanticEngine',
-  'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
+  'typesenseDashboard', 'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
 ]);
 
 const LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
@@ -74,6 +75,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     embeddingModel: 'nomic-ai/nomic-embed-text-v1.5',
     useVecIndex: false,
     semanticEngine: 'cosine',
+    typesenseDashboard: false,
     minLogLevel: 'warn',
     frameworkHints: [],
     fuzzyResolutionThreshold: 0.5,
@@ -121,12 +123,15 @@ export function validateConfig(config: unknown): KiroGraphConfig {
   const useVecIndex = typeof raw.useVecIndex === 'boolean'
     ? raw.useVecIndex
     : defaults.useVecIndex;
-  const SEMANTIC_ENGINES = new Set(['cosine', 'sqlite-vec', 'orama', 'pglite', 'lancedb', 'qdrant']);
+  const SEMANTIC_ENGINES = new Set(['cosine', 'sqlite-vec', 'orama', 'pglite', 'lancedb', 'qdrant', 'typesense']);
   // useVecIndex is a legacy alias: if set and no explicit semanticEngine, map it
   const rawEngine = typeof raw.semanticEngine === 'string' && SEMANTIC_ENGINES.has(raw.semanticEngine)
     ? (raw.semanticEngine as KiroGraphConfig['semanticEngine'])
     : useVecIndex ? 'sqlite-vec' : defaults.semanticEngine;
   const semanticEngine = rawEngine;
+  const typesenseDashboard = typeof raw.typesenseDashboard === 'boolean'
+    ? raw.typesenseDashboard
+    : defaults.typesenseDashboard;
   const minLogLevel = typeof raw.minLogLevel === 'string' && LOG_LEVELS.has(raw.minLogLevel)
     ? (raw.minLogLevel as KiroGraphConfig['minLogLevel'])
     : defaults.minLogLevel;
@@ -155,6 +160,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     embeddingModel,
     useVecIndex,
     semanticEngine,
+    typesenseDashboard,
     minLogLevel,
     frameworkHints,
     fuzzyResolutionThreshold,

@@ -13,11 +13,13 @@ import { spawnSync } from 'child_process';
 import { updateConfig } from '../../config';
 import { printBanner } from '../banner';
 import { renderIndexProgress } from '../progress';
+import { dim, reset } from '../ui';
 import { ask } from './prompts';
 import { promptConfigOptions } from './config-prompt';
 import { writeMcpConfig } from './mcp';
 import { writeHooks } from './hooks';
 import { writeSteering } from './steering';
+import { openTypesenseDashboard } from './dashboard';
 
 export async function runInstaller(): Promise<void> {
   printBanner();
@@ -99,6 +101,16 @@ export async function runInstaller(): Promise<void> {
             console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
             console.warn(`    npm install qdrant-local`);
           }
+        } else if (patch.semanticEngine === 'typesense') {
+          console.log(`\n  Installing Typesense dependencies...`);
+          const result = spawnSync('npm', ['install', 'typesense'], { stdio: 'inherit', shell: true });
+          if (result.status === 0) {
+            console.log(`  ✓ typesense installed`);
+            console.log(`  ℹ  The Typesense binary (~37MB) will be auto-downloaded on first index run.`);
+          } else {
+            console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
+            console.warn(`    npm install typesense`);
+          }
         }
       }
       console.log(`  • extractDocstrings: ${patch.extractDocstrings}`);
@@ -123,6 +135,13 @@ export async function runInstaller(): Promise<void> {
       process.stdout.write('\n');
       console.log(`  ✓ Indexed ${result.filesIndexed} files, ${result.nodesCreated} symbols, ${result.edgesCreated} edges`);
       cg.close();
+
+      if (patch.typesenseDashboard) {
+        await openTypesenseDashboard(cwd);
+        console.log(`  ${dim}Press Ctrl+C to stop the dashboard server when done.${reset}`);
+        process.on('SIGINT', () => { rl.close(); process.exit(0); });
+        return; // rl.close() handled via SIGINT
+      }
     }
 
     console.log('\n  Done! Restart Kiro for the MCP server to load.\n');
