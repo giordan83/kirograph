@@ -532,7 +532,7 @@ Key advantages:
 
 If not installed, falls back to `cosine`.
 
-#### lancedb
+#### LanceDB
 
 ANN vector search powered by [LanceDB](https://github.com/lancedb/lancedb) — stores embeddings in Apache Lance columnar format at `.kirograph/lancedb/`. Sub-linear search time using cosine distance. Pure JS, no native compilation required.
 

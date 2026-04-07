@@ -655,6 +655,7 @@ export default class KiroGraph {
   }
 
   close(): void {
+    this.vectors.close();
     this.releaseLock();
     this.db.close();
   }

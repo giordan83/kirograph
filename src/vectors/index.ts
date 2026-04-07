@@ -22,6 +22,7 @@ import { VecIndex } from './vec-index';
 import { OramaIndex } from './orama-index';
 import { PGliteIndex } from './pglite-index';
 import { LanceDBIndex } from './lancedb-index';
+import { QdrantIndex } from './qdrant-index';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export class VectorManager {
   private oramaIndex: OramaIndex | null = null;
   private pgliteIndex: PGliteIndex | null = null;
   private lancedbIndex: LanceDBIndex | null = null;
+  private qdrantIndex: QdrantIndex | null = null;
   private _engineFallback: string | null = null;
 
   constructor(
@@ -196,6 +198,15 @@ export class VectorManager {
           this._engineFallback = 'lancedb unavailable — run: npm install @lancedb/lancedb';
           logDebug('VectorManager: LanceDB unavailable, falling back to in-process cosine');
         }
+      } else if (engine === 'qdrant') {
+        this.qdrantIndex = new QdrantIndex(kirographDir, EMBEDDING_DIM);
+        await this.qdrantIndex.initialize();
+        if (this.qdrantIndex.isAvailable()) {
+          logDebug('VectorManager: Qdrant ANN index ready');
+        } else {
+          this._engineFallback = 'qdrant unavailable — run: npm install qdrant-local';
+          logDebug('VectorManager: Qdrant unavailable, falling back to in-process cosine');
+        }
       }
     }
   }
@@ -217,13 +228,14 @@ export class VectorManager {
       const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
       const embedding = toFloat32Array(output.data);
       // non-cosine engines are sole stores of record when active — skip the SQLite vectors table
-      if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable()) {
+      if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable()) {
         this.db.storeEmbedding(node.id, embedding, this.config.embeddingModel || DEFAULT_MODEL);
       }
       this.vecIndex?.upsert(node.id, embedding);
       if (this.oramaIndex?.isAvailable()) await this.oramaIndex.upsert(node, embedding);
       if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
       if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.upsert(node, embedding);
+      if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.upsert(node, embedding);
     } catch (err) {
       logWarn('Failed to embed node', { nodeId: node.id, error: String(err) });
     }
@@ -235,6 +247,7 @@ export class VectorManager {
     if (this.oramaIndex?.isAvailable()) return this.oramaIndex.count();
     if (this.pgliteIndex?.isAvailable()) return this.pgliteIndex.count();
     if (this.lancedbIndex?.isAvailable()) return this.lancedbIndex.count();
+    if (this.qdrantIndex?.isAvailable()) return this.qdrantIndex.count();
     return 0;
   }
 
@@ -250,6 +263,7 @@ export class VectorManager {
       if (this.oramaIndex?.isAvailable()) await this.oramaIndex.delete(id);
       if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.delete(id);
       if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.delete(id);
+      if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.delete(id);
     }
   }
 
@@ -264,7 +278,9 @@ export class VectorManager {
     const allNodes = this.db.getAllNodes().filter(n => EMBEDDABLE_KINDS.has(n.kind));
     // When a non-cosine engine is active it is the sole store — query it directly instead of SQLite
     const existingIds = new Set(
-      this.lancedbIndex?.isAvailable()
+      this.qdrantIndex?.isAvailable()
+        ? await this.qdrantIndex.getEmbeddedNodeIds()
+        : this.lancedbIndex?.isAvailable()
         ? await this.lancedbIndex.getEmbeddedNodeIds()
         : this.pgliteIndex?.isAvailable()
           ? await this.pgliteIndex.getEmbeddedNodeIds()
@@ -297,13 +313,14 @@ export class VectorManager {
           const node = batch[j]!;
           const embedding = flat.slice(j * dim, (j + 1) * dim);
           // non-cosine engines are sole stores of record when active — skip the SQLite vectors table
-          if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable()) {
+          if (!this.vecIndex?.isAvailable() && !this.oramaIndex?.isAvailable() && !this.pgliteIndex?.isAvailable() && !this.lancedbIndex?.isAvailable() && !this.qdrantIndex?.isAvailable()) {
             this.db.storeEmbedding(node.id, embedding, modelId);
           }
           this.vecIndex?.upsert(node.id, embedding);
           if (this.oramaIndex?.isAvailable()) await this.oramaIndex.upsert(node, embedding);
           if (this.pgliteIndex?.isAvailable()) await this.pgliteIndex.upsert(node, embedding);
           if (this.lancedbIndex?.isAvailable()) await this.lancedbIndex.upsert(node, embedding);
+          if (this.qdrantIndex?.isAvailable()) await this.qdrantIndex.upsert(node, embedding);
         }
       } catch (err) {
         logWarn('VectorManager: batch embedding failed', { batchStart: i, error: String(err) });
@@ -346,6 +363,9 @@ export class VectorManager {
       } else if (this.lancedbIndex?.isAvailable()) {
         // ANN search via LanceDB — columnar Lance format, cosine metric
         nodeIds = await this.lancedbIndex.search(queryVec, topN);
+      } else if (this.qdrantIndex?.isAvailable()) {
+        // ANN search via Qdrant — HNSW index, cosine metric
+        nodeIds = await this.qdrantIndex.search(queryVec, topN);
       } else if (this.vecIndex?.isAvailable()) {
         // ANN search via sqlite-vec — fast, sub-linear
         nodeIds = this.vecIndex.search(queryVec, topN);
@@ -370,5 +390,10 @@ export class VectorManager {
       logWarn('VectorManager: search failed', { error: String(err) });
       return [];
     }
+  }
+
+  /** Release engine resources (e.g. kill Qdrant child process). */
+  close(): void {
+    this.qdrantIndex?.close();
   }
 }

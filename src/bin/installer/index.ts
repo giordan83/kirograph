@@ -90,6 +90,15 @@ export async function runInstaller(): Promise<void> {
             console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
             console.warn(`    npm install @lancedb/lancedb`);
           }
+        } else if (patch.semanticEngine === 'qdrant') {
+          console.log(`\n  Installing Qdrant dependencies...`);
+          const result = spawnSync('npm', ['install', 'qdrant-local'], { stdio: 'inherit', shell: true });
+          if (result.status === 0) {
+            console.log(`  ✓ qdrant-local installed`);
+          } else {
+            console.warn(`  ✗ npm install failed (exit ${result.status}). Run manually:`);
+            console.warn(`    npm install qdrant-local`);
+          }
         }
       }
       console.log(`  • extractDocstrings: ${patch.extractDocstrings}`);

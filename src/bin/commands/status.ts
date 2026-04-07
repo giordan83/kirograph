@@ -42,6 +42,7 @@ export function register(program: Command): void {
           stats.semanticEngine === 'orama'      ? `orama  ${dim}(hybrid — ${stats.vecIndexCount} docs in index)${reset}` :
           stats.semanticEngine === 'pglite'     ? `pglite+pgvector  ${dim}(hybrid — ${stats.vecIndexCount} rows in DB)${reset}` :
           stats.semanticEngine === 'lancedb'    ? `lancedb  ${dim}(${stats.vecIndexCount} entries in ANN index)${reset}` :
+          stats.semanticEngine === 'qdrant'     ? `qdrant  ${dim}(${stats.vecIndexCount} points in collection)${reset}` :
           `in-process cosine`;
         const total = stats.embeddableNodeCount > 0 ? stats.embeddableNodeCount : stats.nodes;
         const displayed = Math.min(stats.embeddingCount, total);
