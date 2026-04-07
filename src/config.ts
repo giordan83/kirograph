@@ -27,6 +27,7 @@ export interface KiroGraphConfig {
   useVecIndex: boolean;
   semanticEngine: 'cosine' | 'sqlite-vec' | 'orama' | 'pglite' | 'lancedb' | 'qdrant' | 'typesense';
   typesenseDashboard: boolean;
+  qdrantDashboard: boolean;
   minLogLevel: 'debug' | 'info' | 'warn' | 'error';
   frameworkHints: string[];
   fuzzyResolutionThreshold: number; // 0.0–1.0
@@ -40,7 +41,7 @@ const CONFIG_FILE = 'config.json';
 const KNOWN_FIELDS = new Set<string>([
   'version', 'languages', 'include', 'exclude', 'maxFileSize',
   'extractDocstrings', 'trackCallSites', 'enableEmbeddings', 'embeddingModel', 'useVecIndex', 'semanticEngine',
-  'typesenseDashboard', 'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
+  'typesenseDashboard', 'qdrantDashboard', 'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
 ]);
 
 const LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
@@ -76,6 +77,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     useVecIndex: false,
     semanticEngine: 'cosine',
     typesenseDashboard: false,
+    qdrantDashboard: false,
     minLogLevel: 'warn',
     frameworkHints: [],
     fuzzyResolutionThreshold: 0.5,
@@ -132,6 +134,9 @@ export function validateConfig(config: unknown): KiroGraphConfig {
   const typesenseDashboard = typeof raw.typesenseDashboard === 'boolean'
     ? raw.typesenseDashboard
     : defaults.typesenseDashboard;
+  const qdrantDashboard = typeof raw.qdrantDashboard === 'boolean'
+    ? raw.qdrantDashboard
+    : defaults.qdrantDashboard;
   const minLogLevel = typeof raw.minLogLevel === 'string' && LOG_LEVELS.has(raw.minLogLevel)
     ? (raw.minLogLevel as KiroGraphConfig['minLogLevel'])
     : defaults.minLogLevel;
@@ -161,6 +166,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     useVecIndex,
     semanticEngine,
     typesenseDashboard,
+    qdrantDashboard,
     minLogLevel,
     frameworkHints,
     fuzzyResolutionThreshold,

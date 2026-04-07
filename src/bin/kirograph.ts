@@ -21,6 +21,7 @@ import { register as registerUnlock } from './commands/unlock';
 import { register as registerInstall } from './commands/install';
 import { register as registerServe } from './commands/serve';
 import { register as registerTypesense } from './commands/typesense';
+import { register as registerQdrant } from './commands/qdrant';
 
 const program = new Command();
 
@@ -49,6 +50,7 @@ registerAffected(program);
 registerUnlock(program);
 registerServe(program);
 registerTypesense(program);
+registerQdrant(program);
 
 // Show banner + help when called with no arguments, otherwise parse normally
 if (process.argv.length === 2) {

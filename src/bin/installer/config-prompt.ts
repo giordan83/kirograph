@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import { KiroGraphConfig } from '../../config';
 import { ask, askBool, arrowSelect, dim, reset, violet } from './prompts';
 
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'extractDocstrings' | 'trackCallSites'> & { embeddingModel?: string };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites'> & { embeddingModel?: string };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -18,7 +18,7 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     'Enables semantic/similarity-based code search. Increases indexing time and requires a compatible local embedding model (e.g. via Ollama).',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, extractDocstrings: true, trackCallSites: true };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true };
 
   if (enableEmbeddings) {
     console.log(`\n  ${dim}HuggingFace model identifier for generating embeddings (e.g. org/model-name).${reset}`);
@@ -51,7 +51,15 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
       patch.typesenseDashboard = await askBool(
         rl,
         'Open Typesense dashboard after indexing?',
-        'Opens the Typesense Dashboard (https://bfritscher.github.io/typesense-dashboard/) in your browser after indexing completes, pre-filled with the local server connection details.',
+        'Serves the Typesense Dashboard locally and opens it in your browser after indexing completes.',
+      );
+    }
+
+    if (semanticEngine === 'qdrant') {
+      patch.qdrantDashboard = await askBool(
+        rl,
+        'Open Qdrant dashboard after indexing?',
+        'Downloads the Qdrant Web UI (first time only) and opens it in your browser after indexing completes.',
       );
     }
   }

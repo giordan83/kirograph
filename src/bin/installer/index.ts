@@ -20,6 +20,7 @@ import { writeMcpConfig } from './mcp';
 import { writeHooks } from './hooks';
 import { writeSteering } from './steering';
 import { openTypesenseDashboard } from './dashboard';
+import { ensureQdrantUI, openQdrantDashboard } from './qdrant-dashboard';
 
 export async function runInstaller(): Promise<void> {
   printBanner();
@@ -121,7 +122,12 @@ export async function runInstaller(): Promise<void> {
       process.exit(1);
     }
 
-    // 5. Optionally init + index
+    // 5. Pre-download Qdrant UI before indexing so Qdrant starts with static content dir
+    if (patch.qdrantDashboard) {
+      await ensureQdrantUI(cwd);
+    }
+
+    // 6. Optionally init + index
     const doIndex = await ask(rl, '\n  Initialize and index this project now? (Y/n) ');
     if (doIndex.toLowerCase() !== 'n') {
       const KiroGraph = (await import('../../index')).default;
@@ -141,6 +147,10 @@ export async function runInstaller(): Promise<void> {
         console.log(`  ${dim}Press Ctrl+C to stop the dashboard server when done.${reset}`);
         process.on('SIGINT', () => { rl.close(); process.exit(0); });
         return; // rl.close() handled via SIGINT
+      }
+
+      if (patch.qdrantDashboard) {
+        await openQdrantDashboard(cwd);
       }
     }
 

@@ -32,8 +32,12 @@ import type { Node } from '../types';
 const DEFAULT_DIM  = 768;
 const STORAGE_DIR  = 'qdrant';
 const COLLECTION   = 'kg_nodes';
-const READYZ_TIMEOUT_MS = 10_000;
-const READYZ_POLL_MS    = 100;
+const READYZ_TIMEOUT_MS  = 10_000;
+const READYZ_POLL_MS     = 100;
+const SERVER_STATE_FILE  = 'qdrant-server.json';
+export const DASHBOARD_SUBDIR = 'qdrant/dashboard'; // relative to kirographDir
+
+interface ServerState { pid: number; port: number; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -83,17 +87,43 @@ export class QdrantIndex {
   private client: any       = null;
   private child:  any       = null;
   private _available        = false;
+  private _ownedProcess     = false;
   private storagePath:      string;
+  private stateFile:        string;
 
   constructor(
     private readonly kirographDir: string,
     private readonly dim = DEFAULT_DIM,
   ) {
     this.storagePath = path.join(kirographDir, STORAGE_DIR);
+    this.stateFile   = path.join(kirographDir, SERVER_STATE_FILE);
   }
 
-  isAvailable(): boolean {
-    return this._available;
+  isAvailable(): boolean { return this._available; }
+
+  private readState(): ServerState | null {
+    try { return JSON.parse(fs.readFileSync(this.stateFile, 'utf8')) as ServerState; }
+    catch { return null; }
+  }
+  private writeState(s: ServerState): void {
+    try { fs.writeFileSync(this.stateFile, JSON.stringify(s)); } catch { /* ignore */ }
+  }
+  private clearState(): void {
+    try { fs.unlinkSync(this.stateFile); } catch { /* ignore */ }
+  }
+  private isProcessAlive(pid: number): boolean {
+    try { process.kill(pid, 0); return true; } catch { return false; }
+  }
+
+  /** The HTTP port of the running server, or null if not available. */
+  getPort(): number | null {
+    if (this._available) {
+      const s = this.readState();
+      return s?.port ?? null;
+    }
+    const s = this.readState();
+    if (s && this.isProcessAlive(s.pid)) return s.port;
+    return null;
   }
 
   /**
@@ -132,11 +162,38 @@ export class QdrantIndex {
       return;
     }
 
-    // ── 3. Spawn Qdrant binary ────────────────────────────────────────────────
+    // ── 3. Try to reuse an already-running server ─────────────────────────────
+    const saved = this.readState();
+    if (saved) {
+      if (this.isProcessAlive(saved.pid)) {
+        try {
+          await waitReady(saved.port, 3_000);
+          this.client = new QdrantClient({ host: '127.0.0.1', port: saved.port, checkCompatibility: false });
+          await this.ensureCollection();
+          this._available    = true;
+          this._ownedProcess = false;
+          logDebug('QdrantIndex: reused running server', { pid: saved.pid, port: saved.port });
+          return;
+        } catch {
+          // Stale — kill and respawn
+          try { process.kill(saved.pid, 'SIGKILL'); } catch { /* ignore */ }
+          await new Promise(r => setTimeout(r, 300));
+        }
+      }
+      this.clearState();
+    }
+
+    // ── 4. Spawn Qdrant binary ────────────────────────────────────────────────
     try {
       fs.mkdirSync(this.storagePath, { recursive: true });
 
       const port = await getFreePort();
+
+      // Auto-serve dashboard if UI files are present
+      const dashboardDir = path.join(this.kirographDir, DASHBOARD_SUBDIR);
+      const staticEnv: Record<string, string> = fs.existsSync(dashboardDir)
+        ? { QDRANT__SERVICE__STATIC_CONTENT_DIR: dashboardDir }
+        : {};
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { spawn } = require('child_process');
@@ -144,43 +201,40 @@ export class QdrantIndex {
         stdio: 'ignore',
         env: {
           ...process.env,
-          QDRANT__SERVICE__HTTP_PORT:        String(port),
-          QDRANT__SERVICE__ENABLE_STATIC_CONTENT: '0',
-          QDRANT__STORAGE__STORAGE_PATH:     this.storagePath,
-          QDRANT__LOG_LEVEL:                 'WARN',
+          QDRANT__SERVICE__HTTP_PORT:    String(port),
+          QDRANT__STORAGE__STORAGE_PATH: this.storagePath,
+          QDRANT__LOG_LEVEL:             'WARN',
+          ...staticEnv,
         },
       });
 
       this.child.unref();
 
-      // Kill child when the parent exits
-      const cleanup = () => { try { this.child?.kill(); } catch { /* ignore */ } };
-      process.once('exit',    cleanup);
-      process.once('SIGINT',  cleanup);
-      process.once('SIGTERM', cleanup);
-
-      // ── 4. Wait until Qdrant is ready ──────────────────────────────────────
+      // ── 5. Wait until Qdrant is ready ──────────────────────────────────────
       await waitReady(port, READYZ_TIMEOUT_MS);
 
-      this.client = new QdrantClient({
-        host: '127.0.0.1',
-        port,
-        checkCompatibility: false,
-      });
+      this.writeState({ pid: this.child.pid, port });
 
-      // ── 5. Ensure collection exists ────────────────────────────────────────
-      const existsResult = await this.client.collectionExists(COLLECTION);
-      const exists = typeof existsResult === 'object' ? existsResult.exists : existsResult;
-      if (!exists) {
-        await this.client.createCollection(COLLECTION, {
-          vectors: { size: this.dim, distance: 'Cosine' },
-        });
-      }
+      this.client = new QdrantClient({ host: '127.0.0.1', port, checkCompatibility: false });
 
-      this._available = true;
+      // ── 6. Ensure collection exists ────────────────────────────────────────
+      await this.ensureCollection();
+
+      this._available    = true;
+      this._ownedProcess = true;
       logDebug('QdrantIndex: ready', { storagePath: this.storagePath, port, dim: this.dim });
     } catch (err) {
       logError('QdrantIndex: initialization failed', { error: String(err) });
+    }
+  }
+
+  private async ensureCollection(): Promise<void> {
+    const existsResult = await this.client.collectionExists(COLLECTION);
+    const exists = typeof existsResult === 'object' ? existsResult.exists : existsResult;
+    if (!exists) {
+      await this.client.createCollection(COLLECTION, {
+        vectors: { size: this.dim, distance: 'Cosine' },
+      });
     }
   }
 
@@ -272,13 +326,9 @@ export class QdrantIndex {
     return ids;
   }
 
-  /**
-   * Kill the Qdrant child process and release the HTTP connection so the
-   * Node.js event loop can drain immediately.
-   */
+  /** Disconnect the client. The Qdrant server keeps running as a daemon. */
   close(): void {
     this._available = false;
-    try { this.child?.kill(); } catch { /* ignore */ }
     this.child  = null;
     this.client = null;
   }

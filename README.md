@@ -398,6 +398,30 @@ if [ -n "$AFFECTED" ]; then
 fi
 ```
 
+### Qdrant Engine
+
+When `semanticEngine` is set to `qdrant`, use these commands to manage the background server and dashboard.
+
+```bash
+kirograph qdrant start [path]   # Start server (if not running) and open dashboard
+kirograph qdrant stop [path]    # Stop the Qdrant server
+```
+
+**`qdrant start`**
+
+- If the Qdrant server is already running for this project, reconnects to it.
+- If not running, spawns the Qdrant binary (from `qdrant-local`).
+- Downloads the [Qdrant Web UI](https://github.com/qdrant/qdrant-web-ui) on first use (cached at `.kirograph/qdrant/dashboard/`) and serves it via the Qdrant built-in static content feature.
+- Opens the dashboard in your browser at `http://127.0.0.1:<port>/dashboard`.
+- The Qdrant server keeps running as a background daemon after this command exits.
+
+**`qdrant stop`**
+
+- Sends SIGTERM to the Qdrant background process and removes the state file.
+- Does nothing if no server is running.
+
+The Qdrant server runs as a persistent daemon across `kg` commands. The state file (`.kirograph/qdrant-server.json`) tracks the PID and port. Once the Web UI is downloaded, it is served automatically on every subsequent start via `QDRANT__SERVICE__STATIC_CONTENT_DIR`.
+
 ### Typesense Engine
 
 When `semanticEngine` is set to `typesense`, use these commands to manage the background server and dashboard.
@@ -603,9 +627,18 @@ npm install qdrant-local
 Key characteristics:
 - **HNSW index** — high-quality ANN search with Qdrant's native indexing
 - **Embedded binary** — no separate server setup; the process is spawned and managed automatically
+- **Persistent daemon** — the server stays running between `kg` commands; state tracked in `.kirograph/qdrant-server.json`
+- **Built-in dashboard** — run `kg qdrant start` to download the [Qdrant Web UI](https://github.com/qdrant/qdrant-web-ui) and open it (cached at `.kirograph/qdrant/dashboard/`, served via Qdrant's built-in static content feature)
 - **Async startup** — polls `/readyz` instead of blocking with a fixed sleep
 - **Cosine distance** metric
 - Data persists across restarts in `.kirograph/qdrant/`
+
+Manage the server:
+
+```bash
+kirograph qdrant start   # start server + open dashboard
+kirograph qdrant stop    # stop server
+```
 
 If not installed, falls back to `cosine`.
 
