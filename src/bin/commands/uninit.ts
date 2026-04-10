@@ -25,7 +25,7 @@ async function runUninit(projectPath: string | undefined, opts: { force?: boolea
     printBanner();
     const farewell = UNINIT_FAREWELLS[Math.floor(Math.random() * UNINIT_FAREWELLS.length)]!;
     console.log(`  ${violet}${bold}${farewell}${reset}`);
-    console.log(`\n  ${dim}This will remove .kirograph/, all Kiro hooks, and the steering file.${reset}`);
+    console.log(`\n  ${dim}This will remove .kirograph/, all Kiro hooks, the steering file, and the CLI agent config.${reset}`);
     console.log(`  ${dim}Your source code is untouched.${reset}\n`);
     const readline = await import('readline');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -64,6 +64,13 @@ async function runUninit(projectPath: string | undefined, opts: { force?: boolea
   if (fs.existsSync(steeringPath)) {
     fs.unlinkSync(steeringPath);
     console.log(`  ${green}✓${reset} Removed .kiro/steering/kirograph.md`);
+  }
+
+  // Remove .kiro/agents/kirograph.json
+  const agentPath = path.join(target, '.kiro', 'agents', 'kirograph.json');
+  if (fs.existsSync(agentPath)) {
+    fs.unlinkSync(agentPath);
+    console.log(`  ${green}✓${reset} Removed .kiro/agents/kirograph.json`);
   }
 
   console.log(`\n  ${dim}Done. Run ${violet}kirograph install${reset}${dim} to come back anytime.${reset}\n`);

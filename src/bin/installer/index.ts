@@ -2,9 +2,10 @@
  * KiroGraph Installer for Kiro
  *
  * Wires up:
- *  1. .kiro/settings/mcp.json  — registers the MCP server
- *  2. .kiro/hooks/*.json       — auto-sync on file save/create/delete (via mark-dirty + sync-if-dirty)
- *  3. .kiro/steering/kirograph.md — teaches Kiro to use the graph tools
+ *  1. .kiro/settings/mcp.json        — registers the MCP server (IDE + CLI)
+ *  2. .kiro/hooks/*.json             — auto-sync hooks for Kiro IDE
+ *  3. .kiro/steering/kirograph.md    — teaches Kiro to use the graph tools (IDE + CLI)
+ *  4. .kiro/agents/kirograph.json    — custom agent config for Kiro CLI
  */
 
 import * as path from 'path';
@@ -19,6 +20,7 @@ import { promptConfigOptions } from './config-prompt';
 import { writeMcpConfig } from './mcp';
 import { writeHooks } from './hooks';
 import { writeSteering } from './steering';
+import { writeCliAgent } from './cli-agent';
 import { openTypesenseDashboard } from './dashboard';
 import { ensureQdrantUI, openQdrantDashboard } from './qdrant-dashboard';
 
@@ -40,11 +42,14 @@ export async function runInstaller(): Promise<void> {
     // 1. MCP config
     writeMcpConfig(kiroDir);
 
-    // 2. Hooks
+    // 2. IDE hooks
     writeHooks(kiroDir);
 
-    // 3. Steering
+    // 3. Steering (IDE + CLI)
     writeSteering(kiroDir);
+
+    // 4. CLI agent config
+    writeCliAgent(kiroDir);
 
     // 4. Prompt for config options and persist
     const patch = await promptConfigOptions(rl);
@@ -154,7 +159,8 @@ export async function runInstaller(): Promise<void> {
       }
     }
 
-    console.log('\n  Done! Restart Kiro for the MCP server to load.\n');
+    console.log('\n  Done! Restart Kiro IDE for the MCP server to load.');
+    console.log('  For Kiro CLI, use the "kirograph" agent: kiro-cli --agent kirograph\n');
   } finally {
     rl.close();
   }

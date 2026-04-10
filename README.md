@@ -68,10 +68,10 @@ Enable and configure via `kirograph install` (interactive arrow-key menu) or dir
 npm install -g kirograph
 
 # In your project:
-kirograph install    # wire up MCP + hooks + steering in .kiro/
+kirograph install    # wire up MCP + hooks + steering + CLI agent in .kiro/
 ```
 
-Restart Kiro. It will now use KiroGraph tools automatically.
+Restart Kiro IDE, or switch to the `kirograph` agent in Kiro CLI. It will now use KiroGraph tools automatically.
 
 Or using the short alias:
 
@@ -106,11 +106,11 @@ Kiro hooks mark the index dirty on every file save or create, then flush on agen
 
 ## Using with Kiro
 
-`kirograph install` sets up three things in your Kiro workspace:
+`kirograph install` sets up four things in your Kiro workspace — all coexist, so you can switch between IDE and CLI freely:
 
 ### MCP Server (`.kiro/settings/mcp.json`)
 
-Registers the KiroGraph MCP server so Kiro can call graph tools directly:
+Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
 
 ```json
 {
@@ -129,9 +129,9 @@ Registers the KiroGraph MCP server so Kiro can call graph tools directly:
 }
 ```
 
-### Auto-Sync Hooks (`.kiro/hooks/`)
+### IDE Auto-Sync Hooks (`.kiro/hooks/`)
 
-Four hooks keep the index fresh automatically:
+Four hooks keep the index fresh automatically in the Kiro IDE:
 
 | Hook | Event | Action |
 |------|-------|--------|
@@ -144,14 +144,33 @@ File changes are batched: saves and creates write a dirty marker; the actual syn
 
 Hooks fire for: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`, `.cs`, `.rb`, `.php`, `.swift`, `.kt`, `.dart`
 
+### CLI Agent Config (`.kiro/agents/kirograph.json`)
+
+A custom agent for Kiro CLI that wires up the MCP server, inlines the steering instructions as a prompt, and handles sync in the CLI's own hook format. The CLI has no file-watch events, so syncing is handled at session boundaries instead:
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `agentSpawn` | Agent starts | `kirograph sync-if-dirty --quiet` — catches edits made between sessions |
+| `userPromptSubmit` | Each prompt | `kirograph sync-if-dirty --quiet` — keeps graph fresh within a session |
+| `stop` | End of each turn | `kirograph sync-if-dirty --quiet` — deferred flush, mirrors IDE `agentStop` |
+
+Use it with:
+
+```bash
+kiro-cli --agent kirograph
+```
+
+Or swap to it inside an active session:
+
+```
+/agent swap kirograph
+```
+
+> Note: restart `kiro-cli` after running `kirograph install` for the agent to be picked up.
+
 ### Steering File (`.kiro/steering/kirograph.md`)
 
-Teaches Kiro to prefer graph tools over file scanning when `.kirograph/` exists:
-
-- Start with `kirograph_context` for any task instead of reading files
-- Use `kirograph_search` instead of grep/glob
-- Use `kirograph_callers` / `kirograph_callees` to trace code flow
-- Use `kirograph_impact` before modifying a symbol
+Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists. The CLI agent has the same instructions inlined directly in its `prompt` field.
 
 ## MCP Tools
 
