@@ -157,28 +157,39 @@ export class GraphDatabase {
 
   searchNodes(query: string, opts: SearchOptions = {}): Node[] {
     const { kinds, languages, limit = 20 } = opts;
-    // Sanitize for FTS5: escape special chars and append wildcard
-    const safe = query.replace(/['"*()]/g, ' ').trim();
-    const ftsQuery = safe ? safe + '*' : safe;
+    // Sanitize for FTS5: strip special chars and append wildcard.
+    // Both the MATCH value and LIMIT are inlined (not bound via ?) because
+    // node-sqlite3-wasm passes bound parameters through to FTS5's own query
+    // parser before SQLite substitutes them, causing "syntax error near ?".
+    const safe = query
+      .replace(/\b(AND|OR|NOT)\b/g, ' ')       // FTS5 boolean operators
+      .replace(/['"*()?\-+^~:{}\\\.]/g, ' ')   // FTS5 special chars
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!safe) return [];
 
-    const conditions: string[] = ['nodes_fts MATCH ?'];
-    const params: any[] = [ftsQuery];
+    const ftsQuery = safe + '*';
+    const safeLimit = Math.max(1, Math.floor(Number(limit)));
+
+    const conditions: string[] = [];
+    const params: any[] = [];
 
     if (kinds && kinds.length > 0) {
-      conditions.push(`n.kind IN (${kinds.map(() => '?').join(',')})`);
+      conditions.push(`kind IN (${kinds.map(() => '?').join(',')})`);
       params.push(...kinds);
     }
     if (languages && languages.length > 0) {
-      conditions.push(`n.language IN (${languages.map(() => '?').join(',')})`);
+      conditions.push(`language IN (${languages.map(() => '?').join(',')})`);
       params.push(...languages);
     }
-    params.push(limit);
+
+    const where = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
 
     return this.db.all(
-      `SELECT n.* FROM nodes n
-       JOIN nodes_fts f ON n.id = f.id
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY rank LIMIT ?`,
+      `SELECT * FROM nodes
+       WHERE id IN (SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH '${ftsQuery}')
+       ${where}
+       LIMIT ${safeLimit}`,
       params
     ).map(this.rowToNode);
   }
