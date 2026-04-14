@@ -164,7 +164,7 @@ export class GraphDatabase {
     // parser before SQLite substitutes them, causing "syntax error near ?".
     const safe = query
       .replace(/\b(AND|OR|NOT)\b/g, ' ')       // FTS5 boolean operators
-      .replace(/['"*()?\-+^~:{}\\\.]/g, ' ')   // FTS5 special chars
+      .replace(/['"*()?\-+^~:{}\\\.\/]/g, ' ')  // FTS5 special chars (incl. /)
       .replace(/\s+/g, ' ')
       .trim();
     if (!safe) return [];
