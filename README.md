@@ -62,11 +62,35 @@ Enable and configure via `kirograph install` (interactive arrow-key menu) or dir
 }
 ```
 
-## Quick Start
+## Installation
+
+### From npm (recommended)
 
 ```bash
 npm install -g kirograph
+```
 
+### From source
+
+```bash
+git clone https://github.com/davide-desio-eleva/kirograph.git
+cd kirograph
+npm install
+npm run build
+sudo npm install -g .
+```
+
+After building, the `kirograph` and `kg` commands are available globally.
+
+### Verify
+
+```bash
+kirograph --version
+```
+
+## Quick Start
+
+```bash
 # In your project:
 kirograph install    # wire up MCP + hooks + steering + CLI agent in .kiro/
 ```
