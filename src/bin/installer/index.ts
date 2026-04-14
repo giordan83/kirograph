@@ -121,6 +121,7 @@ export async function runInstaller(): Promise<void> {
       }
       console.log(`  • extractDocstrings: ${patch.extractDocstrings}`);
       console.log(`  • trackCallSites: ${patch.trackCallSites}`);
+      console.log(`  • enableArchitecture: ${patch.enableArchitecture}`);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`\n  ✗ Failed to write configuration: ${reason}`);

@@ -99,3 +99,76 @@ CREATE TABLE IF NOT EXISTS vectors (
 );
 
 CREATE INDEX IF NOT EXISTS idx_vectors_model ON vectors(model);
+
+-- ── Architecture tables (opt-in, only populated when enableArchitecture=true) ──
+
+CREATE TABLE IF NOT EXISTS arch_packages (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  path TEXT NOT NULL,
+  source TEXT NOT NULL CHECK(source IN ('manifest','directory')),
+  language TEXT,
+  manifest_path TEXT,
+  version TEXT,
+  external_deps TEXT,  -- JSON array of strings
+  metadata TEXT,       -- JSON object
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arch_packages_path ON arch_packages(path);
+CREATE INDEX IF NOT EXISTS idx_arch_packages_source ON arch_packages(source);
+
+CREATE TABLE IF NOT EXISTS arch_layers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  source TEXT NOT NULL CHECK(source IN ('auto','config')),
+  patterns TEXT NOT NULL,  -- JSON array of glob patterns
+  metadata TEXT,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS arch_file_packages (
+  file_path TEXT NOT NULL,
+  package_id TEXT NOT NULL REFERENCES arch_packages(id) ON DELETE CASCADE,
+  PRIMARY KEY (file_path, package_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arch_fp_file ON arch_file_packages(file_path);
+CREATE INDEX IF NOT EXISTS idx_arch_fp_pkg ON arch_file_packages(package_id);
+
+CREATE TABLE IF NOT EXISTS arch_file_layers (
+  file_path TEXT NOT NULL,
+  layer_id TEXT NOT NULL REFERENCES arch_layers(id) ON DELETE CASCADE,
+  confidence REAL NOT NULL DEFAULT 1.0,
+  matched_pattern TEXT,
+  PRIMARY KEY (file_path, layer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arch_fl_file ON arch_file_layers(file_path);
+CREATE INDEX IF NOT EXISTS idx_arch_fl_layer ON arch_file_layers(layer_id);
+
+CREATE TABLE IF NOT EXISTS arch_package_deps (
+  source_pkg TEXT NOT NULL REFERENCES arch_packages(id) ON DELETE CASCADE,
+  target_pkg TEXT NOT NULL REFERENCES arch_packages(id) ON DELETE CASCADE,
+  dep_count INTEGER NOT NULL DEFAULT 1,
+  files TEXT,  -- JSON array of {from,to} pairs (sample, max 5)
+  PRIMARY KEY (source_pkg, target_pkg)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arch_pkgdep_src ON arch_package_deps(source_pkg);
+CREATE INDEX IF NOT EXISTS idx_arch_pkgdep_tgt ON arch_package_deps(target_pkg);
+
+CREATE TABLE IF NOT EXISTS arch_layer_deps (
+  source_layer TEXT NOT NULL REFERENCES arch_layers(id) ON DELETE CASCADE,
+  target_layer TEXT NOT NULL REFERENCES arch_layers(id) ON DELETE CASCADE,
+  dep_count INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (source_layer, target_layer)
+);
+
+CREATE TABLE IF NOT EXISTS arch_coupling (
+  package_id TEXT PRIMARY KEY REFERENCES arch_packages(id) ON DELETE CASCADE,
+  afferent INTEGER NOT NULL DEFAULT 0,
+  efferent INTEGER NOT NULL DEFAULT 0,
+  instability REAL NOT NULL DEFAULT 0.0,
+  updated_at INTEGER NOT NULL
+);

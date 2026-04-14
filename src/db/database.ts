@@ -6,6 +6,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import type { Node, Edge, FileRecord, NodeKind, Language, GraphStats, NodeContext, NodeMetrics, SearchOptions } from '../types';
+import type { ArchPackage, ArchLayer, ArchPackageDep, ArchLayerDep, ArchCoupling } from '../architecture/types';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Database } = require('node-sqlite3-wasm');
@@ -703,7 +704,192 @@ export class GraphDatabase {
     let dbSizeBytes = 0;
     try { dbSizeBytes = fs.statSync(dbPath).size; } catch { /* ignore */ }
     const embeddingCount = this.getEmbeddingCount();
-    return { files, nodes, edges, nodesByKind, filesByLanguage, dbSizeBytes, embeddingCount, embeddingsEnabled: false, embeddingModel: '', useVecIndex: false, semanticEngine: 'cosine' as const, vecIndexCount: 0, engineFallback: null, embeddableNodeCount: 0, frameworks: [] };
+    return { files, nodes, edges, nodesByKind, filesByLanguage, dbSizeBytes, embeddingCount, embeddingsEnabled: false, embeddingModel: '', useVecIndex: false, semanticEngine: 'cosine' as const, vecIndexCount: 0, engineFallback: null, embeddableNodeCount: 0, frameworks: [], architectureEnabled: false };
+  }
+
+  // ── Architecture ──────────────────────────────────────────────────────────
+
+  clearArchitecture(): void {
+    this.db.run('DELETE FROM arch_coupling');
+    this.db.run('DELETE FROM arch_layer_deps');
+    this.db.run('DELETE FROM arch_package_deps');
+    this.db.run('DELETE FROM arch_file_layers');
+    this.db.run('DELETE FROM arch_file_packages');
+    this.db.run('DELETE FROM arch_layers');
+    this.db.run('DELETE FROM arch_packages');
+  }
+
+  upsertArchPackage(pkg: ArchPackage): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_packages
+        (id, name, path, source, language, manifest_path, version, external_deps, metadata, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [
+        pkg.id, pkg.name, pkg.path, pkg.source,
+        pkg.language ?? null, pkg.manifestPath ?? null, pkg.version ?? null,
+        pkg.externalDeps ? JSON.stringify(pkg.externalDeps) : null,
+        pkg.metadata ? JSON.stringify(pkg.metadata) : null,
+        pkg.updatedAt,
+      ]
+    );
+  }
+
+  upsertArchLayer(layer: ArchLayer): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_layers (id, name, source, patterns, metadata, updated_at)
+       VALUES (?,?,?,?,?,?)`,
+      [
+        layer.id, layer.name, layer.source,
+        JSON.stringify(layer.patterns),
+        layer.metadata ? JSON.stringify(layer.metadata) : null,
+        layer.updatedAt,
+      ]
+    );
+  }
+
+  upsertArchFilePackage(filePath: string, packageId: string): void {
+    this.db.run(
+      'INSERT OR IGNORE INTO arch_file_packages (file_path, package_id) VALUES (?,?)',
+      [filePath, packageId]
+    );
+  }
+
+  upsertArchFileLayer(filePath: string, layerId: string, confidence: number, matchedPattern: string): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_file_layers (file_path, layer_id, confidence, matched_pattern)
+       VALUES (?,?,?,?)`,
+      [filePath, layerId, confidence, matchedPattern]
+    );
+  }
+
+  upsertArchPackageDep(sourcePkg: string, targetPkg: string, depCount: number, files?: Array<{ from: string; to: string }>): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_package_deps (source_pkg, target_pkg, dep_count, files)
+       VALUES (?,?,?,?)`,
+      [sourcePkg, targetPkg, depCount, files ? JSON.stringify(files) : null]
+    );
+  }
+
+  upsertArchLayerDep(sourceLayer: string, targetLayer: string, depCount: number): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_layer_deps (source_layer, target_layer, dep_count)
+       VALUES (?,?,?)`,
+      [sourceLayer, targetLayer, depCount]
+    );
+  }
+
+  upsertArchCoupling(coupling: ArchCoupling): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO arch_coupling (package_id, afferent, efferent, instability, updated_at)
+       VALUES (?,?,?,?,?)`,
+      [coupling.packageId, coupling.afferent, coupling.efferent, coupling.instability, coupling.updatedAt]
+    );
+  }
+
+  getArchPackages(): ArchPackage[] {
+    return this.db.all('SELECT * FROM arch_packages').map((r: any): ArchPackage => ({
+      id: r.id,
+      name: r.name,
+      path: r.path,
+      source: r.source,
+      language: r.language ?? undefined,
+      manifestPath: r.manifest_path ?? undefined,
+      version: r.version ?? undefined,
+      externalDeps: r.external_deps ? JSON.parse(r.external_deps) : undefined,
+      metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  getArchLayers(): ArchLayer[] {
+    return this.db.all('SELECT * FROM arch_layers').map((r: any): ArchLayer => ({
+      id: r.id,
+      name: r.name,
+      source: r.source,
+      patterns: JSON.parse(r.patterns),
+      metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  getArchPackageDeps(): ArchPackageDep[] {
+    return this.db.all('SELECT * FROM arch_package_deps').map((r: any): ArchPackageDep => ({
+      sourcePkg: r.source_pkg,
+      targetPkg: r.target_pkg,
+      depCount: r.dep_count,
+      files: r.files ? JSON.parse(r.files) : undefined,
+    }));
+  }
+
+  getArchLayerDeps(): ArchLayerDep[] {
+    return this.db.all('SELECT * FROM arch_layer_deps').map((r: any): ArchLayerDep => ({
+      sourceLayer: r.source_layer,
+      targetLayer: r.target_layer,
+      depCount: r.dep_count,
+    }));
+  }
+
+  getArchCoupling(): ArchCoupling[] {
+    return this.db.all('SELECT * FROM arch_coupling').map((r: any): ArchCoupling => ({
+      packageId: r.package_id,
+      afferent: r.afferent,
+      efferent: r.efferent,
+      instability: r.instability,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  getArchStats(): { packages: number; layers: number; packageDeps: number } {
+    return {
+      packages: this.db.get('SELECT COUNT(*) as c FROM arch_packages')?.c ?? 0,
+      layers: this.db.get('SELECT COUNT(*) as c FROM arch_layers')?.c ?? 0,
+      packageDeps: this.db.get('SELECT COUNT(*) as c FROM arch_package_deps')?.c ?? 0,
+    };
+  }
+
+  /**
+   * Return file-to-file import relationships by joining edges + nodes.
+   * Used by ArchitectureAnalyzer to roll up package-level dependencies.
+   */
+  getFileImportPairs(): Array<{ sourceFile: string; targetFile: string }> {
+    return this.db.all(
+      `SELECT DISTINCT n1.file_path as source_file, n2.file_path as target_file
+       FROM edges e
+       JOIN nodes n1 ON n1.id = e.source
+       JOIN nodes n2 ON n2.id = e.target
+       WHERE e.kind = 'imports' AND n1.file_path != n2.file_path`
+    ).map((r: any) => ({ sourceFile: r.source_file, targetFile: r.target_file }));
+  }
+
+  getArchFilePackages(): Array<{ filePath: string; packageId: string }> {
+    return this.db.all('SELECT file_path, package_id FROM arch_file_packages')
+      .map((r: any) => ({ filePath: r.file_path, packageId: r.package_id }));
+  }
+
+  getArchFileLayers(): Array<{ filePath: string; layerId: string; confidence: number; matchedPattern: string }> {
+    return this.db.all('SELECT file_path, layer_id, confidence, matched_pattern FROM arch_file_layers')
+      .map((r: any) => ({
+        filePath: r.file_path,
+        layerId: r.layer_id,
+        confidence: r.confidence,
+        matchedPattern: r.matched_pattern,
+      }));
+  }
+
+  getArchitectureResult(): {
+    packages: ArchPackage[];
+    layers: ArchLayer[];
+    packageDeps: ArchPackageDep[];
+    layerDeps: ArchLayerDep[];
+    coupling: ArchCoupling[];
+  } {
+    return {
+      packages: this.getArchPackages(),
+      layers: this.getArchLayers(),
+      packageDeps: this.getArchPackageDeps(),
+      layerDeps: this.getArchLayerDeps(),
+      coupling: this.getArchCoupling(),
+    };
   }
 
   // ── Transactions ──────────────────────────────────────────────────────────

@@ -1,0 +1,259 @@
+/**
+ * IndexPipeline — full-index and incremental-sync pipelines.
+ *
+ * Owns the two heavy workflows:
+ *   - indexAll(): scan all files, extract, store, resolve, detect frameworks,
+ *                 generate embeddings, analyze architecture.
+ *   - sync():     detect changed files via git (or full scan fallback),
+ *                 re-extract only what changed, then run the same tail pipeline.
+ *
+ * Everything that touches the filesystem or sub-systems is injected via the
+ * constructor, keeping this class testable and free of global state.
+ */
+
+import * as path from 'path';
+import * as fs from 'fs';
+import { GraphDatabase } from '../db/database';
+import { scanDirectory, hashContent, getChangedFiles } from '../sync/index';
+import { extractFile } from '../extraction/extractor';
+import { detectFrameworks } from '../frameworks/index';
+import { ReferenceResolver } from '../resolution/index';
+import { VectorManager } from '../vectors/index';
+import { ArchitectureAnalyzer } from '../architecture/index';
+import type { KiroGraphConfig } from '../config';
+import type { IndexResult, IndexProgress, SyncResult } from '../types';
+import { LockManager } from './lock-manager';
+import { Mutex } from '../utils';
+
+const FILE_IO_BATCH_SIZE = 10;
+
+export class IndexPipeline {
+  private readonly mutex = new Mutex();
+
+  constructor(
+    private readonly db: GraphDatabase,
+    private readonly vectors: VectorManager,
+    private readonly resolver: ReferenceResolver,
+    private readonly arch: ArchitectureAnalyzer,
+    private readonly lock: LockManager,
+    private readonly config: KiroGraphConfig,
+    private readonly projectRoot: string,
+  ) {}
+
+  async indexAll(opts?: {
+    onProgress?: (p: IndexProgress) => void;
+    force?: boolean;
+    signal?: AbortSignal;
+  }): Promise<IndexResult> {
+    const release = await this.mutex.acquire();
+    this.lock.acquire();
+    const start = Date.now();
+    const errors: string[] = [];
+    let filesIndexed = 0;
+    let nodesCreated = 0;
+    let edgesCreated = 0;
+
+    try {
+      const files = await scanDirectory(this.projectRoot, this.config, opts?.signal);
+      opts?.onProgress?.({ phase: 'scanning', current: files.length, total: files.length });
+
+      // Batch-read files in parallel
+      const contentMap = new Map<string, Buffer>();
+      for (let b = 0; b < files.length; b += FILE_IO_BATCH_SIZE) {
+        const batch = files.slice(b, b + FILE_IO_BATCH_SIZE);
+        const results = await Promise.all(batch.map(f => fs.promises.readFile(f).catch(() => null)));
+        for (let i = 0; i < batch.length; i++) {
+          if (results[i]) contentMap.set(batch[i], results[i]!);
+        }
+      }
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        opts?.onProgress?.({ phase: 'parsing', current: i + 1, total: files.length, currentFile: file });
+
+        try {
+          const content = contentMap.get(file);
+          if (!content) continue;
+          if (content.length > this.config.maxFileSize) continue;
+
+          const relPath = path.relative(this.projectRoot, file).replace(/\\/g, '/');
+
+          if (!opts?.force) {
+            const existing = this.db.getFile(relPath);
+            if (existing && hashContent(content) === existing.contentHash) continue;
+          }
+
+          const extracted = await extractFile(file, this.projectRoot, content);
+          if (!extracted) continue;
+
+          const oldNodes = this.db.getNodesByFile(extracted.filePath);
+          if (oldNodes.length > 0) await this.vectors.deleteEmbeddings(oldNodes.map(n => n.id));
+
+          this.db.transaction(() => {
+            this.db.deleteNodesByFile(extracted.filePath);
+            this.db.deleteUnresolvedRefsByFile(extracted.filePath);
+            this.db.upsertFile({
+              path: extracted.filePath,
+              contentHash: extracted.contentHash,
+              language: extracted.language,
+              fileSize: extracted.fileSize,
+              symbolCount: extracted.nodes.length,
+              indexedAt: Date.now(),
+            });
+            for (const node of extracted.nodes) { this.db.upsertNode(node); nodesCreated++; }
+            for (const edge of extracted.edges) { this.db.insertEdge(edge); edgesCreated++; }
+            for (const ref of extracted.unresolvedRefs) {
+              this.db.insertUnresolvedRef(ref.sourceId, ref.refName, ref.refKind, extracted.filePath, ref.line, ref.column);
+            }
+          });
+
+          filesIndexed++;
+        } catch (err) {
+          errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // Resolve cross-file references
+      opts?.onProgress?.({ phase: 'resolving', current: 0, total: 1 });
+      await this.resolver.resolveAll((current, total) => {
+        opts?.onProgress?.({ phase: 'resolving', current, total });
+      });
+
+      // Detect frameworks
+      opts?.onProgress?.({ phase: 'detecting frameworks', current: 0, total: 1 });
+      const detectedFrameworks = await detectFrameworks(this.projectRoot, this.db);
+      const languages = [...new Set(this.db.getAllFiles().map(f => (f as any).language).filter(Boolean))];
+      opts?.onProgress?.({
+        phase: 'detecting frameworks', current: 1, total: 1,
+        meta: { frameworks: detectedFrameworks.map(f => f.name), languages },
+      });
+
+      // Generate embeddings (if enabled)
+      if (this.vectors.isInitialized()) {
+        opts?.onProgress?.({ phase: 'embeddings', current: 0, total: 1 });
+        await this.vectors.embedAll((current, total) =>
+          opts?.onProgress?.({ phase: 'embeddings', current, total })
+        );
+      }
+
+      // Analyze architecture (if enabled)
+      if (this.config.enableArchitecture) {
+        opts?.onProgress?.({ phase: 'architecture', current: 0, total: 1 });
+        await this.arch.analyze(msg =>
+          opts?.onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } })
+        );
+        opts?.onProgress?.({ phase: 'architecture', current: 1, total: 1 });
+      }
+
+      this.lock.clearDirty();
+      return { success: errors.length === 0, filesIndexed, nodesCreated, edgesCreated, errors, duration: Date.now() - start };
+    } finally {
+      this.lock.release();
+      release();
+    }
+  }
+
+  async sync(changedFiles?: string[]): Promise<SyncResult> {
+    const release = await this.mutex.acquire();
+    this.lock.acquire();
+    const start = Date.now();
+    const result: SyncResult = {
+      added: [], modified: [], removed: [],
+      nodesCreated: 0, nodesRemoved: 0, errors: [], duration: 0,
+    };
+
+    try {
+      const removeFile = async (rel: string) => {
+        await this.vectors.deleteEmbeddings(this.db.getNodesByFile(rel).map(n => n.id));
+        this.db.deleteFile(rel);
+        this.db.deleteUnresolvedRefsByFile(rel);
+        result.removed.push(rel);
+      };
+
+      let filesToProcess: string[];
+
+      if (changedFiles) {
+        filesToProcess = changedFiles.map(f => path.resolve(this.projectRoot, f));
+      } else {
+        const gitChanged = await getChangedFiles(this.projectRoot, this.config);
+        const hasChanges = gitChanged.added.length > 0 || gitChanged.modified.length > 0 || gitChanged.removed.length > 0;
+
+        if (hasChanges) {
+          for (const p of gitChanged.removed) {
+            await removeFile(path.relative(this.projectRoot, p).replace(/\\/g, '/'));
+          }
+          filesToProcess = [...gitChanged.added, ...gitChanged.modified];
+        } else {
+          // Fallback: full scan + detect removed files
+          const indexed = new Set(this.db.getAllFiles().map(f => f.path));
+          const current = new Set(
+            (await scanDirectory(this.projectRoot, this.config))
+              .map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/'))
+          );
+          for (const p of indexed) {
+            if (!current.has(p)) await removeFile(p);
+          }
+          filesToProcess = await scanDirectory(this.projectRoot, this.config);
+        }
+      }
+
+      for (const file of filesToProcess) {
+        if (!fs.existsSync(file)) {
+          const rel = path.relative(this.projectRoot, file).replace(/\\/g, '/');
+          await removeFile(rel);
+          continue;
+        }
+
+        try {
+          const extracted = await extractFile(file, this.projectRoot);
+          if (!extracted) continue;
+
+          const existing = this.db.getFile(extracted.filePath);
+          const isNew = !existing;
+          if (!isNew && existing!.contentHash === extracted.contentHash) continue;
+
+          const oldNodes = this.db.getNodesByFile(extracted.filePath);
+          await this.vectors.deleteEmbeddings(oldNodes.map(n => n.id));
+
+          this.db.transaction(() => {
+            result.nodesRemoved += oldNodes.length;
+            this.db.deleteNodesByFile(extracted.filePath);
+            this.db.deleteUnresolvedRefsByFile(extracted.filePath);
+            this.db.upsertFile({
+              path: extracted.filePath,
+              contentHash: extracted.contentHash,
+              language: extracted.language,
+              fileSize: extracted.fileSize,
+              symbolCount: extracted.nodes.length,
+              indexedAt: Date.now(),
+            });
+            for (const node of extracted.nodes) { this.db.upsertNode(node); result.nodesCreated++; }
+            for (const edge of extracted.edges) { this.db.insertEdge(edge); }
+            for (const ref of extracted.unresolvedRefs) {
+              this.db.insertUnresolvedRef(ref.sourceId, ref.refName, ref.refKind, extracted.filePath, ref.line, ref.column);
+            }
+          });
+
+          this.resolver.invalidateFile(extracted.filePath);
+          if (isNew) result.added.push(extracted.filePath);
+          else result.modified.push(extracted.filePath);
+        } catch (err) {
+          result.errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      await this.resolver.resolveAll();
+      await detectFrameworks(this.projectRoot);
+
+      if (this.vectors.isInitialized()) await this.vectors.embedAll();
+      if (this.config.enableArchitecture) await this.arch.analyze();
+
+      this.lock.clearDirty();
+      result.duration = Date.now() - start;
+      return result;
+    } finally {
+      this.lock.release();
+      release();
+    }
+  }
+}

@@ -34,6 +34,14 @@ export interface KiroGraphConfig {
   minLogLevel: 'debug' | 'info' | 'warn' | 'error';
   frameworkHints: string[];
   fuzzyResolutionThreshold: number; // 0.0–1.0
+  /** Enable architecture analysis (package graph + layer detection). Default: false. */
+  enableArchitecture: boolean;
+  /**
+   * User-defined layer → glob pattern overrides.
+   * When set, config-defined layers win over auto-detected ones.
+   * Example: { "api": ["src/routes/**", "src/controllers/**"] }
+   */
+  architectureLayers?: Record<string, string[]>;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -87,6 +95,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     minLogLevel: 'warn',
     frameworkHints: [],
     fuzzyResolutionThreshold: 0.5,
+    enableArchitecture: false,
   };
 }
 
@@ -162,6 +171,12 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     ? raw.fuzzyResolutionThreshold
     : defaults.fuzzyResolutionThreshold;
 
+  const enableArchitecture = typeof raw.enableArchitecture === 'boolean'
+    ? raw.enableArchitecture
+    : defaults.enableArchitecture;
+
+  const architectureLayers = _validateArchitectureLayers(raw.architectureLayers);
+
   // Validate glob patterns — exclude unsafe regex patterns
   const include = _validatePatterns(raw.include, defaults.include);
   const exclude = _validatePatterns(raw.exclude, defaults.exclude);
@@ -186,6 +201,8 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     minLogLevel,
     frameworkHints,
     fuzzyResolutionThreshold,
+    enableArchitecture,
+    ...(architectureLayers !== undefined ? { architectureLayers } : {}),
   };
 }
 
@@ -195,8 +212,9 @@ function _validateArchitectureLayers(raw: unknown): Record<string, string[]> | u
   const result: Record<string, string[]> = {};
   for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof key !== 'string') continue;
-    if (!Array.isArray(val) || !val.every(v => typeof v === 'string')) continue;
-    result[key] = val as string[];
+    if (!Array.isArray(val)) continue;
+    const patterns = val.filter((p): p is string => typeof p === 'string' && isSafeRegex(p));
+    if (patterns.length > 0) result[key] = patterns;
   }
   return Object.keys(result).length > 0 ? result : undefined;
 }

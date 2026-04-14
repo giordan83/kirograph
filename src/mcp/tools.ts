@@ -194,6 +194,53 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'kirograph_architecture',
+    description: 'Get the high-level software architecture: packages, layers, and their dependencies. Requires enableArchitecture=true in config. Call this first on a new task to orient yourself without reading files.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        level: {
+          type: 'string',
+          description: 'View level: "packages" (package graph), "layers" (architectural layers), or "both" (default)',
+          enum: ['packages', 'layers', 'both'],
+          default: 'both',
+        },
+        includeFiles: { type: 'boolean', description: 'Include per-file package/layer assignments (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_coupling',
+    description: 'Show coupling metrics for packages: afferent (Ca), efferent (Ce), and instability (Ce/(Ca+Ce)). High instability = depends on many others; low instability = depended on by many. Requires enableArchitecture=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sortBy: {
+          type: 'string',
+          description: 'Sort order: "instability" (default), "afferent", or "efferent"',
+          enum: ['instability', 'afferent', 'efferent'],
+          default: 'instability',
+        },
+        limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_package',
+    description: 'Drill into one package: files it contains, symbols it exports, packages it depends on, and packages that depend on it. Requires enableArchitecture=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        package: { type: 'string', description: 'Package name or path (partial match accepted)' },
+        includeFiles: { type: 'boolean', description: 'List files in the package (default: true)', default: true },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['package'],
+    },
+  },
+  {
     name: 'kirograph_type_hierarchy',
     description: 'Traverse the type hierarchy of a class or interface (base types and derived types).',
     inputSchema: {
@@ -383,6 +430,11 @@ export class ToolHandler {
         const frameworkLine = stats.frameworks.length > 0
           ? `  Frameworks: ${stats.frameworks.join(', ')}`
           : `  Frameworks: none detected`;
+        const archLine = stats.architectureEnabled
+          ? stats.architectureStats
+            ? `  Architecture: enabled — ${stats.architectureStats.packages} packages, ${stats.architectureStats.layers} layers, ${stats.architectureStats.packageDeps} deps`
+            : `  Architecture: enabled (not yet analyzed — run kirograph index)`
+          : `  Architecture: disabled`;
         return [
           `KiroGraph Status`,
           `  Project: ${cg.getProjectRoot()}`,
@@ -392,6 +444,7 @@ export class ToolHandler {
           `  By kind: ${Object.entries(stats.nodesByKind).map(([k, v]) => `${k}=${v}`).join(', ')}`,
           langLine ? `  By language: ${langLine}` : '',
           frameworkLine,
+          archLine,
           `  DB size: ${dbMb} MB`,
           ...semanticLines,
         ].filter(Boolean).join('\n');
@@ -501,6 +554,166 @@ export class ToolHandler {
         if (hierarchy.length === 0) return `No type hierarchy found for \`${node.name}\`.`;
         return `Type hierarchy for \`${node.name}\` (direction: ${direction}):\n` +
           hierarchy.map(n => `- ${mapKind(n.kind)} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
+      }
+
+      case 'kirograph_architecture': {
+        if (!cg.isArchitectureEnabled()) {
+          return 'Architecture analysis is disabled. Set enableArchitecture=true in .kirograph/config.json and re-index.';
+        }
+        const level = (args.level as string) ?? 'both';
+        const includeFiles = args.includeFiles === true;
+        const arch = cg.getArchitecture();
+
+        const lines: string[] = ['# Architecture'];
+
+        if ((level === 'packages' || level === 'both') && arch.packages.length > 0) {
+          lines.push('\n## Packages');
+          for (const pkg of arch.packages) {
+            const meta = [pkg.language, pkg.version].filter(Boolean).join(', ');
+            lines.push(`- **${pkg.name}** (${pkg.path}) [${pkg.source}${meta ? ' · ' + meta : ''}]`);
+          }
+          if (arch.packageDeps.length > 0) {
+            lines.push('\n## Package Dependencies');
+            for (const dep of arch.packageDeps) {
+              const src = arch.packages.find(p => p.id === dep.sourcePkg)?.name ?? dep.sourcePkg;
+              const tgt = arch.packages.find(p => p.id === dep.targetPkg)?.name ?? dep.targetPkg;
+              lines.push(`- ${src} → ${tgt} (${dep.depCount} import${dep.depCount !== 1 ? 's' : ''})`);
+            }
+          }
+        }
+
+        if ((level === 'layers' || level === 'both') && arch.layers.length > 0) {
+          lines.push('\n## Layers');
+          for (const layer of arch.layers) {
+            const fileCount = Object.values(arch.fileLayers).filter(fl => fl.some(l => l.layerId === layer.id)).length;
+            lines.push(`- **${layer.name}** [${layer.source}] — ${fileCount} file${fileCount !== 1 ? 's' : ''}`);
+          }
+          if (arch.layerDeps.length > 0) {
+            lines.push('\n## Layer Dependencies');
+            for (const dep of arch.layerDeps) {
+              const src = dep.sourceLayer.replace('layer:', '');
+              const tgt = dep.targetLayer.replace('layer:', '');
+              lines.push(`- ${src} → ${tgt} (${dep.depCount})`);
+            }
+          }
+        }
+
+        if (includeFiles && (level === 'packages' || level === 'both')) {
+          lines.push('\n## File → Package');
+          for (const [file, pkgIds] of Object.entries(arch.filePackages).slice(0, 50)) {
+            const names = pkgIds.map(id => arch.packages.find(p => p.id === id)?.name ?? id).join(', ');
+            lines.push(`- ${file}: ${names}`);
+          }
+          if (Object.keys(arch.filePackages).length > 50) lines.push('  …(truncated)');
+        }
+
+        if (arch.packages.length === 0 && arch.layers.length === 0) {
+          return 'No architecture data found. Run `kirograph index` with enableArchitecture=true.';
+        }
+
+        return lines.join('\n');
+      }
+
+      case 'kirograph_coupling': {
+        if (!cg.isArchitectureEnabled()) {
+          return 'Architecture analysis is disabled. Set enableArchitecture=true in .kirograph/config.json and re-index.';
+        }
+        const sortBy = (args.sortBy as string) ?? 'instability';
+        const limit = clampLimit(args.limit as number | undefined, 20);
+        const arch = cg.getArchitecture();
+
+        if (arch.coupling.length === 0) {
+          return 'No coupling data. Run `kirograph index` with enableArchitecture=true.';
+        }
+
+        const sorted = [...arch.coupling].sort((a, b) => {
+          if (sortBy === 'afferent') return b.afferent - a.afferent;
+          if (sortBy === 'efferent') return b.efferent - a.efferent;
+          return b.instability - a.instability;
+        }).slice(0, limit);
+
+        const lines = [
+          `Coupling Metrics (sorted by ${sortBy}):`,
+          '',
+          'Package                          Ca    Ce    I',
+          '─'.repeat(52),
+        ];
+
+        for (const c of sorted) {
+          const pkg = arch.packages.find(p => p.id === c.packageId);
+          const name = (pkg?.name ?? c.packageId).slice(0, 32).padEnd(32);
+          const ca = String(c.afferent).padStart(4);
+          const ce = String(c.efferent).padStart(4);
+          const inst = c.instability.toFixed(2).padStart(5);
+          lines.push(`${name}  ${ca}  ${ce}  ${inst}`);
+        }
+
+        lines.push('', 'Ca=afferent (depended on by), Ce=efferent (depends on), I=instability (Ce/(Ca+Ce))');
+        return lines.join('\n');
+      }
+
+      case 'kirograph_package': {
+        if (!cg.isArchitectureEnabled()) {
+          return 'Architecture analysis is disabled. Set enableArchitecture=true in .kirograph/config.json and re-index.';
+        }
+        const query = (args.package as string).toLowerCase();
+        const includeFiles = args.includeFiles !== false;
+        const arch = cg.getArchitecture();
+
+        const pkg = arch.packages.find(p =>
+          p.name.toLowerCase().includes(query) || p.path.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
+        );
+        if (!pkg) return `Package "${args.package}" not found. Use kirograph_architecture to list all packages.`;
+
+        const lines = [
+          `## Package: ${pkg.name}`,
+          `Path: ${pkg.path}`,
+          `Source: ${pkg.source}${pkg.manifestPath ? ` (${pkg.manifestPath})` : ''}`,
+          ...(pkg.version ? [`Version: ${pkg.version}`] : []),
+          ...(pkg.language ? [`Language: ${pkg.language}`] : []),
+        ];
+
+        const deps = arch.packageDeps.filter(d => d.sourcePkg === pkg.id);
+        const dependents = arch.packageDeps.filter(d => d.targetPkg === pkg.id);
+        const coupling = arch.coupling.find(c => c.packageId === pkg.id);
+
+        if (coupling) {
+          lines.push('', `Coupling: Ca=${coupling.afferent} Ce=${coupling.efferent} I=${coupling.instability.toFixed(2)}`);
+        }
+
+        if (deps.length > 0) {
+          lines.push('', `Depends on (${deps.length}):`);
+          for (const dep of deps) {
+            const name = arch.packages.find(p => p.id === dep.targetPkg)?.name ?? dep.targetPkg;
+            lines.push(`  → ${name} (${dep.depCount} import${dep.depCount !== 1 ? 's' : ''})`);
+          }
+        }
+
+        if (dependents.length > 0) {
+          lines.push('', `Depended on by (${dependents.length}):`);
+          for (const dep of dependents) {
+            const name = arch.packages.find(p => p.id === dep.sourcePkg)?.name ?? dep.sourcePkg;
+            lines.push(`  ← ${name} (${dep.depCount} import${dep.depCount !== 1 ? 's' : ''})`);
+          }
+        }
+
+        if (pkg.externalDeps && pkg.externalDeps.length > 0) {
+          lines.push('', `External deps (${pkg.externalDeps.length}): ${pkg.externalDeps.slice(0, 10).join(', ')}${pkg.externalDeps.length > 10 ? '…' : ''}`);
+        }
+
+        if (includeFiles) {
+          const files = Object.entries(arch.filePackages)
+            .filter(([, ids]) => ids.includes(pkg.id))
+            .map(([f]) => f)
+            .sort();
+          if (files.length > 0) {
+            lines.push('', `Files (${files.length}):`);
+            for (const f of files.slice(0, 30)) lines.push(`  ${f}`);
+            if (files.length > 30) lines.push(`  …and ${files.length - 30} more`);
+          }
+        }
+
+        return lines.join('\n');
       }
 
       default:

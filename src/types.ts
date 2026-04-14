@@ -109,6 +109,8 @@ export interface GraphStats {
   vecIndexCount: number;
   engineFallback: string | null;
   frameworks: string[];
+  architectureEnabled: boolean;
+  architectureStats?: { packages: number; layers: number; packageDeps: number };
 }
 
 export interface TaskContext {
@@ -121,7 +123,7 @@ export interface TaskContext {
 }
 
 export interface IndexProgress {
-  phase: 'scanning' | 'parsing' | 'storing' | 'resolving' | 'detecting frameworks' | 'embeddings';
+  phase: 'scanning' | 'parsing' | 'storing' | 'resolving' | 'detecting frameworks' | 'embeddings' | 'architecture';
   current: number;
   total: number;
   currentFile?: string;

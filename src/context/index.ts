@@ -6,12 +6,15 @@
  * Mirrors CodeGraph src/context/index.ts
  */
 
-import type { Node } from '../types';
+import * as fs from 'fs';
+import * as path from 'path';
+import type { Node, TaskContext } from '../types';
 import type { GraphDatabase } from '../db/database';
 import type { ReferenceResolver } from '../resolution/index';
 import type { VectorManager } from '../vectors/index';
 import { logDebug } from '../errors';
 import { extractSearchTerms } from '../search/query-utils';
+import { validatePathWithinRoot } from '../utils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -42,11 +45,22 @@ interface RankedNode {
 
 // ── ContextBuilder ────────────────────────────────────────────────────────────
 
+const FEATURE_REQUEST_WORDS = new Set([
+  'add', 'create', 'implement', 'build', 'make', 'new', 'feature', 'support', 'enable', 'allow',
+  'introduce', 'generate', 'write', 'develop', 'design', 'extend',
+]);
+
+function isFeatureRequest(task: string): boolean {
+  const words = task.toLowerCase().split(/\s+/);
+  return words.some(w => FEATURE_REQUEST_WORDS.has(w));
+}
+
 export class ContextBuilder {
   constructor(
     private readonly db: GraphDatabase,
     private readonly resolver: ReferenceResolver,
     private readonly vectors: VectorManager,
+    private readonly projectRoot: string,
   ) {}
 
   /**
@@ -146,6 +160,45 @@ export class ContextBuilder {
     }
 
     return trimmed.map(r => r.node);
+  }
+
+  /**
+   * Build a full TaskContext for the given task description.
+   * Finds relevant nodes, gathers their edges and source snippets, and returns
+   * the structured context used by MCP tools and the query API.
+   */
+  async buildTaskContext(task: string, opts?: { maxNodes?: number; includeCode?: boolean }): Promise<TaskContext> {
+    const maxNodes = opts?.maxNodes ?? DEFAULT_MAX_NODES;
+    const nodes = await this.findRelevantContext(task, { maxNodes });
+
+    const entryPoints = nodes.slice(0, Math.ceil(maxNodes / 2));
+    const relatedNodes = nodes.slice(Math.ceil(maxNodes / 2));
+    const edges = this.db.getEdgesForNodes(nodes.map(n => n.id));
+
+    const codeSnippets = new Map<string, string>();
+    if (opts?.includeCode !== false) {
+      for (const node of nodes.slice(0, 10)) {
+        const src = this._readNodeSource(node);
+        if (src) codeSnippets.set(node.id, src);
+      }
+    }
+
+    const hint = isFeatureRequest(task)
+      ? ' (feature request — showing existing patterns and extension points)'
+      : '';
+
+    return {
+      task, entryPoints, relatedNodes, edges, codeSnippets,
+      summary: `Found ${entryPoints.length} entry points and ${relatedNodes.length} related symbols for: "${task}"${hint}`,
+    };
+  }
+
+  private _readNodeSource(node: Node): string | null {
+    const absPath = validatePathWithinRoot(path.join(this.projectRoot, node.filePath), this.projectRoot);
+    if (!absPath) return null;
+    try {
+      return fs.readFileSync(absPath, 'utf8').split('\n').slice(node.startLine - 1, node.endLine).join('\n');
+    } catch { return null; }
   }
 
   /**

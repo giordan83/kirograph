@@ -150,6 +150,50 @@ export class GraphQueryManager {
     });
   }
 
+  /**
+   * Find test files that are transitively affected by changes to the given source files.
+   * BFS-traverses import/call dependents to discover which test files depend on changed code.
+   */
+  getAffectedTests(
+    changedFiles: string[],
+    opts?: { depth?: number; testPattern?: string },
+  ): string[] {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const picomatch = require('picomatch');
+    const depth = opts?.depth ?? 5;
+    const isTest = picomatch(
+      opts?.testPattern ?? '{**/*.spec.*,**/*.test.*,**/e2e/**,**/tests/**,**/__tests__/**}'
+    );
+
+    const results = new Set<string>();
+
+    for (const file of changedFiles) {
+      const rel = file.replace(/\\/g, '/').replace(/^\.\//, '');
+
+      if (isTest(rel)) { results.add(rel); continue; }
+
+      const visited = new Set<string>([rel]);
+      let frontier = [rel];
+
+      for (let d = 0; d < depth; d++) {
+        if (frontier.length === 0) break;
+        const next: string[] = [];
+        for (const f of frontier) {
+          for (const dep of this.db.getDependentFiles(f)) {
+            if (!visited.has(dep)) {
+              visited.add(dep);
+              next.push(dep);
+              if (isTest(dep)) results.add(dep);
+            }
+          }
+        }
+        frontier = next;
+      }
+    }
+
+    return [...results].sort();
+  }
+
   /** Find all circular import dependencies. Returns arrays of file paths forming cycles. */
   async findCircularDependencies(): Promise<string[][]> {
     return this.db.findCircularDependencies();

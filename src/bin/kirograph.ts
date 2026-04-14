@@ -21,6 +21,9 @@ import { register as registerUnlock } from './commands/unlock';
 import { register as registerInstall } from './commands/install';
 import { register as registerServe } from './commands/serve';
 import { register as registerDashboard } from './commands/dashboard';
+import { register as registerArchitecture } from './commands/architecture';
+import { register as registerCoupling } from './commands/coupling';
+import { register as registerPackage } from './commands/package';
 
 const program = new Command();
 
@@ -49,6 +52,9 @@ registerAffected(program);
 registerUnlock(program);
 registerServe(program);
 registerDashboard(program);
+registerArchitecture(program);
+registerCoupling(program);
+registerPackage(program);
 
 // Show banner + help when called with no arguments, otherwise parse normally
 if (process.argv.length === 2) {

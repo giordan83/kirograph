@@ -27,7 +27,7 @@ The index is kept fresh automatically via Kiro hooks — no background watcher p
 
 ## How Indexing Works
 
-Indexing has two layers: **structural** (always on) and **semantic** (opt-in).
+Indexing has three layers: **structural** (always on), **semantic** (opt-in), and **architecture** (opt-in).
 
 ### Structural indexing
 
@@ -61,6 +61,20 @@ Enable and configure via `kirograph install` (interactive arrow-key menu) or dir
   "semanticEngine": "pglite"
 }
 ```
+
+### Architecture analysis (opt-in)
+
+When `enableArchitecture: true` is set, KiroGraph detects the high-level structure of your project — packages and architectural layers — and computes coupling metrics between them. Results are stored in `arch_*` tables inside `kirograph.db` and exposed via dedicated MCP tools and CLI commands.
+
+Enable via `kirograph install` or directly in `.kirograph/config.json`:
+
+```json
+{
+  "enableArchitecture": true
+}
+```
+
+See the [Architecture Analysis](#architecture-analysis-opt-in-1) section below for full details.
 
 ## Quick Start
 
@@ -122,7 +136,8 @@ Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
         "kirograph_search", "kirograph_context", "kirograph_callers",
         "kirograph_callees", "kirograph_impact", "kirograph_node",
         "kirograph_status", "kirograph_files", "kirograph_dead_code",
-        "kirograph_circular_deps", "kirograph_path", "kirograph_type_hierarchy"
+        "kirograph_circular_deps", "kirograph_path", "kirograph_type_hierarchy",
+        "kirograph_architecture", "kirograph_coupling", "kirograph_package"
       ]
     }
   }
@@ -174,7 +189,7 @@ Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/`
 
 ## MCP Tools
 
-All 12 tools are auto-approved and available to Kiro once installed.
+All tools are auto-approved and available to Kiro once installed.
 
 ### `kirograph_context`
 
@@ -322,6 +337,40 @@ Check index health and statistics: files indexed, symbol count, edge count, brea
 
 **How it works:** Reads aggregate counts from the graph database + calls `count()` on the active vector engine to report embedding coverage. No graph traversal, no vector search.
 
+### `kirograph_architecture` *(requires `enableArchitecture: true`)*
+
+Get the full architecture overview: detected packages, layers, and the dependency graph between them.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+Returns: packages (with source, language, version, external deps, file membership), layers (with file counts and detection patterns), package dependency edges, layer dependency edges, and per-file package/layer assignments.
+
+**How it works:** Reads the `arch_*` tables populated during the last `kirograph index` run. Returns nothing useful if architecture analysis was not enabled at index time.
+
+### `kirograph_coupling` *(requires `enableArchitecture: true`)*
+
+Get coupling metrics for all packages or a specific one.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `packageId` | string | — | Package ID (e.g. `pkg:npm:src/auth`). Omit for all packages. |
+| `projectPath` | string | cwd | Project root path |
+
+Returns per-package: **Ca** (afferent — how many other packages depend on this one), **Ce** (efferent — how many packages this one depends on), and **instability** (`Ce / (Ca + Ce)`, 0 = maximally stable, 1 = maximally unstable). When `packageId` is given, also returns the full list of incoming and outgoing package dependencies.
+
+### `kirograph_package` *(requires `enableArchitecture: true`)*
+
+Inspect the files and dependencies of a specific package.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `packageId` | string | required | Package ID (e.g. `pkg:npm:src/auth`) |
+| `projectPath` | string | cwd | Project root path |
+
+Returns: package metadata, all files assigned to the package, packages it depends on (with import counts), and packages that depend on it.
+
 ## CLI Reference
 
 ### Setup
@@ -417,6 +466,56 @@ if [ -n "$AFFECTED" ]; then
 fi
 ```
 
+### Architecture Analysis *(requires `enableArchitecture: true`)*
+
+Visualize the detected package graph, architectural layers, and package dependencies.
+
+```bash
+kirograph architecture [path]              # Show packages + layers + all deps
+kirograph architecture --packages          # Show packages section only
+kirograph architecture --layers            # Show layers section only
+kirograph architecture --format json       # JSON output
+```
+
+**Output includes:**
+- Each detected package with its source (`manifest` or `directory`), language, version, and declared external deps
+- Package-to-package dependency edges with import counts
+- Detected layers (`api`, `service`, `data`, `ui`, `shared`) with file counts
+- Layer-to-layer dependency edges
+
+### Package Inspection *(requires `enableArchitecture: true`)*
+
+Drill into a single package: metadata, coupling metrics, dependencies, and files.
+
+```bash
+kirograph package <name>                   # Inspect a package by name or path fragment
+kirograph package auth                     # Partial match accepted (e.g. matches "pkg:npm:src/auth")
+kirograph package src/auth --no-files      # Omit file list
+kirograph package auth --format json       # JSON output
+```
+
+Shows package source (manifest or directory), language, version, manifest path, coupling metrics (Ca/Ce/instability), outgoing dependencies, incoming dependents, declared external deps, and the full list of files belonging to the package.
+
+### Coupling Metrics *(requires `enableArchitecture: true`)*
+
+Inspect coupling health across your package graph.
+
+```bash
+kirograph coupling [path]                  # All packages, sorted by instability
+kirograph coupling --sort ca               # Sort by afferent coupling (most depended-on first)
+kirograph coupling --sort ce               # Sort by efferent coupling (most dependent first)
+kirograph coupling --sort name             # Sort alphabetically
+kirograph coupling --package auth          # Detail view for a single package
+kirograph coupling --format json           # JSON output
+```
+
+The table shows each package with:
+- **Ca** — afferent coupling: how many packages depend on this one (higher = more stable)
+- **Ce** — efferent coupling: how many packages this one depends on (higher = more unstable)
+- **Instability** — `Ce / (Ca + Ce)`, rendered as a color-coded bar: green (stable) → yellow (neutral) → red (unstable)
+
+The `--package` detail view shows who depends on this package and what it depends on, with import counts for each relationship.
+
 ### Dashboard
 
 When `semanticEngine` is set to `qdrant` or `typesense`, use these commands to manage the background server and its dashboard UI.
@@ -460,8 +559,10 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `trackCallSites` | boolean | `true` | Record line/column for call edges |
 | `enableEmbeddings` | boolean | `false` | Generate semantic embeddings (opt-in, ~130MB model) |
 | `embeddingModel` | string | `nomic-ai/nomic-embed-text-v1.5` | HuggingFace model for embeddings |
-| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, `qdrant`, or `typesense` (see below) |
+| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, `qdrant`, or `typesense` |
 | `useVecIndex` | boolean | `false` | Deprecated alias for `semanticEngine: "sqlite-vec"` |
+| `enableArchitecture` | boolean | `false` | Enable architecture analysis (package graph + layer detection, opt-in) |
+| `architectureLayers` | object | — | Custom layer definitions: `{ "layerName": ["glob/**"] }` |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 | `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
 
@@ -666,6 +767,71 @@ kirograph dashboard stop    # stop server
 ```
 
 If not installed (or binary download fails), falls back to `cosine`.
+
+### Architecture Analysis (opt-in)
+
+When `enableArchitecture: true` is set, KiroGraph analyses the high-level structure of your project during indexing and populates `arch_*` tables in `kirograph.db`. Zero behavioral change when disabled.
+
+#### What it detects
+
+**Packages** — logical groupings of files. Detected two ways:
+
+1. **Manifest-based** — parsed from `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`/`setup.py`/`setup.cfg`, `pom.xml`, `build.gradle`/`build.gradle.kts`, and `.csproj` files. Produces IDs like `pkg:npm:src/auth`.
+2. **Directory fallback** — for files not covered by any manifest, groups them by their nearest ancestor directory. Produces IDs like `pkg:dir:src/utils`.
+
+**Layers** — architectural tiers detected from file paths using per-language glob patterns:
+
+| Layer | Examples |
+|-------|---------|
+| `api` | `**/controllers/**`, `**/routes/**`, `**/handlers/**`, `**/api/**` |
+| `service` | `**/services/**`, `**/usecases/**`, `**/domain/**` |
+| `data` | `**/repositories/**`, `**/models/**`, `**/db/**`, `**/migrations/**` |
+| `ui` | `**/components/**`, `**/views/**`, `**/pages/**`, `**/screens/**` |
+| `shared` | `**/utils/**`, `**/helpers/**`, `**/lib/**`, `**/common/**` |
+
+Layer detection is per-language (TypeScript/JS, Python, Go, Java, Ruby, Rust, C#) with framework-specific patterns where applicable (Django, Rails, Spring MVC, ASP.NET, etc.). Custom layer overrides are supported via `architectureLayers` in config.
+
+**Package dependencies** — rolled up from existing `imports` edges in the graph. No re-parsing required.
+
+**Coupling metrics** — computed per package:
+- **Ca** (afferent) — how many other packages depend on this one
+- **Ce** (efferent) — how many packages this one depends on
+- **Instability** — `Ce / (Ca + Ce)`: 0 = maximally stable (everyone depends on it, it depends on nothing), 1 = maximally unstable (depends on everything, nobody depends on it)
+
+#### Custom layer definitions
+
+Override or extend the auto-detected layer patterns in `.kirograph/config.json`:
+
+```json
+{
+  "enableArchitecture": true,
+  "architectureLayers": {
+    "api": ["src/routes/**", "src/controllers/**"],
+    "service": ["src/domain/**", "src/application/**"],
+    "data": ["src/infrastructure/**", "src/persistence/**"]
+  }
+}
+```
+
+When `architectureLayers` is set, those patterns take precedence over the auto-detected ones for the specified layer names.
+
+#### Storage
+
+All architecture data is stored in `kirograph.db` alongside the symbol graph:
+
+| Table | Contents |
+|-------|---------|
+| `arch_packages` | Package definitions (id, name, path, source, language, version, deps) |
+| `arch_layers` | Layer definitions (id, name, patterns) |
+| `arch_file_packages` | File → package assignments |
+| `arch_file_layers` | File → layer assignments (with confidence score) |
+| `arch_package_deps` | Package → package dependency edges (with import count) |
+| `arch_layer_deps` | Layer → layer dependency edges |
+| `arch_coupling` | Per-package Ca, Ce, instability metrics |
+
+#### IndexProgress phase
+
+Architecture analysis runs as a dedicated phase during `kirograph index`. Progress is reported with `phase: 'architecture'`.
 
 ## Supported Languages
 
