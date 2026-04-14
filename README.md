@@ -62,7 +62,6 @@ Enable and configure via `kirograph install` (interactive arrow-key menu) or dir
 }
 ```
 
-<<<<<<< HEAD
 ### Architecture analysis (opt-in)
 
 When `enableArchitecture: true` is set, KiroGraph detects the high-level structure of your project — packages and architectural layers — and computes coupling metrics between them. Results are stored in `arch_*` tables inside `kirograph.db` and exposed via dedicated MCP tools and CLI commands.
@@ -77,12 +76,9 @@ Enable via `kirograph install` or directly in `.kirograph/config.json`:
 
 See the [Architecture Analysis](#architecture-analysis-opt-in-1) section below for full details.
 
-## Quick Start
-=======
 ## Installation
 
-### From npm (recommended)
->>>>>>> main
+### From npm (not yet available on npm registry)
 
 ```bash
 npm install -g kirograph
