@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0] - 2026-04-14
+
+### Added
+
+- Caveman mode — agent communication style compression, inspired by [caveman](https://github.com/JuliusBrussee/caveman) by JuliusBrussee
+- `cavemanMode` config field (`off` | `lite` | `full` | `ultra`); default `off`
+- `kirograph caveman [mode]` command — reads or sets the mode; regenerates steering file and CLI agent config immediately
+- Four compression levels: `lite` (compact, no filler, full sentences), `full` (fragments, no articles), `ultra` (maximum compression, abbreviations, `→` for causality)
+- Rules injected into `.kiro/steering/kirograph.md` (IDE, `inclusion: always`) and inlined into `.kiro/agents/kirograph.json` prompt (kiro-cli) — no extra hook calls
+- `kirograph install` interactive arrow-key prompt for caveman mode selection
+
+### Changed
+
+- Caveman rules no longer use a dedicated hook file (`kirograph-caveman.json`) — the steering file's `inclusion: always` makes injection hooks unnecessary for both IDE and CLI
+
+---
+
 ## [0.8.0] - 2026-04-14
 
 ### Added
@@ -173,6 +190,7 @@
 - MCP tools: `kirograph_context`, `kirograph_search`, `kirograph_callers`, `kirograph_callees`, `kirograph_impact`, `kirograph_node`, `kirograph_type_hierarchy`, `kirograph_path`, `kirograph_dead_code`, `kirograph_circular_deps`, `kirograph_files`, `kirograph_status`
 - CLI: `kirograph index`, `kirograph sync`, `kirograph query`, `kirograph context`, `kirograph files`, `kirograph affected`, `kirograph status`, `kirograph unlock`
 
+[0.9.0]: https://github.com/davide-desio-eleva/kirograph/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/davide-desio-eleva/kirograph/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/davide-desio-eleva/kirograph/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/davide-desio-eleva/kirograph/compare/v0.5.0...v0.6.0

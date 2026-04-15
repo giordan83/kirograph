@@ -490,6 +490,35 @@ if [ -n "$AFFECTED" ]; then
 fi
 ```
 
+### 🪨 Caveman Mode 🪨
+
+Caveman mode compresses the agent's communication style, cutting token usage on responses without affecting tool calls or code output. Inspired by [caveman](https://github.com/JuliusBrussee/caveman) 🪨 by [JuliusBrussee](https://github.com/JuliusBrussee).
+
+**Why it's useful:** KiroGraph's graph tools return compact, structured data. The bottleneck in long coding sessions isn't the tool calls — it's the verbose prose the agent wraps around them. Caveman mode strips that overhead so you get the signal without the filler. The rules are injected at session start via the steering file (IDE) and the inline agent prompt (kiro-cli), so they're always in context with no extra tool calls.
+
+Four levels:
+
+| Mode | Style |
+|------|-------|
+| `off` | Normal responses *(default)* |
+| `lite` | Compact, no filler, full sentences |
+| `full` | Fragments, no articles, short synonyms |
+| `ultra` | Maximum compression, abbreviations, `→` for causality |
+
+```bash
+kirograph caveman lite    # compact, still readable
+kirograph caveman full    # fragments, no articles
+kirograph caveman ultra   # maximum compression
+kirograph caveman off     # back to normal
+kirograph caveman         # show current mode
+```
+
+Set during `kirograph install` (interactive arrow-key menu) or any time after. Takes effect on the next agent session.
+
+Caveman mode never touches code blocks, file paths, URLs, or technical terms — only prose.
+
+**Auto-clarity exceptions:** the agent temporarily reverts to normal prose for security warnings, confirmations of irreversible actions (delete, overwrite, force-push), and multi-step sequences where fragment order could cause misunderstanding. Compressed style resumes immediately after.
+
 ### Architecture Analysis *(requires `enableArchitecture: true`)*
 
 Visualize the detected package graph, architectural layers, and package dependencies.
@@ -590,6 +619,7 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `architectureLayers` | object | — | Custom layer definitions: `{ "layerName": ["glob/**"] }` |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 | `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
+| `cavemanMode` | string | `off` | Agent communication style: `off`, `lite`, `full`, `ultra` |
 
 Default exclude patterns: `node_modules/**`, `dist/**`, `build/**`, `.git/**`, `*.min.js`, `.kirograph/**`
 
