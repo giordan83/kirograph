@@ -55,6 +55,15 @@ function copyAssets(): void {
     }
   }
 
+  // logo (used by export command)
+  const assetsSrc = path.join(__dirname, '..', 'assets');
+  const assetsDst = path.join(dist, 'assets');
+  fs.mkdirSync(assetsDst, { recursive: true });
+  const logoSrc = path.join(assetsSrc, 'logo.png');
+  if (fs.existsSync(logoSrc)) {
+    fs.copyFileSync(logoSrc, path.join(assetsDst, 'logo.png'));
+  }
+
   console.log('Assets copied.');
 }
 

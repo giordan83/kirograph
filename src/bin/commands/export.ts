@@ -24,7 +24,21 @@ async function generateExport(
   cg.close();
 
   const projectName = path.basename(target);
-  const html = buildHtml(nodes, edges, projectName, opts.includeContains);
+
+  // Embed logo as base64 if it exists next to this package
+  let logoBase64: string | undefined;
+  const logoCandidates = [
+    path.join(__dirname, '../../assets/logo.png'),         // dist layout
+    path.join(__dirname, '../../../assets/logo.png'),      // src layout (dev)
+  ];
+  for (const p of logoCandidates) {
+    if (fs.existsSync(p)) {
+      logoBase64 = fs.readFileSync(p).toString('base64');
+      break;
+    }
+  }
+
+  const html = buildHtml(nodes, edges, projectName, opts.includeContains, logoBase64);
 
   const outPath = opts.output
     ? path.resolve(opts.output)
@@ -105,7 +119,7 @@ function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildHtml(nodes: any[], edges: any[], projectName: string, includeContains: boolean): string {
+function buildHtml(nodes: any[], edges: any[], projectName: string, includeContains: boolean, logoBase64?: string): string {
   const filteredEdges = includeContains ? edges : edges.filter(e => e.kind !== 'contains');
 
   const degree = new Map<string, number>();
@@ -378,7 +392,9 @@ input[type=range] {
 <body>
 
 <div id="header">
-  <h1>⬡ KiroGraph</h1>
+  ${logoBase64
+    ? `<img src="data:image/png;base64,${logoBase64}" alt="KiroGraph" style="height:32px;width:auto;object-fit:contain;flex-shrink:0">`
+    : `<h1>⬡ KiroGraph</h1>`}
   <span class="sep">·</span>
   <span id="stats">${visNodes.length} nodes · ${visEdges.length} edges</span>
   <span class="sep">·</span>
