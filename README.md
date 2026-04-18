@@ -104,6 +104,36 @@ After building, the `kirograph` and `kg` commands are available globally.
 kirograph --version
 ```
 
+## Uninstallation
+
+### Remove from a project
+
+```bash
+kirograph uninit [path]     # Remove .kirograph/, hooks, and steering file from the project
+kirograph uninit --force    # Skip confirmation prompt
+```
+
+This removes:
+- `.kirograph/` — index database, snapshots, and exported HTML
+- `.kiro/hooks/kirograph-*.json` — all KiroGraph hooks
+- `.kiro/steering/kirograph.md` — the steering file
+- `.kiro/agents/kirograph.json` — the CLI agent config
+
+### Remove the CLI globally
+
+If installed from npm:
+
+```bash
+npm uninstall -g kirograph
+```
+
+If installed from source:
+
+```bash
+cd kirograph
+npm uninstall -g .
+```
+
 ## Quick Start
 
 ```bash
