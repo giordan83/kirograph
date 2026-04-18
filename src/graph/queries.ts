@@ -100,9 +100,9 @@ export class GraphQueryManager {
       const [currentId, depth] = queue.shift()!;
       if (depth >= maxDepth) continue;
 
-      const edges = this.db.getEdgesForNodes([currentId]).filter(e => e.source === currentId);
+      const edges = this.db.getEdgesForNodes([currentId]);
       for (const edge of edges) {
-        const neighborId = edge.target;
+        const neighborId = edge.source === currentId ? edge.target : edge.source;
         if (!visited.has(neighborId)) {
           visited.add(neighborId);
           prev.set(neighborId, currentId);
