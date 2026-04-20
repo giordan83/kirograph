@@ -715,6 +715,8 @@ kirograph export build --include-contains # Include structural contains edges (a
 
 Output lands in `.kirograph/export/` by default. Open `index.html` in any browser.
 
+![KiroGraph export](assets/export.gif)
+
 #### Graph & navigation
 
 - **Color-coded nodes** by kind (class, function, method, component…) with size proportional to degree
