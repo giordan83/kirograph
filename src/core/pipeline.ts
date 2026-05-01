@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import { GraphDatabase } from '../db/database';
 import { scanDirectory, hashContent, getChangedFiles } from '../sync/index';
 import { extractFile } from '../extraction/extractor';
+import { clearParserCache } from '../extraction/grammars';
 import { detectFrameworks } from '../frameworks/index';
 import { ReferenceResolver } from '../resolution/index';
 import { VectorManager } from '../vectors/index';
@@ -109,7 +110,19 @@ export class IndexPipeline {
 
           filesIndexed++;
         } catch (err) {
-          errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${file}: ${msg}`);
+
+          // Detect WASM runtime abort (tree-sitter or sqlite).
+          // Once Emscripten sets ABORT=true the module is permanently dead.
+          // Reset the parser cache so subsequent files can re-initialize.
+          if (
+            err instanceof WebAssembly.RuntimeError ||
+            msg.includes('Aborted(') ||
+            msg.includes('RuntimeError')
+          ) {
+            clearParserCache();
+          }
         }
       }
 

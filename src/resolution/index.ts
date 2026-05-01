@@ -128,104 +128,126 @@ export class ReferenceResolver {
     let resolved = 0;
     const total = refs.length;
 
-    for (let i = 0; i < refs.length; i++) {
-      const ref = refs[i];
-      onProgress?.(i + 1, total);
-      const {
-        id: refId,
-        source_id: sourceId,
-        ref_name: refName,
-        ref_kind: refKind,
-        file_path: filePath,
-        line,
-        column,
-      } = ref;
+    // Process in batched transactions to avoid WASM heap exhaustion.
+    // Without batching, each individual write allocates journal pages in the
+    // WASM linear memory, which can exceed the 2GB limit on large codebases.
+    const BATCH_SIZE = 1000;
 
-      const attemptedStrategies: string[] = [];
-      let targetId: string | null = null;
+    // Skip the expensive "scan all nodes" fuzzy fallback for very large graphs.
+    // The O(N*M) cost is prohibitive and the WASM heap cannot sustain it.
+    const FUZZY_ALL_NODES_LIMIT = 200_000;
+    const skipFullFuzzy = this.nodeByIdCache.size > FUZZY_ALL_NODES_LIMIT;
+    if (skipFullFuzzy) {
+      logDebug(`ReferenceResolver: skipping full-scan fuzzy (${this.nodeByIdCache.size} nodes exceeds ${FUZZY_ALL_NODES_LIMIT} limit)`);
+    }
 
-      if (refKind === 'import') {
-        // Strategy: import-path-based resolution (confidence 1.0)
-        attemptedStrategies.push('import-path');
-        targetId = this._resolveImportPath(refName, filePath);
-      } else {
-        // Strategy 1: Framework-specific (placeholder — not yet implemented)
-        attemptedStrategies.push('framework');
+    for (let batchStart = 0; batchStart < refs.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, refs.length);
 
-        // Strategy 2: Qualified name match (confidence 0.95)
-        attemptedStrategies.push('qualified');
-        const qualifiedNode = this.qualifiedNameCache.get(refName);
-        if (qualifiedNode) {
-          targetId = qualifiedNode.id;
-        }
+      // Wrap each batch in a transaction — dramatically reduces write amplification
+      rawDb.run('BEGIN');
+      try {
+        for (let i = batchStart; i < batchEnd; i++) {
+          const ref = refs[i];
+          onProgress?.(i + 1, total);
+          const {
+            id: refId,
+            source_id: sourceId,
+            ref_name: refName,
+            ref_kind: refKind,
+            file_path: filePath,
+            line,
+            column,
+          } = ref;
 
-        // Strategy 3: Method call pattern (confidence 0.85)
-        if (!targetId && refName.includes('.')) {
-          attemptedStrategies.push('method');
-          const methodPart = refName.slice(refName.lastIndexOf('.') + 1);
-          const methodCandidates = this.nameCache.get(methodPart) ?? [];
-          if (methodCandidates.length > 0) {
-            targetId = methodCandidates[0].id;
-          }
-        }
+          const attemptedStrategies: string[] = [];
+          let targetId: string | null = null;
 
-        // Strategy 4: Exact name match (confidence 0.9)
-        if (!targetId) {
-          attemptedStrategies.push('exact');
-          const exactCandidates = this.nameCache.get(refName) ?? [];
-          if (exactCandidates.length > 0) {
-            targetId = exactCandidates[0].id;
-          }
-        }
+          if (refKind === 'import') {
+            attemptedStrategies.push('import-path');
+            targetId = this._resolveImportPath(refName, filePath);
+          } else {
+            attemptedStrategies.push('framework');
 
-        // Strategy 5: Fuzzy / lowercase match (confidence 0.5)
-        if (!targetId) {
-          attemptedStrategies.push('fuzzy');
-          const threshold = this.config.fuzzyResolutionThreshold ?? 0.5;
-          const lowerRef = refName.toLowerCase();
-          const fuzzyCandidates = this.lowerNameCache.get(lowerRef) ?? [];
+            // Strategy 2: Qualified name match (confidence 0.95)
+            attemptedStrategies.push('qualified');
+            const qualifiedNode = this.qualifiedNameCache.get(refName);
+            if (qualifiedNode) {
+              targetId = qualifiedNode.id;
+            }
 
-          if (fuzzyCandidates.length > 0) {
-            const match = matchReference(refName, fuzzyCandidates, threshold);
-            if (match) {
-              targetId = match.nodeId;
+            // Strategy 3: Method call pattern (confidence 0.85)
+            if (!targetId && refName.includes('.')) {
+              attemptedStrategies.push('method');
+              const methodPart = refName.slice(refName.lastIndexOf('.') + 1);
+              const methodCandidates = this.nameCache.get(methodPart) ?? [];
+              if (methodCandidates.length > 0) {
+                targetId = methodCandidates[0].id;
+              }
+            }
+
+            // Strategy 4: Exact name match (confidence 0.9)
+            if (!targetId) {
+              attemptedStrategies.push('exact');
+              const exactCandidates = this.nameCache.get(refName) ?? [];
+              if (exactCandidates.length > 0) {
+                targetId = exactCandidates[0].id;
+              }
+            }
+
+            // Strategy 5: Fuzzy / lowercase match (confidence 0.5)
+            if (!targetId) {
+              attemptedStrategies.push('fuzzy');
+              const threshold = this.config.fuzzyResolutionThreshold ?? 0.5;
+              const lowerRef = refName.toLowerCase();
+              const fuzzyCandidates = this.lowerNameCache.get(lowerRef) ?? [];
+
+              if (fuzzyCandidates.length > 0) {
+                const match = matchReference(refName, fuzzyCandidates, threshold);
+                if (match) {
+                  targetId = match.nodeId;
+                }
+              }
+
+              // Full-scan fuzzy: only for smaller graphs (O(N*M) is too expensive otherwise)
+              if (!targetId && !skipFullFuzzy) {
+                const allCandidates = [...this.nodeByIdCache.values()];
+                const match = matchReference(refName, allCandidates, threshold);
+                if (match) {
+                  targetId = match.nodeId;
+                }
+              }
             }
           }
 
-          // If still not found, try matchReference across all cached nodes
-          if (!targetId) {
-            const allCandidates = [...this.nodeByIdCache.values()];
-            const match = matchReference(refName, allCandidates, threshold);
-            if (match) {
-              targetId = match.nodeId;
+          if (targetId) {
+            const edge: Edge = {
+              source: sourceId,
+              target: targetId,
+              kind: refKind === 'import' ? 'imports' : 'calls',
+              line: line ?? undefined,
+              column: column ?? undefined,
+            };
+            this.db.insertEdge(edge);
+            rawDb.run('DELETE FROM unresolved_refs WHERE id = ?', [refId]);
+            resolved++;
+          } else {
+            const strategiesJson = JSON.stringify(attemptedStrategies);
+            try {
+              rawDb.run(
+                'UPDATE unresolved_refs SET attempted_strategies = ? WHERE id = ?',
+                [strategiesJson, refId]
+              );
+            } catch {
+              logWarn(`ReferenceResolver: failed to record attempted strategies for ref ${refId}`);
             }
           }
         }
-      }
-
-      if (targetId) {
-        // Insert resolved edge
-        const edge: Edge = {
-          source: sourceId,
-          target: targetId,
-          kind: refKind === 'import' ? 'imports' : 'calls',
-          line: line ?? undefined,
-          column: column ?? undefined,
-        };
-        this.db.insertEdge(edge);
-        rawDb.run('DELETE FROM unresolved_refs WHERE id = ?', [refId]);
-        resolved++;
-      } else {
-        // Record attempted strategies on failure
-        const strategiesJson = JSON.stringify(attemptedStrategies);
-        try {
-          rawDb.run(
-            'UPDATE unresolved_refs SET attempted_strategies = ? WHERE id = ?',
-            [strategiesJson, refId]
-          );
-        } catch {
-          logWarn(`ReferenceResolver: failed to record attempted strategies for ref ${refId}`);
-        }
+        rawDb.run('COMMIT');
+      } catch (err) {
+        // Roll back the failed batch but continue with remaining batches
+        try { rawDb.run('ROLLBACK'); } catch { /* already rolled back */ }
+        logWarn(`ReferenceResolver: batch ${batchStart}-${batchEnd} failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
