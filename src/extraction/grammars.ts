@@ -154,6 +154,15 @@ export function isGrammarLoaded(language: Language): boolean {
 }
 
 /**
+ * Returns true if a WASM grammar file exists for the given language,
+ * regardless of whether it has been loaded yet.
+ * Use this to distinguish "language has no grammar" from "grammar failed to load".
+ */
+export function hasWasmGrammar(language: Language): boolean {
+  return resolveWasmPath(language) !== null;
+}
+
+/**
  * Returns the list of languages for which a WASM grammar file is known.
  * Languages with an empty GRAMMAR_FILE_MAP entry are excluded.
  */
