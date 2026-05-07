@@ -94,6 +94,31 @@ function scanDirectoryWalk(
   return results;
 }
 
+// ── Git root helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Finds all git roots at or under `root` (including root itself).
+ * Returns paths sorted shallowest-first so parent roots are processed before children.
+ */
+function findGitRoots(root: string): string[] {
+  const roots: string[] = [];
+
+  const walk = (dir: string) => {
+    if (fs.existsSync(path.join(dir, '.git'))) {
+      roots.push(dir);
+      return; // don't recurse into nested git repos
+    }
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.isDirectory()) walk(path.join(dir, entry.name));
+    }
+  };
+
+  walk(root);
+  return roots.length > 0 ? roots : [root];
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -121,7 +146,9 @@ export function hashContent(content: Buffer | string): string {
 
 /**
  * Returns absolute paths of all indexable files under root.
- * Uses git ls-files fast-path when available; falls back to filesystem walk.
+ * Handles monorepos with multiple nested git roots by running git ls-files
+ * from each sub-repo root independently, then merging results.
+ * Falls back to filesystem walk if no git roots found.
  * Respects AbortSignal.
  */
 export async function scanDirectory(
@@ -131,31 +158,37 @@ export async function scanDirectory(
 ): Promise<string[]> {
   if (signal?.aborted) return [];
 
-  // Try git fast-path
-  try {
-    const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 10_000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+  const gitRoots = findGitRoots(root);
+  const allFiles: string[] = [];
 
-    if (signal?.aborted) return [];
-
-    const relPaths = output.split('\n').filter(Boolean);
-    return relPaths
-      .filter(rel => shouldIncludeFile(rel, config))
-      .map(rel => path.join(root, rel))
-      .filter(abs => detectLanguage(abs) !== 'unknown');
-  } catch {
-    // Fall through to filesystem walk
+  for (const gitRoot of gitRoots) {
+    if (signal?.aborted) return allFiles;
+    try {
+      const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+        cwd: gitRoot,
+        encoding: 'utf8',
+        timeout: 10_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      if (signal?.aborted) return allFiles;
+      const files = output.split('\n').filter(Boolean)
+        .map(rel => path.join(gitRoot, rel))
+        .filter(abs => {
+          const rel = path.relative(root, abs).replace(/\\/g, '/');
+          return shouldIncludeFile(rel, config) && detectLanguage(abs) !== 'unknown';
+        });
+      allFiles.push(...files);
+    } catch {
+      // git unavailable for this root — fall back to walk
+      allFiles.push(...scanDirectoryWalk(gitRoot, config, signal));
+    }
   }
 
-  return scanDirectoryWalk(root, config, signal);
+  return allFiles;
 }
 
 /**
- * Classifies git-changed files into added / modified / removed.
+ * Classifies git-changed files into added / modified / removed across all nested git roots.
  * Returns absolute paths. Returns empty arrays if git is unavailable.
  * Excludes paths whose detected language is 'unknown'.
  */
@@ -163,39 +196,38 @@ export async function getChangedFiles(
   root: string,
   config: KiroGraphConfig
 ): Promise<{ added: string[]; modified: string[]; removed: string[] }> {
-  const empty = { added: [] as string[], modified: [] as string[], removed: [] as string[] };
+  const added: string[] = [];
+  const modified: string[] = [];
+  const removed: string[] = [];
 
-  try {
-    const output = execFileSync('git', ['status', '--porcelain', '--no-renames'], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 10_000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+  const gitRoots = findGitRoots(root);
 
-    const added: string[] = [];
-    const modified: string[] = [];
-    const removed: string[] = [];
+  for (const gitRoot of gitRoots) {
+    try {
+      const output = execFileSync('git', ['status', '--porcelain', '--no-renames'], {
+        cwd: gitRoot,
+        encoding: 'utf8',
+        timeout: 10_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
 
-    for (const line of output.split('\n').filter(Boolean)) {
-      const statusCode = line.slice(0, 2);
-      const relPath = line.slice(3).trim();
-      const absPath = path.join(root, relPath);
-
-      // Exclude unknown languages
-      if (detectLanguage(absPath) === 'unknown') continue;
-
-      if (statusCode === '??' ) {
-        added.push(absPath);
-      } else if (statusCode[0] === 'D' || statusCode[1] === 'D') {
-        removed.push(absPath);
-      } else {
-        modified.push(absPath);
+      for (const line of output.split('\n').filter(Boolean)) {
+        const statusCode = line.slice(0, 2);
+        const relPath = line.slice(3).trim();
+        const absPath = path.join(gitRoot, relPath);
+        if (detectLanguage(absPath) === 'unknown') continue;
+        if (statusCode === '??') {
+          added.push(absPath);
+        } else if (statusCode[0] === 'D' || statusCode[1] === 'D') {
+          removed.push(absPath);
+        } else {
+          modified.push(absPath);
+        }
       }
+    } catch {
+      // git unavailable for this root — skip
     }
-
-    return { added, modified, removed };
-  } catch {
-    return empty;
   }
+
+  return { added, modified, removed };
 }
