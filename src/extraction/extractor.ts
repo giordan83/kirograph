@@ -14,7 +14,7 @@ import { initGrammars, getParser, hasWasmGrammar } from './grammars';
 export interface UnresolvedRef {
   sourceId: string;
   refName: string;
-  refKind: 'function' | 'import';
+  refKind: 'function' | 'import' | 'extends' | 'implements';
   line: number;
   column: number;
 }
@@ -374,6 +374,11 @@ function walkTree(
 
       // Collect call references within this symbol
       collectCallRefs(node, source, id, unresolvedRefs);
+
+      // Extract inheritance edges for C# and Java class/interface nodes
+      if ((kind === 'class' || kind === 'interface') && (language === 'csharp' || language === 'java')) {
+        extractInheritance(node, source, language, id, unresolvedRefs);
+      }
 
       // Recurse with this node as parent
       for (let i = 0; i < node.childCount; i++) {
@@ -772,31 +777,158 @@ function isStatic(node: any): boolean {
 
 // ── Call reference collection ─────────────────────────────────────────────────
 
+/**
+ * Node types that represent a function/method call across all supported languages.
+ * Using a combined set avoids threading a language parameter through the recursive walker.
+ */
+const CALL_NODE_TYPES = new Set([
+  'call_expression',          // JS/TS/Go/Rust/Swift/Kotlin/Dart/C/C++
+  'invocation_expression',    // C#
+  'method_invocation',        // Java
+  'call',                     // Python/Ruby/Elixir (function calls in bodies)
+  'function_call_expression', // PHP
+]);
+
+/**
+ * Extract the callee name from a call node.
+ * Uses named field lookup first (more precise), then falls back to first-child heuristic.
+ */
+function extractCallName(node: any, source: string): string | null {
+  // Named fields — Java uses 'name', Python/Ruby use 'function'/'method', Elixir uses 'target'
+  for (const field of ['name', 'method', 'function', 'target']) {
+    const f = node.childForFieldName?.(field);
+    if (f) {
+      const t = f.type;
+      if (t === 'identifier' || t === 'name' || t === 'property_identifier' || t === 'type_identifier') {
+        const text = source.slice(f.startIndex, f.endIndex).trim();
+        if (text && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(text)) return text;
+      }
+    }
+  }
+  // Fallback: first child, take final segment of dotted access (covers JS/TS, C#, Go, Rust…)
+  const funcNode = node.child(0);
+  if (funcNode) {
+    const rawName = source.slice(funcNode.startIndex, funcNode.endIndex).split('(')[0].trim();
+    if (rawName && rawName.length < 100) {
+      const calleeName = rawName.split('.').pop()!.trim();
+      if (calleeName && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(calleeName)) return calleeName;
+    }
+  }
+  return null;
+}
+
 function collectCallRefs(node: any, source: string, sourceId: string, unresolvedRefs: UnresolvedRef[]): void {
   walkForCalls(node, source, sourceId, unresolvedRefs);
 }
 
 function walkForCalls(node: any, source: string, sourceId: string, unresolvedRefs: UnresolvedRef[]): void {
-  if (node.type === 'call_expression') {
-    const funcNode = node.child(0);
-    if (funcNode) {
-      const rawName = source.slice(funcNode.startIndex, funcNode.endIndex).split('(')[0].trim();
-      if (rawName && rawName.length < 100) {
-        // Use only the final segment of dotted/chained calls (e.g., "a.b.c()" → "c")
-        const calleeName = rawName.split('.').pop()!.trim();
-        if (calleeName && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(calleeName)) {
-          unresolvedRefs.push({
-            sourceId,
-            refName: calleeName,
-            refKind: 'function',
-            line: node.startPosition.row + 1,
-            column: node.startPosition.column,
-          });
-        }
-      }
+  if (CALL_NODE_TYPES.has(node.type)) {
+    const calleeName = extractCallName(node, source);
+    if (calleeName) {
+      unresolvedRefs.push({
+        sourceId,
+        refName: calleeName,
+        refKind: 'function',
+        line: node.startPosition.row + 1,
+        column: node.startPosition.column,
+      });
     }
   }
   for (let i = 0; i < node.childCount; i++) {
     walkForCalls(node.child(i), source, sourceId, unresolvedRefs);
+  }
+}
+
+// ── Inheritance extraction ────────────────────────────────────────────────────
+
+/**
+ * Extract the simple type name from an AST node representing a type reference.
+ * Strips generic parameters (e.g. "List<T>" → "List").
+ */
+function extractTypeName(node: any, source: string): string | null {
+  const t = node.type;
+  if (t === 'identifier' || t === 'type_identifier' || t === 'name') {
+    return source.slice(node.startIndex, node.endIndex).trim() || null;
+  }
+  // qualified_name / generic_name: take the rightmost identifier
+  if (t === 'qualified_name' || t === 'generic_name' || t === 'scoped_type_identifier') {
+    for (let i = node.childCount - 1; i >= 0; i--) {
+      const child = node.child(i);
+      if (child.type === 'identifier' || child.type === 'type_identifier' || child.type === 'name') {
+        return source.slice(child.startIndex, child.endIndex).trim() || null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Scan a class/interface AST node for its base types and add them as unresolved
+ * extends/implements refs, which the resolver later turns into graph edges.
+ *
+ * C#:  base_list  children → all are either base class or interface (can't distinguish without types)
+ * Java: superclass → extends; super_interfaces / extends_interfaces → implements / extends
+ */
+function extractInheritance(
+  node: any,
+  source: string,
+  language: Language,
+  classNodeId: string,
+  unresolvedRefs: UnresolvedRef[],
+): void {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+
+    if (language === 'csharp' && child.type === 'base_list') {
+      for (let j = 0; j < child.childCount; j++) {
+        const item = child.child(j);
+        const name = extractTypeName(item, source);
+        if (name) {
+          unresolvedRefs.push({
+            sourceId: classNodeId,
+            refName: name,
+            // In C# both classes and interfaces appear in the same base_list;
+            // we emit 'extends' for all — the resolver maps it to the extends edge
+            // which covers both parent classes and parent interfaces structurally.
+            refKind: 'extends',
+            line: item.startPosition.row + 1,
+            column: item.startPosition.column,
+          });
+        }
+      }
+    }
+
+    if (language === 'java') {
+      if (child.type === 'superclass') {
+        // superclass has a single type_identifier or scoped_type_identifier child
+        const typeNode = child.namedChild?.(0);
+        if (typeNode) {
+          const name = extractTypeName(typeNode, source);
+          if (name) unresolvedRefs.push({ sourceId: classNodeId, refName: name, refKind: 'extends', line: child.startPosition.row + 1, column: child.startPosition.column });
+        }
+      }
+      if (child.type === 'super_interfaces' || child.type === 'extends_interfaces') {
+        // contains a type_list with one or more types
+        const typeList = child.namedChild?.(0);
+        if (typeList) {
+          const count = typeList.namedChildCount ?? 0;
+          for (let j = 0; j < count; j++) {
+            const typeNode = typeList.namedChild(j);
+            if (typeNode) {
+              const name = extractTypeName(typeNode, source);
+              if (name) {
+                unresolvedRefs.push({
+                  sourceId: classNodeId,
+                  refName: name,
+                  refKind: child.type === 'extends_interfaces' ? 'extends' : 'implements',
+                  line: typeNode.startPosition.row + 1,
+                  column: typeNode.startPosition.column,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

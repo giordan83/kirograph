@@ -9,6 +9,12 @@
 - **Elixir architecture layer detection** — Phoenix-aware glob patterns for all five layers: `api` (controllers, channels, router, plugs), `service` (contexts, workers, jobs), `data` (schemas, repo, migrations), `ui` (LiveView, components, views, templates), `shared` (helpers, lib, config, mailers).
 - Auto-sync hooks now fire for `.ex` and `.exs` files.
 
+### Fixed
+
+- **Multi-language call edge extraction** — `walkForCalls` previously only recognised `call_expression` (JS/TS/Go/Rust/…). C# (`invocation_expression`), Java (`method_invocation`), Python (`call`), Ruby (`call`), and PHP (`function_call_expression`) produced zero call edges, causing empty `kirograph_callers`, `kirograph_callees`, and `kirograph_hotspots` results. All missing call node types are now handled with per-language name extraction using tree-sitter field lookups.
+- **Inheritance edge extraction for C# and Java** — `walkTree` now scans `base_list` (C# class/interface declarations) and `superclass`/`super_interfaces`/`extends_interfaces` (Java) to emit `extends` and `implements` edges. This restores `kirograph_type_hierarchy` results for C# and Java projects.
+- **Namespace/package import resolution** — `_resolveImportPath` previously returned `null` for any import that didn't start with `.`. Java package imports (`import com.example.Foo`) now resolve via exact qualifiedName lookup, then name+namespace-prefix match. C# namespace imports (`using MyApp.Services`) resolve via a new namespace prefix cache (built from qualifiedNames at warm-cache time) and namespace node lookup. Wildcard imports (`import com.example.*`) resolve to any type in the namespace.
+
 ---
 
 ## [0.11.0] - 2026-04-20
