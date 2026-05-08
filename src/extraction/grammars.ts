@@ -32,7 +32,7 @@ export const GRAMMAR_FILE_MAP: Record<Language, string> = {
   java: 'tree-sitter-java',
   c: 'tree-sitter-c',
   cpp: 'tree-sitter-cpp',
-  csharp: 'tree-sitter-c-sharp',
+  csharp: 'tree-sitter-c_sharp',
   php: 'tree-sitter-php',
   ruby: 'tree-sitter-ruby',
   swift: 'tree-sitter-swift',
