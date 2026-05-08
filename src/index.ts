@@ -118,8 +118,14 @@ export default class KiroGraph {
     return this.pipeline.indexAll(opts);
   }
 
-  async sync(changedFiles?: string[]): Promise<SyncResult> {
-    return this.pipeline.sync(changedFiles);
+  async sync(changedFilesOrOpts?: string[] | { files?: string[]; onProgress?: (p: IndexProgress) => void }): Promise<SyncResult> {
+    if (Array.isArray(changedFilesOrOpts)) {
+      return this.pipeline.sync({ changedFiles: changedFilesOrOpts });
+    }
+    return this.pipeline.sync({
+      changedFiles: changedFilesOrOpts?.files,
+      onProgress: changedFilesOrOpts?.onProgress,
+    });
   }
 
   // ── Symbol search ──────────────────────────────────────────────────────────

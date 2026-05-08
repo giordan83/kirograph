@@ -144,7 +144,11 @@ export interface SyncResult {
   modified: string[];
   removed: string[];
   nodesCreated: number;
+  nodesUpdated: number;
   nodesRemoved: number;
+  edgesCreated: number;
+  edgesRemoved: number;
+  filesScanned: number;
   errors: string[];
   duration: number;
 }

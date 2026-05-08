@@ -153,24 +153,37 @@ export class IndexPipeline {
     }
   }
 
-  async sync(changedFiles?: string[]): Promise<SyncResult> {
+  async sync(opts?: {
+    changedFiles?: string[];
+    onProgress?: (p: IndexProgress) => void;
+  }): Promise<SyncResult> {
     const release = await this.mutex.acquire();
     this.lock.acquire();
     const start = Date.now();
+    const changedFiles = opts?.changedFiles;
+    const onProgress = opts?.onProgress;
     const result: SyncResult = {
       added: [], modified: [], removed: [],
-      nodesCreated: 0, nodesRemoved: 0, errors: [], duration: 0,
+      nodesCreated: 0, nodesUpdated: 0, nodesRemoved: 0,
+      edgesCreated: 0, edgesRemoved: 0,
+      filesScanned: 0, errors: [], duration: 0,
     };
 
     try {
       const removeFile = async (rel: string) => {
-        await this.vectors.deleteEmbeddings(this.db.getNodesByFile(rel).map(n => n.id));
+        const oldNodes = this.db.getNodesByFile(rel);
+        const oldEdgeCount = this.db.getEdgesForNodes(oldNodes.map(n => n.id)).length;
+        result.nodesRemoved += oldNodes.length;
+        result.edgesRemoved += oldEdgeCount;
+        await this.vectors.deleteEmbeddings(oldNodes.map(n => n.id));
         this.db.deleteFile(rel);
         this.db.deleteUnresolvedRefsByFile(rel);
         result.removed.push(rel);
       };
 
       let filesToProcess: string[];
+
+      onProgress?.({ phase: 'scanning', current: 0, total: 0 });
 
       if (changedFiles) {
         filesToProcess = changedFiles.map(f => path.resolve(this.projectRoot, f));
@@ -190,6 +203,7 @@ export class IndexPipeline {
             (await scanDirectory(this.projectRoot, this.config))
               .map(f => path.relative(this.projectRoot, f).replace(/\\/g, '/'))
           );
+          result.filesScanned = current.size;
           for (const p of indexed) {
             if (!current.has(p)) await removeFile(p);
           }
@@ -197,7 +211,13 @@ export class IndexPipeline {
         }
       }
 
-      for (const file of filesToProcess) {
+      result.filesScanned = result.filesScanned || filesToProcess.length;
+      onProgress?.({ phase: 'scanning', current: result.filesScanned, total: result.filesScanned });
+
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file = filesToProcess[i];
+        onProgress?.({ phase: 'parsing', current: i + 1, total: filesToProcess.length, currentFile: file });
+
         if (!fs.existsSync(file)) {
           const rel = path.relative(this.projectRoot, file).replace(/\\/g, '/');
           await removeFile(rel);
@@ -213,10 +233,12 @@ export class IndexPipeline {
           if (!isNew && existing!.contentHash === extracted.contentHash) continue;
 
           const oldNodes = this.db.getNodesByFile(extracted.filePath);
+          const oldEdgeCount = this.db.getEdgesForNodes(oldNodes.map(n => n.id)).length;
           await this.vectors.deleteEmbeddings(oldNodes.map(n => n.id));
 
           this.db.transaction(() => {
             result.nodesRemoved += oldNodes.length;
+            result.edgesRemoved += oldEdgeCount;
             this.db.deleteNodesByFile(extracted.filePath);
             this.db.deleteUnresolvedRefsByFile(extracted.filePath);
             this.db.upsertFile({
@@ -228,7 +250,7 @@ export class IndexPipeline {
               indexedAt: Date.now(),
             });
             for (const node of extracted.nodes) { this.db.upsertNode(node); result.nodesCreated++; }
-            for (const edge of extracted.edges) { this.db.insertEdge(edge); }
+            for (const edge of extracted.edges) { this.db.insertEdge(edge); result.edgesCreated++; }
             for (const ref of extracted.unresolvedRefs) {
               this.db.insertUnresolvedRef(ref.sourceId, ref.refName, ref.refKind, extracted.filePath, ref.line, ref.column);
             }
@@ -236,17 +258,36 @@ export class IndexPipeline {
 
           this.resolver.invalidateFile(extracted.filePath);
           if (isNew) result.added.push(extracted.filePath);
-          else result.modified.push(extracted.filePath);
+          else { result.modified.push(extracted.filePath); result.nodesUpdated += extracted.nodes.length; }
         } catch (err) {
           result.errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 
-      await this.resolver.resolveAll();
+      // Resolve cross-file references
+      onProgress?.({ phase: 'resolving', current: 0, total: 1 });
+      await this.resolver.resolveAll((current, total) => {
+        onProgress?.({ phase: 'resolving', current, total });
+      });
+
       await detectFrameworks(this.projectRoot);
 
-      if (this.vectors.isInitialized()) await this.vectors.embedAll();
-      if (this.config.enableArchitecture) await this.arch.analyze();
+      // Generate embeddings (if enabled)
+      if (this.vectors.isInitialized()) {
+        onProgress?.({ phase: 'embeddings', current: 0, total: 1 });
+        await this.vectors.embedAll((current, total) =>
+          onProgress?.({ phase: 'embeddings', current, total })
+        );
+      }
+
+      // Analyze architecture (if enabled)
+      if (this.config.enableArchitecture) {
+        onProgress?.({ phase: 'architecture', current: 0, total: 1 });
+        await this.arch.analyze(msg =>
+          onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } })
+        );
+        onProgress?.({ phase: 'architecture', current: 1, total: 1 });
+      }
 
       this.lock.clearDirty();
       result.duration = Date.now() - start;
