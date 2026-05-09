@@ -32,12 +32,14 @@ import { register as registerSnapshot } from './commands/snapshot';
 import { register as registerPath } from './commands/path';
 import { register as registerExport } from './commands/export';
 
+declare const __CLI_VERSION__: string;
+
 const program = new Command();
 
 program
   .name('kirograph')
   .description('Semantic code knowledge graph for Kiro')
-  .version('0.1.0')
+  .version(__CLI_VERSION__)
   .addHelpCommand(true)
   .hook('preAction', (thisCommand) => {
     const name = thisCommand.name();
