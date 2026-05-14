@@ -11,9 +11,13 @@
 - **Sync state in `kirograph status` CLI** — the status command now shows a `Sync` section with idle/running state and pending file count, with a yellow warning when the count exceeds the threshold.
 - **`LockManager.isLocked()`** — exposes whether a sync/index is currently running in another process, used by both the MCP tool and CLI status command.
 - **`KiroGraph.getPendingSyncCount()`** — returns the number of files that have changed on disk but are not yet reflected in the index. Uses `git status` first, falls back to a filesystem diff against the indexed set.
+- **Large-codebase pre-flight warning** — when embeddable node count exceeds 100K, a yellow warning is printed before the embedding phase starts, advising the user to disable embeddings or use a lighter model.
+- **Paginated `embedAll`** — the embedding phase now streams nodes in pages of 2,000 instead of loading all nodes into memory at once. Critical for large codebases (100K+ symbols) where a single `getAllNodes()` call could exhaust the Node.js heap or WASM linear memory.
+- **`getEmbeddableNodesPaged()` and `countEmbeddableNodes()`** — new paginated DB queries for memory-efficient embedding.
 
 ### Fixed
 
+- **WASM parser poisoning on large codebases** — when a tree-sitter WASM parser aborts (e.g. due to memory pressure), the language is now tracked as "poisoned" and remaining files of that language are skipped until `clearParserCache()` + `initGrammars()` succeeds. Previously, every subsequent file of the same language would instantly re-abort, producing hundreds of `Aborted()` messages and wasting time.
 - `config-prompt.ts`: `cavemanMode` was missing from the initial `ConfigPatch` object literal, causing a TypeScript error. Default is now `'off'` (overwritten later in the prompt flow).
 - `config-prompt.ts`: `CavemanMode` type was used but never defined or imported; added local type alias.
 

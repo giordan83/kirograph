@@ -704,6 +704,28 @@ export class GraphDatabase {
     return this.db.all('SELECT * FROM nodes').map(this.rowToNode);
   }
 
+  /**
+   * Returns embeddable nodes in pages for memory-efficient streaming.
+   * `kinds` filters by node kind (e.g. ['function','method','class']).
+   * Returns an empty array when offset >= total count.
+   */
+  getEmbeddableNodesPaged(kinds: string[], limit: number, offset: number): import('../types').Node[] {
+    if (kinds.length === 0) return [];
+    const placeholders = kinds.map(() => '?').join(',');
+    return this.db.all(
+      `SELECT * FROM nodes WHERE kind IN (${placeholders}) LIMIT ? OFFSET ?`,
+      [...kinds, limit, offset]
+    ).map(this.rowToNode);
+  }
+
+  /** Count of nodes whose kind is in the provided list. */
+  countEmbeddableNodes(kinds: string[]): number {
+    if (kinds.length === 0) return 0;
+    const placeholders = kinds.map(() => '?').join(',');
+    const row = this.db.get(`SELECT COUNT(*) as c FROM nodes WHERE kind IN (${placeholders})`, kinds);
+    return row?.c ?? 0;
+  }
+
   getAllEdges(): Edge[] {
     return this.db.all('SELECT source, target, kind FROM edges').map((row: any) => ({
       source: row.source,

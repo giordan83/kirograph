@@ -54,6 +54,11 @@ export class IndexPipeline {
     let nodesCreated = 0;
     let edgesCreated = 0;
 
+    // Track languages whose WASM parser is currently poisoned (ABORT=true on the module).
+    // Once a language's parser aborts, every subsequent parse call for that language
+    // fails instantly. We skip those files until clearParserCache + initGrammars succeeds.
+    const poisonedLanguages = new Set<string>();
+
     try {
       const files = await scanDirectory(this.projectRoot, this.config, opts?.signal);
       opts?.onProgress?.({ phase: 'scanning', current: files.length, total: files.length });
@@ -83,6 +88,11 @@ export class IndexPipeline {
             const existing = this.db.getFile(relPath);
             if (existing && hashContent(content) === existing.contentHash) continue;
           }
+
+          // Skip files whose language parser is currently poisoned
+          const { detectLanguage } = await import('../extraction/languages');
+          const lang = detectLanguage(file);
+          if (poisonedLanguages.has(lang)) continue;
 
           const extracted = await extractFile(file, this.projectRoot, content);
           if (!extracted) continue;
@@ -119,9 +129,16 @@ export class IndexPipeline {
             || msg.includes('RuntimeError')
             || msg.includes('WASM grammar exists but failed to load');
           if (isWasmCrash) {
+            // Mark the language as poisoned so we skip remaining files of this language
+            const { detectLanguage } = await import('../extraction/languages');
+            const lang = detectLanguage(file);
+            poisonedLanguages.add(lang);
+
             clearParserCache();
             try {
               await initGrammars();
+              // Recovery succeeded — un-poison all languages
+              poisonedLanguages.clear();
             } catch {
               errors.push('WASM runtime unrecoverable after crash — aborting batch');
               break;
@@ -285,6 +302,8 @@ export class IndexPipeline {
       result.filesScanned = result.filesScanned || filesToProcess.length;
       onProgress?.({ phase: 'scanning', current: result.filesScanned, total: result.filesScanned });
 
+      const poisonedLanguages = new Set<string>();
+
       for (let i = 0; i < filesToProcess.length; i++) {
         const file = filesToProcess[i];
         onProgress?.({ phase: 'parsing', current: i + 1, total: filesToProcess.length, currentFile: file });
@@ -296,6 +315,11 @@ export class IndexPipeline {
         }
 
         try {
+          // Skip files whose language parser is currently poisoned
+          const { detectLanguage } = await import('../extraction/languages');
+          const lang = detectLanguage(file);
+          if (poisonedLanguages.has(lang)) continue;
+
           const extracted = await extractFile(file, this.projectRoot);
           if (!extracted) continue;
 
@@ -340,9 +364,14 @@ export class IndexPipeline {
             || msg.includes('RuntimeError')
             || msg.includes('WASM grammar exists but failed to load');
           if (isWasmCrash) {
+            const { detectLanguage } = await import('../extraction/languages');
+            const lang = detectLanguage(file);
+            poisonedLanguages.add(lang);
+
             clearParserCache();
             try {
               await initGrammars();
+              poisonedLanguages.clear();
             } catch {
               result.errors.push('WASM runtime unrecoverable after crash — aborting sync');
               break;

@@ -63,8 +63,15 @@ export function renderIndexProgress(p: IndexProgress): void {
     }
 
   } else if (p.phase === 'embeddings') {
-    process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
-    if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    if (p.current === -1) {
+      // Large-codebase pre-flight warning emitted by VectorManager
+      process.stdout.write(`\n  \x1b[33m⚠ Large codebase: ${_num(p.total)} embeddable symbols detected.\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  Embedding may be slow or memory-intensive. Consider setting enableEmbeddings: false\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  for codebases this large, or use a lighter model (e.g. Xenova/all-MiniLM-L6-v2).\x1b[0m\n\n`);
+    } else {
+      process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
+      if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    }
 
   } else {
     process.stdout.write(`\r  ${_v}${p.phase}${_r}  ${p.current}/${p.total}${' '.repeat(20)}`);
@@ -105,8 +112,14 @@ export function renderSyncProgress(p: IndexProgress): void {
     }
 
   } else if (p.phase === 'embeddings') {
-    process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
-    if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    if (p.current === -1) {
+      process.stdout.write(`\n  \x1b[33m⚠ Large codebase: ${_num(p.total)} embeddable symbols detected.\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  Embedding may be slow or memory-intensive. Consider setting enableEmbeddings: false\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  for codebases this large, or use a lighter model (e.g. Xenova/all-MiniLM-L6-v2).\x1b[0m\n\n`);
+    } else {
+      process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
+      if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    }
 
   } else {
     process.stdout.write(`\r  ${_v}${p.phase}${_r}  ${p.current}/${p.total}${' '.repeat(20)}`);
@@ -145,9 +158,15 @@ export function renderSyncProgressVerbose(p: IndexProgress): void {
     }
 
   } else if (p.phase === 'embeddings') {
-    const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
-    process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
-    if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    if (p.current === -1) {
+      process.stdout.write(`\n  \x1b[33m⚠ Large codebase: ${_num(p.total)} embeddable symbols detected.\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  Embedding may be slow or memory-intensive. Consider setting enableEmbeddings: false\x1b[0m\n`);
+      process.stdout.write(`  \x1b[33m  for codebases this large, or use a lighter model (e.g. Xenova/all-MiniLM-L6-v2).\x1b[0m\n\n`);
+    } else {
+      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
+      process.stdout.write(`\r  ${_v}embeddings${_r} [${_bar(pct)}] ${_v}${pct}%${_r}${' '.repeat(10)}`);
+      if (p.current === p.total && p.total > 0) process.stdout.write('\n');
+    }
 
   } else if (p.phase === 'architecture') {
     if (p.meta?.msg) {
