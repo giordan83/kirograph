@@ -17,7 +17,7 @@ export type Language =
   | 'java' | 'c' | 'cpp' | 'csharp' | 'php' | 'ruby' | 'swift' | 'kotlin'
   | 'dart' | 'svelte' | 'pascal' | 'liquid' | 'elixir'
   | 'scala' | 'lua' | 'zig' | 'bash' | 'ocaml' | 'elm' | 'solidity' | 'vue' | 'objc'
-  | 'yaml' | 'hcl'
+  | 'yaml' | 'hcl' | 'css' | 'scss'
   | 'unknown';
 
 export interface Node {

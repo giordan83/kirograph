@@ -52,6 +52,9 @@ export const GRAMMAR_FILE_MAP: Record<Language, string> = {
   yaml: 'tree-sitter-yaml',
   // HCL (Terraform) is bundled in src/extraction/wasm/ (not in tree-sitter-wasms)
   hcl: 'tree-sitter-hcl',
+  // CSS is in tree-sitter-wasms; SCSS is bundled in src/extraction/wasm/
+  css: 'tree-sitter-css',
+  scss: 'tree-sitter-scss',
   // Pascal is bundled in src/extraction/wasm/ (not in tree-sitter-wasms)
   pascal: 'tree-sitter-pascal',
   // No WASM available
@@ -91,6 +94,9 @@ function resolveWasmPath(lang: Language): string | null {
   }
   if (lang === 'hcl') {
     return path.join(__dirname, 'wasm', 'tree-sitter-hcl.wasm');
+  }
+  if (lang === 'scss') {
+    return path.join(__dirname, 'wasm', 'tree-sitter-scss.wasm');
   }
   const grammarFile = GRAMMAR_FILE_MAP[lang];
   if (!grammarFile) return null;

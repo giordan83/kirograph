@@ -483,6 +483,19 @@ function getLanguageSpecificKind(type: string, lang: Language): NodeKind | null 
       if (type === 'block') return 'namespace';
       if (type === 'attribute') return 'variable';
       break;
+    case 'scss':
+      if (type === 'mixin_statement') return 'function';
+      if (type === 'function_statement') return 'function';
+      if (type === 'variable_declaration') return 'variable';
+      if (type === 'include_statement') return 'import';
+      if (type === 'use_statement') return 'import';
+      if (type === 'forward_statement') return 'import';
+      if (type === 'placeholder') return 'class';
+      break;
+    case 'css':
+      if (type === 'rule_set') return 'class';
+      if (type === 'declaration') return 'variable';
+      break;
   }
   return null;
 }

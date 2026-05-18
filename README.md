@@ -1145,6 +1145,8 @@ Architecture analysis runs as a dedicated phase during `kirograph index`. Progre
 | Objective-C | `.m` |
 | YAML | `.yaml`, `.yml` |
 | HCL (Terraform) | `.tf`, `.tfvars` |
+| CSS | `.css` |
+| SCSS / Sass | `.scss`, `.sass` |
 
 ## Framework Detection
 

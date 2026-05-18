@@ -19,6 +19,7 @@ const FILE_PATTERNS = [
   '**/*.elm', '**/*.sol', '**/*.vue', '**/*.m',
   '**/*.yaml', '**/*.yml',
   '**/*.tf', '**/*.tfvars',
+  '**/*.css', '**/*.scss', '**/*.sass',
 ];
 
 const HOOKS: Array<{ filename: string; hook: object }> = [
