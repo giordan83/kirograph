@@ -57,6 +57,7 @@
       <a href="#languages" class="sidebar-link">Languages</a>
       <a href="#frameworks" class="sidebar-link">Frameworks</a>
       <a href="#using-with-kiro" class="sidebar-link">Using with Kiro</a>
+      <a href="#other-tools" class="sidebar-link">Other Tools (Experimental)</a>
       <a href="#configuration" class="sidebar-link">Configuration</a>
     </div>
     <div class="sidebar-section">
@@ -337,7 +338,7 @@ cd kirograph && npm uninstall -g .</code></pre>
     <!-- ── Using with Kiro ── -->
     <h2 id="using-with-kiro">Using with Kiro</h2>
 
-    <p><code>kirograph install</code> sets up four things in your Kiro workspace — all coexist so you can switch between IDE and CLI freely.</p>
+    <p><code>kirograph install</code> sets up four things in your Kiro workspace — all coexist so you can switch between IDE and CLI freely. <strong>Kiro is the primary and fully supported target.</strong></p>
 
     <h3 id="mcp-server">MCP Server (<code>.kiro/settings/mcp.json</code>)</h3>
     <p>Registers the KiroGraph MCP server with all 17 tools auto-approved. Used by both the IDE and the CLI agent.</p>
@@ -390,6 +391,23 @@ cd kirograph && npm uninstall -g .</code></pre>
 
     <h3 id="steering-file">Steering File (<code>.kiro/steering/kirograph.md</code>)</h3>
     <p>Teaches the Kiro IDE to prefer graph tools over file scanning when <code>.kirograph/</code> exists. Uses <code>inclusion: always</code> so it's in context on every turn. The CLI agent has the same instructions inlined in its <code>prompt</code> field.</p>
+
+    <!-- ── Other Tools (Experimental) ── -->
+    <h2 id="other-tools">Other Tools (Experimental)</h2>
+
+    <div class="callout" style="border-color: var(--yellow); background: rgba(210,153,34,0.05);">
+      <strong>⚠️ Not fully tested — community-contributed.</strong> The integrations below are outside the original scope of KiroGraph. They are provided as-is. Issues and PRs related to these targets are welcome, but there is no guarantee they will be supported or merged without active help from the contributor.
+    </div>
+
+    <p>KiroGraph can also be installed for other MCP-capable coding agents. All targets share the same <code>.kirograph/</code> data — if the project is already initialized, installing another target only writes that tool's integration files.</p>
+
+    <h3 id="claude-code">Claude Code</h3>
+    <pre><code>kirograph install --target claude</code></pre>
+    <p>Writes <code>.mcp.json</code> (project-scoped MCP config), <code>.kirograph/claude.md</code> (tool guidance), and imports it from <code>CLAUDE.md</code>. Claude Code prompts for MCP approval the first time it sees <code>.mcp.json</code>.</p>
+
+    <h3 id="codex">Codex</h3>
+    <pre><code>kirograph install --target codex</code></pre>
+    <p>Writes <code>.kirograph/codex.md</code> (tool guidance) and a generated block in <code>AGENTS.md</code>. Codex MCP configuration is user-scoped, so the installer prints the exact <code>codex mcp add ...</code> command instead of editing files outside the project.</p>
 
     <!-- ── Configuration ── -->
     <h2 id="configuration">Configuration</h2>

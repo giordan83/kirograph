@@ -4,9 +4,11 @@
 
 ![KiroGraph terminal](https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/terminal.png)
 
-Semantic code knowledge graph for [Kiro](https://kiro.dev) and MCP-capable coding agents: fewer tool calls, instant symbol lookups, 100% local.
+Semantic code knowledge graph for [Kiro](https://kiro.dev): fewer tool calls, instant symbol lookups, 100% local.
 
 Inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [colbymchenry](https://github.com/colbymchenry) for Claude Code, rebuilt natively for Kiro's MCP and hooks system.
+
+> **Full support is for Kiro only.** Experimental integrations for other MCP-capable tools (Claude Code, Codex) are available but not fully tested. See [Other Tools (Experimental)](#other-tools-experimental) for details.
 
 ## Why KiroGraph?
 
@@ -118,8 +120,8 @@ Without `--force`, KiroGraph asks separately whether to remove the selected tool
 This can remove:
 - `.kirograph/` — index database, snapshots, and export directory
 - Kiro target: `.kiro/hooks/kirograph-*.json`, `.kiro/steering/kirograph.md`, `.kiro/agents/kirograph.json`
-- Claude target: `kirograph` from `.mcp.json`, plus the KiroGraph import from `CLAUDE.md`
-- Codex target: the generated KiroGraph block from `AGENTS.md`
+- Claude target (experimental): `kirograph` from `.mcp.json`, plus the KiroGraph import from `CLAUDE.md`
+- Codex target (experimental): the generated KiroGraph block from `AGENTS.md`
 
 ### Remove the CLI globally
 
@@ -141,13 +143,9 @@ npm uninstall -g .
 ```bash
 # In your project:
 kirograph install                  # wire up Kiro MCP + hooks + steering + CLI agent
-kirograph install --target claude  # wire up Claude Code MCP + project memory
-kirograph install --target codex   # write Codex instructions and print MCP config
 ```
 
-All targets share the same `.kirograph/` data. If the project is already initialized, installing another target only writes that tool's integration files and reuses the existing graph configuration.
-
-Restart Kiro IDE, or switch to the `kirograph` agent in Kiro CLI. It will now use KiroGraph tools automatically.
+All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch to the `kirograph` agent in Kiro CLI. It will now use KiroGraph tools automatically.
 
 Or using the short alias:
 
@@ -250,7 +248,18 @@ Or swap to it inside an active session:
 
 Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists. The CLI agent has the same instructions inlined directly in its `prompt` field.
 
-## Using with Claude Code
+## Other Tools (Experimental)
+
+> **⚠️ Not fully tested — community-contributed.** The integrations below are outside the original scope of KiroGraph. They are provided as-is. Issues and PRs related to these targets are welcome, but there is no guarantee they will be supported or merged without active help from the contributor.
+
+KiroGraph can also be installed for other MCP-capable coding agents. All targets share the same `.kirograph/` data — if the project is already initialized, installing another target only writes that tool's integration files and reuses the existing graph.
+
+```bash
+kirograph install --target claude  # wire up Claude Code MCP + project memory
+kirograph install --target codex   # write Codex instructions and print MCP config
+```
+
+### Using with Claude Code
 
 ```bash
 kirograph install --target claude
@@ -264,7 +273,7 @@ This writes:
 
 Claude Code prompts for project MCP approval the first time it sees `.mcp.json`.
 
-## Using with Codex
+### Using with Codex
 
 ```bash
 kirograph install --target codex
@@ -279,7 +288,7 @@ Codex MCP configuration is user-scoped, so the installer prints the exact `codex
 
 ## MCP Tools
 
-All tools are available to the configured MCP client once installed.
+All tools are auto-approved in Kiro once installed. Other MCP clients can use the same tools after configuring their respective targets.
 
 ### `kirograph_context`
 
@@ -1252,7 +1261,8 @@ Detected frameworks are stored in config and used to improve symbol extraction a
 ## Requirements
 
 - Node.js >= 18
-- Kiro IDE
+- Kiro IDE (fully supported)
+- Other MCP-capable tools (experimental — see [Other Tools](#other-tools-experimental))
 
 ## License
 
