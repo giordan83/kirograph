@@ -55,6 +55,7 @@ export const GRAMMAR_FILE_MAP: Record<Language, string> = {
   // CSS is in tree-sitter-wasms; SCSS is bundled in src/extraction/wasm/
   css: 'tree-sitter-css',
   scss: 'tree-sitter-scss',
+  html: 'tree-sitter-html',
   // Pascal is bundled in src/extraction/wasm/ (not in tree-sitter-wasms)
   pascal: 'tree-sitter-pascal',
   // No WASM available

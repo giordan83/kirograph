@@ -20,6 +20,7 @@ const FILE_PATTERNS = [
   '**/*.yaml', '**/*.yml',
   '**/*.tf', '**/*.tfvars',
   '**/*.css', '**/*.scss', '**/*.sass',
+  '**/*.html',
 ];
 
 const HOOKS: Array<{ filename: string; hook: object }> = [

@@ -1114,6 +1114,8 @@ Architecture analysis runs as a dedicated phase during `kirograph index`. Progre
 
 ## Supported Languages
 
+### General-purpose
+
 | Language | Extensions |
 |----------|-----------|
 | TypeScript | `.ts` |
@@ -1132,27 +1134,48 @@ Architecture analysis runs as a dedicated phase during `kirograph index`. Progre
 | Swift | `.swift` |
 | Kotlin | `.kt` |
 | Dart | `.dart` |
-| Svelte | `.svelte` |
-| Elixir | `.ex`, `.exs` |
 | Scala | `.scala`, `.sc`, `.sbt` |
 | Lua | `.lua` |
 | Zig | `.zig`, `.zon` |
 | Bash | `.sh`, `.bash`, `.zsh` |
 | OCaml | `.ml`, `.mli` |
 | Elm | `.elm` |
-| Solidity | `.sol` |
-| Vue | `.vue` |
 | Objective-C | `.m` |
-| YAML | `.yaml`, `.yml` |
-| HCL (Terraform) | `.tf`, `.tfvars` |
+
+### Frontend & UI
+
+| Language | Extensions |
+|----------|-----------|
+| React / React Native | `.tsx`, `.jsx` (via TypeScript/JSX grammars) |
+| Next.js | `.tsx`, `.jsx` (via TypeScript/JSX grammars) |
+| Angular | `.ts`, `.html` (via TypeScript/HTML grammars) |
+| Svelte | `.svelte` |
+| Vue | `.vue` |
+| HTML | `.html`, `.htm` |
 | CSS | `.css` |
 | SCSS / Sass | `.scss`, `.sass` |
+
+### Domain-specific
+
+| Language | Domain | Extensions |
+|----------|--------|-----------|
+| Solidity | Blockchain / Web3 | `.sol` |
+| Elixir | Distributed systems / Real-time | `.ex`, `.exs` |
+
+### Configuration & Infrastructure
+
+| Language | Extensions |
+|----------|-----------|
+| YAML | `.yaml`, `.yml` |
+| HCL (Terraform) | `.tf`, `.tfvars` |
 
 ## Framework Detection
 
 KiroGraph automatically detects frameworks and enriches the graph with framework-specific semantics (routes, components, lifecycle methods):
 
-**JavaScript / TypeScript:** React, Next.js, React Native, Svelte, SvelteKit, Express, Fastify, Koa
+### Web Frameworks
+
+**JavaScript / TypeScript:** React, Next.js, React Native, Angular, Svelte, SvelteKit, Express, Fastify, Koa
 
 **Vue:** Vue, Nuxt
 
@@ -1178,11 +1201,17 @@ KiroGraph automatically detects frameworks and enriches the graph with framework
 
 **Solidity:** Hardhat, Foundry, Truffle (OpenZeppelin patterns)
 
-**Infrastructure as Code:** AWS CDK, SST, Serverless Framework, AWS SAM, Terraform / OpenTofu, Pulumi, CloudFormation
+### Infrastructure as Code
 
-**Containers & Orchestration:** Kubernetes, Helm, Docker Compose
+AWS CDK, SST, Serverless Framework, AWS SAM, Terraform / OpenTofu, Pulumi, CloudFormation, AWS Amplify Gen 2
 
-**Configuration Management:** Ansible
+### Containers & Orchestration
+
+Kubernetes, Helm, Docker Compose
+
+### Configuration Management
+
+Ansible
 
 Detected frameworks are stored in config and used to improve symbol extraction and resolution.
 

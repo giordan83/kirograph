@@ -63,6 +63,8 @@ export const EXTENSION_MAP: Record<string, Language> = {
   '.css': 'css',
   '.scss': 'scss',
   '.sass': 'scss',
+  '.html': 'html',
+  '.htm': 'html',
 };
 
 export const GRAMMAR_MAP: Record<Language, string> = {
@@ -97,6 +99,7 @@ export const GRAMMAR_MAP: Record<Language, string> = {
   hcl: 'tree-sitter-hcl',
   css: 'tree-sitter-css',
   scss: 'tree-sitter-scss',
+  html: 'tree-sitter-html',
   // Pascal and Liquid require custom WASM not bundled in tree-sitter-wasms
   pascal: '',
   liquid: '',

@@ -39,6 +39,8 @@ export { cloudformationResolver } from './cloudformation';
 export { kubernetesResolver } from './kubernetes';
 export { dockerComposeResolver } from './docker';
 export { ansibleResolver } from './ansible';
+export { angularResolver } from './angular';
+export { amplifyResolver } from './amplify';
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,8 @@ import { cloudformationResolver } from './cloudformation';
 import { kubernetesResolver } from './kubernetes';
 import { dockerComposeResolver } from './docker';
 import { ansibleResolver } from './ansible';
+import { angularResolver } from './angular';
+import { amplifyResolver } from './amplify';
 
 const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   // PHP
@@ -72,6 +76,7 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   expressResolver,
   reactResolver,
   svelteResolver,
+  angularResolver,
   // Vue / Nuxt
   nuxtResolver,
   vueResolver,
@@ -107,6 +112,7 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   terraformResolver,
   pulumiResolver,
   cloudformationResolver,
+  amplifyResolver,
   // Containers & Orchestration
   kubernetesResolver,
   dockerComposeResolver,
