@@ -14,6 +14,10 @@ const FILE_PATTERNS = [
   '**/*.cs', '**/*.rb', '**/*.php', '**/*.swift',
   '**/*.kt', '**/*.dart',
   '**/*.ex', '**/*.exs',
+  '**/*.scala', '**/*.sc', '**/*.lua', '**/*.zig',
+  '**/*.sh', '**/*.bash', '**/*.ml', '**/*.mli',
+  '**/*.elm', '**/*.sol', '**/*.vue', '**/*.m',
+  '**/*.yaml', '**/*.yml',
 ];
 
 const HOOKS: Array<{ filename: string; hook: object }> = [
