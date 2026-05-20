@@ -71,7 +71,7 @@ export function printColoredHelp(): void {
       title: '⚙️ Agent & Configuration',
       commands: [
         { name: 'caveman', args: '[mode]', desc: 'Set agent communication style (off | lite | full | ultra)' },
-        { name: 'compression', args: '[level]', desc: 'Set output compression level (off | normal | aggressive | ultra)' },
+        { name: 'compression', args: '[level]', desc: 'Set shell compression level (off | normal | aggressive | ultra)' },
         { name: 'exec', args: '<command...>', desc: 'Run a shell command with token-optimized output', opts: ['-l, --level <l>  normal | aggressive | ultra', '-t, --timeout <s> Timeout in seconds (default 60)', '--raw         Show raw + compressed for comparison', '--json        Output as JSON'] },
         { name: 'gain', desc: 'Show token savings from compressed command outputs', opts: ['--graph       ASCII graph (last 30 days)', '--history     Recent command history', '--daily       Day-by-day breakdown', '--period <p>  session | today | week | all'] },
         { name: 'serve',   desc: 'Start the MCP server', opts: ['--mcp        Run as MCP stdio server', '--path <p>   Project path'] },

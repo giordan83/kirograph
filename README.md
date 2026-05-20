@@ -1048,7 +1048,7 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 | `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
 | `cavemanMode` | string | `off` | Agent communication style: `off`, `lite`, `full`, `ultra` |
-| `compressionLevel` | string | `normal` | Shell command compression level: `off`, `normal`, `aggressive`, `ultra` |
+| `shellCompressionLevel` | string | `normal` | Shell command compression level: `off`, `normal`, `aggressive`, `ultra` |
 
 Default exclude patterns: `node_modules/**`, `dist/**`, `build/**`, `.git/**`, `*.min.js`, `.kirograph/**`
 

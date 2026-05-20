@@ -457,7 +457,7 @@ cd kirograph && npm uninstall -g .</code></pre>
           <tr><td><code>enableArchitecture</code></td><td>boolean</td><td><code>false</code></td><td>Enable architecture analysis layer</td></tr>
           <tr><td><code>architectureLayers</code></td><td>object</td><td>-</td><td>Override layer glob patterns</td></tr>
           <tr><td><code>cavemanMode</code></td><td>string</td><td><code>"off"</code></td><td>Communication compression: <code>off</code>, <code>lite</code>, <code>full</code>, <code>ultra</code></td></tr>
-          <tr><td><code>compressionLevel</code></td><td>string</td><td><code>"normal"</code></td><td>Shell command compression level: <code>off</code>, <code>normal</code>, <code>aggressive</code>, <code>ultra</code></td></tr>
+          <tr><td><code>shellCompressionLevel</code></td><td>string</td><td><code>"normal"</code></td><td>Shell command compression level: <code>off</code>, <code>normal</code>, <code>aggressive</code>, <code>ultra</code></td></tr>
           <tr><td><code>syncWarningThreshold</code></td><td>number</td><td><code>10</code></td><td>Pending-file count above which <code>kirograph_status</code> warns. Set <code>0</code> to disable.</td></tr>
           <tr><td><code>extractDocstrings</code></td><td>boolean</td><td><code>true</code></td><td>Extract docstrings/comments during indexing</td></tr>
           <tr><td><code>trackCallSites</code></td><td>boolean</td><td><code>true</code></td><td>Track precise call-site locations</td></tr>
@@ -529,7 +529,7 @@ kirograph gain --graph           # ASCII graph (last 30 days)</code></pre>
     <p><strong>Error preservation:</strong> Failed commands always show full diagnostic output regardless of compression level.</p>
 
     <div class="callout">
-      Configure in <code>.kirograph/config.json</code>: <code>"compressionLevel": "normal"</code> (default). Set to <code>"off"</code> to disable the hook and steering section. The <code>kirograph_exec</code> tool remains available regardless.
+      Configure in <code>.kirograph/config.json</code>: <code>"shellCompressionLevel": "normal"</code> (default). Set to <code>"off"</code> to disable the hook and steering section. The <code>kirograph_exec</code> tool remains available regardless.
     </div>
 
     <h3 id="compression-caveman">Coexistence with Caveman Mode</h3>

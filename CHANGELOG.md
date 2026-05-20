@@ -13,7 +13,7 @@
 - **`kirograph_gain` MCP tool**: Query token savings statistics by period (`session`, `today`, `week`, `all`). Returns total commands, savings percentage, breakdown by command family, and recent history.
 - **`kirograph gain` CLI command**: Token savings analytics with `--graph` (ASCII chart), `--history`, `--daily`, `--json`, and `--period` options.
 - **`kirograph compression` CLI command**: Set shell compression level (`off | normal | aggressive | ultra`). Mirrors the caveman command pattern with arrow-key display of available levels.
-- **`compressionLevel` config field** (default: `'normal'`): Controls the default compression level and whether the hook/steering are installed. Supports legacy `enableCompression` boolean via automatic migration.
+- **`shellCompressionLevel` config field** (default: `'normal'`): Controls the default compression level and whether the hook/steering are installed. Supports legacy `enableCompression` boolean via automatic migration.
 - **Installer prompt**: "Enable shell compression (kirograph_exec)?" added to the interactive installer alongside caveman mode.
 - **`kirograph-compress-hint.json` hook**: `preToolUse` hook on shell commands that reminds the agent to use `kirograph_exec` for supported command families. Only installed when compression is enabled.
 - **Steering file compression section**: Teaches the agent when and how to use `kirograph_exec`, with examples and level descriptions. Conditionally included based on `enableCompression`.

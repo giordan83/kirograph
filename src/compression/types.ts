@@ -1,5 +1,5 @@
 /**
- * KiroGraph Output Compression — Type Definitions
+ * KiroGraph Shell Compression — Type Definitions
  */
 
 export interface CompressionResult {

@@ -43,7 +43,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
 
     const alreadyInitialized = fs.existsSync(path.join(cwd, '.kirograph'));
     let cavemanMode: CavemanMode | 'off' = 'off';
-    let compressionLevel: 'off' | 'normal' | 'aggressive' | 'ultra' = 'normal';
+    let shellCompressionLevel: 'off' | 'normal' | 'aggressive' | 'ultra' = 'normal';
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
     let qdrantDashboard = false;
@@ -52,19 +52,19 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
       if (alreadyInitialized) {
         const config = await loadConfig(cwd);
         cavemanMode = config.cavemanMode ?? 'off';
-        compressionLevel = config.compressionLevel ?? 'normal';
+        shellCompressionLevel = config.shellCompressionLevel ?? 'normal';
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
         console.log(`  • enableEmbeddings: ${config.enableEmbeddings}`);
         console.log(`  • enableArchitecture: ${config.enableArchitecture}`);
         console.log(`  • cavemanMode: ${cavemanMode}`);
-        console.log(`  • compressionLevel: ${compressionLevel}`);
+        console.log(`  • shellCompressionLevel: ${shellCompressionLevel}`);
       } else {
         shouldOfferIndex = true;
         const patch = await promptConfigOptions(rl);
         await updateConfig(cwd, patch);
         cavemanMode = patch.cavemanMode ?? 'off';
-        compressionLevel = patch.compressionLevel ?? 'normal';
+        shellCompressionLevel = patch.shellCompressionLevel ?? 'normal';
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
 
@@ -136,10 +136,10 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         console.log(`  • trackCallSites: ${patch.trackCallSites}`);
         console.log(`  • enableArchitecture: ${patch.enableArchitecture}`);
         console.log(`  • cavemanMode: ${cavemanMode}`);
-        console.log(`  • compressionLevel: ${compressionLevel}`);
+        console.log(`  • shellCompressionLevel: ${shellCompressionLevel}`);
       }
 
-      installer.installLate(cwd, cavemanMode, compressionLevel);
+      installer.installLate(cwd, cavemanMode, shellCompressionLevel);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`\n  ✗ Failed to write configuration: ${reason}`);

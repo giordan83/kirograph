@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import { KiroGraphConfig } from '../../config';
 type CavemanMode = 'lite' | 'full' | 'ultra';
 import { ask, askBool, arrowSelect, dim, reset, violet } from './prompts';
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'compressionLevel'> & { embeddingModel?: string; embeddingDim?: number };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -52,7 +52,7 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     'Enables semantic/similarity-based code search. Increases indexing time; the chosen embedding model is downloaded automatically on first use.',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', compressionLevel: 'normal' };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal' };
 
   if (enableEmbeddings) {
     // ── Model selection ────────────────────────────────────────────────────────
@@ -144,13 +144,13 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
   ]);
   patch.cavemanMode = cavemanChoice as CavemanMode | 'off';
 
-  const compressionChoice = await arrowSelect(rl, 'Output compression: default level for kirograph_exec:', [
+  const compressionChoice = await arrowSelect(rl, 'Shell compression: default level for kirograph_exec:', [
     { value: 'off',        label: 'off',        description: 'No compression hook or steering (tool still available)' },
     { value: 'normal',     label: 'normal',     description: 'Balanced: removes noise, keeps structure (recommended)' },
     { value: 'aggressive', label: 'aggressive', description: 'More compact: groups by category, limits output' },
     { value: 'ultra',      label: 'ultra',      description: 'Maximum compression: counts and summaries only' },
   ]);
-  patch.compressionLevel = compressionChoice as KiroGraphConfig['compressionLevel'];
+  patch.shellCompressionLevel = compressionChoice as KiroGraphConfig['shellCompressionLevel'];
 
   return patch;
 }

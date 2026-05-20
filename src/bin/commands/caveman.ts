@@ -90,8 +90,8 @@ export function register(program: Command): void {
         const config = await loadConfig(cwd);
         writeSteering(kiroDir, {
           cavemanMode: normalized as CavemanMode | 'off',
-          enableCompression: config.compressionLevel !== 'off',
-          compressionLevel: config.compressionLevel,
+          enableCompression: config.shellCompressionLevel !== 'off',
+          shellCompressionLevel: config.shellCompressionLevel,
         });
       }
 

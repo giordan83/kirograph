@@ -317,7 +317,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'kirograph_gain',
-    description: 'Show token savings statistics — both from graph tools (vs manual file reads/grep) and from kirograph_exec output compression.',
+    description: 'Show token savings statistics — both from graph tools (vs manual file reads/grep) and from kirograph_exec shell compression.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -408,8 +408,8 @@ export class ToolHandler {
       try {
         const { loadConfig } = await import('../config');
         const config = await loadConfig(projectRoot);
-        if (config.compressionLevel && config.compressionLevel !== 'off') {
-          defaultLevel = config.compressionLevel as 'normal' | 'aggressive' | 'ultra';
+        if (config.shellCompressionLevel && config.shellCompressionLevel !== 'off') {
+          defaultLevel = config.shellCompressionLevel as 'normal' | 'aggressive' | 'ultra';
         }
       } catch { /* no config — use default */ }
 

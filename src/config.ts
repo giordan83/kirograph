@@ -42,8 +42,8 @@ export interface KiroGraphConfig {
   architectureLayers?: Record<string, string[]>;
   /** Agent communication style injected at agentSpawn. Default: 'off'. */
   cavemanMode: 'off' | 'lite' | 'full' | 'ultra';
-  /** Output compression level for kirograph_exec. 'off' disables the hook/steering. Default: 'normal'. */
-  compressionLevel: 'off' | 'normal' | 'aggressive' | 'ultra';
+  /** Shell compression level for kirograph_exec. 'off' disables the hook/steering. Default: 'normal'. */
+  shellCompressionLevel: 'off' | 'normal' | 'aggressive' | 'ultra';
   /**
    * Number of pending (unindexed) files above which kirograph_status warns the agent.
    * Set to 0 to disable the warning. Default: 10.
@@ -61,7 +61,9 @@ const KNOWN_FIELDS = new Set<string>([
   'extractDocstrings', 'trackCallSites', 'enableEmbeddings', 'embeddingModel', 'embeddingDim',
   'useVecIndex', 'semanticEngine', 'typesenseDashboard', 'qdrantDashboard',
   'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
-  'enableArchitecture', 'architectureLayers', 'cavemanMode', 'compressionLevel', 'syncWarningThreshold',
+  'enableArchitecture', 'architectureLayers', 'cavemanMode', 'shellCompressionLevel', 'syncWarningThreshold',
+  // Legacy aliases (still accepted, mapped during validation)
+  'enableCompression', 'compressionLevel',
 ]);
 
 const LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
@@ -104,7 +106,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     fuzzyResolutionThreshold: 0.5,
     enableArchitecture: false,
     cavemanMode: 'off',
-    compressionLevel: 'normal',
+    shellCompressionLevel: 'normal',
     syncWarningThreshold: 10,
   };
 }
@@ -184,14 +186,16 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     ? (raw.cavemanMode as KiroGraphConfig['cavemanMode'])
     : defaults.cavemanMode;
   const COMPRESSION_LEVELS = new Set(['off', 'normal', 'aggressive', 'ultra']);
-  // Support legacy enableCompression boolean → map to 'normal' or 'off'
-  let compressionLevel: KiroGraphConfig['compressionLevel'];
-  if (typeof raw.compressionLevel === 'string' && COMPRESSION_LEVELS.has(raw.compressionLevel)) {
-    compressionLevel = raw.compressionLevel as KiroGraphConfig['compressionLevel'];
+  // Support legacy field names: enableCompression (boolean) and compressionLevel (string)
+  let shellCompressionLevel: KiroGraphConfig['shellCompressionLevel'];
+  if (typeof raw.shellCompressionLevel === 'string' && COMPRESSION_LEVELS.has(raw.shellCompressionLevel)) {
+    shellCompressionLevel = raw.shellCompressionLevel as KiroGraphConfig['shellCompressionLevel'];
+  } else if (typeof raw.compressionLevel === 'string' && COMPRESSION_LEVELS.has(raw.compressionLevel)) {
+    shellCompressionLevel = raw.compressionLevel as KiroGraphConfig['shellCompressionLevel'];
   } else if (typeof raw.enableCompression === 'boolean') {
-    compressionLevel = raw.enableCompression ? 'normal' : 'off';
+    shellCompressionLevel = raw.enableCompression ? 'normal' : 'off';
   } else {
-    compressionLevel = defaults.compressionLevel;
+    shellCompressionLevel = defaults.shellCompressionLevel;
   }
   const syncWarningThreshold = typeof raw.syncWarningThreshold === 'number' && raw.syncWarningThreshold >= 0
     ? Math.round(raw.syncWarningThreshold)
@@ -221,7 +225,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     fuzzyResolutionThreshold,
     enableArchitecture,
     cavemanMode,
-    compressionLevel,
+    shellCompressionLevel,
     syncWarningThreshold,
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
   };

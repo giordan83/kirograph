@@ -11,7 +11,7 @@ import { writeSteering } from '../installer/steering';
 import { writeHooks } from '../installer/hooks';
 import { bold, dim, green, reset, violet } from '../ui';
 
-type CompressionLevel = KiroGraphConfig['compressionLevel'];
+type CompressionLevel = KiroGraphConfig['shellCompressionLevel'];
 
 const LEVELS: Array<{ name: string; desc: string }> = [
   { name: 'off',        desc: 'no compression hook or steering (tool still available)' },
@@ -23,7 +23,7 @@ const LEVELS: Array<{ name: string; desc: string }> = [
 export function register(program: Command): void {
   program
     .command('compression [level]')
-    .description('Set output compression level for kirograph_exec (off | normal | aggressive | ultra)')
+    .description('Set shell compression level for kirograph_exec (off | normal | aggressive | ultra)')
     .action(async (level: string | undefined) => {
       const cwd = process.cwd();
 
@@ -32,11 +32,11 @@ export function register(program: Command): void {
         let current: CompressionLevel = 'normal';
         try {
           const config = await loadConfig(cwd);
-          current = config.compressionLevel ?? 'normal';
+          current = config.shellCompressionLevel ?? 'normal';
         } catch { /* no .kirograph/ */ }
 
         console.log();
-        console.log(`  ${dim}Output compression${reset}  ${violet}${bold}${current}${reset}`);
+        console.log(`  ${dim}Shell compression${reset}  ${violet}${bold}${current}${reset}`);
         console.log();
         console.log(`  ${dim}Available levels:${reset}`);
         for (const l of LEVELS) {
@@ -61,16 +61,16 @@ export function register(program: Command): void {
         process.exit(1);
       }
 
-      const compressionLevel = normalized as CompressionLevel;
-      const config = await updateConfig(cwd, { compressionLevel });
-      const enableCompression = compressionLevel !== 'off';
+      const shellCompressionLevel = normalized as CompressionLevel;
+      const config = await updateConfig(cwd, { shellCompressionLevel });
+      const enableCompression = shellCompressionLevel !== 'off';
 
       const kiroDir = path.join(cwd, '.kiro');
 
       // Regenerate steering file if it exists
       const steeringPath = path.join(kiroDir, 'steering', 'kirograph.md');
       if (fs.existsSync(steeringPath)) {
-        writeSteering(kiroDir, { cavemanMode: config.cavemanMode, enableCompression, compressionLevel });
+        writeSteering(kiroDir, { cavemanMode: config.cavemanMode, enableCompression, shellCompressionLevel });
       }
 
       // Regenerate hooks if hooks dir exists
@@ -80,13 +80,13 @@ export function register(program: Command): void {
       }
 
       console.log();
-      if (compressionLevel === 'off') {
-        console.log(`  ${green}✓${reset} Output compression ${violet}${bold}off${reset}`);
+      if (shellCompressionLevel === 'off') {
+        console.log(`  ${green}✓${reset} Shell compression ${violet}${bold}off${reset}`);
         console.log(`  ${dim}kirograph_exec is still available but the agent won't be prompted to use it.${reset}`);
         console.log(`  ${dim}The compression hook and steering section have been removed.${reset}`);
       } else {
-        console.log(`  ${green}✓${reset} Output compression set to ${violet}${bold}${compressionLevel}${reset}`);
-        console.log(`  ${dim}kirograph_exec will use "${compressionLevel}" as the default level.${reset}`);
+        console.log(`  ${green}✓${reset} Shell compression set to ${violet}${bold}${shellCompressionLevel}${reset}`);
+        console.log(`  ${dim}kirograph_exec will use "${shellCompressionLevel}" as the default level.${reset}`);
         console.log(`  ${dim}The agent will be guided to use it for git, test, lint, build, and docker commands.${reset}`);
       }
       console.log(`  ${dim}Takes effect on next agent session.${reset}`);

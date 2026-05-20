@@ -11,12 +11,12 @@ export function installKiroEarly(projectRoot: string): void {
   writeHooks(kiroDir);
 }
 
-export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', compressionLevel?: string): void {
+export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string): void {
   const kiroDir = path.join(projectRoot, '.kiro');
-  const enableCompression = compressionLevel !== 'off';
+  const enableCompression = shellCompressionLevel !== 'off';
   // Re-write hooks with compression awareness
   writeHooks(kiroDir, { enableCompression });
-  writeSteering(kiroDir, { cavemanMode, enableCompression, compressionLevel: compressionLevel as any });
+  writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any });
   writeCliAgent(kiroDir);
 }
 

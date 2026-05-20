@@ -1,5 +1,5 @@
 /**
- * KiroGraph Output Compression Engine
+ * KiroGraph Shell Compression Engine
  *
  * Filters and compresses command outputs to reduce token consumption.
  * Inspired by rtk (https://github.com/rtk-ai/rtk), implemented in pure TypeScript.

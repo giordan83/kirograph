@@ -41,8 +41,8 @@ export function register(program: Command): void {
       let defaultLevel: 'normal' | 'aggressive' | 'ultra' = 'normal';
       try {
         const config = await loadConfig(cwd);
-        if (config.compressionLevel && config.compressionLevel !== 'off') {
-          defaultLevel = config.compressionLevel as 'normal' | 'aggressive' | 'ultra';
+        if (config.shellCompressionLevel && config.shellCompressionLevel !== 'off') {
+          defaultLevel = config.shellCompressionLevel as 'normal' | 'aggressive' | 'ultra';
         }
       } catch { /* no config */ }
 

@@ -272,7 +272,7 @@ function buildCompressionSection(level: 'normal' | 'aggressive' | 'ultra'): stri
   return `
 ---
 
-## Output Compression (\\\`kirograph_exec\\\`)
+## Shell Compression (\\\`kirograph_exec\\\`)
 
 When running shell commands, prefer \\\`kirograph_exec\\\` over raw shell execution for:
 - **git** operations (status, log, diff, push, pull, commit, add, fetch, branch)
@@ -295,25 +295,27 @@ ${LEVEL_EXAMPLES[level]}
 
 **Important:** Error details are always preserved. Failed commands show full diagnostic output regardless of level.
 
+**Do NOT re-run commands:** When \\\`kirograph_exec\\\` returns a result, treat it as the final answer. Never re-run the same command with raw shell execution to "get more details." The compressed output preserves all essential information. If you genuinely need something missing from the output, explain what's missing before making a second call.
+
 Use \\\`kirograph_gain\\\` to check token savings statistics.`;
 }
 
 export interface SteeringOptions {
   cavemanMode?: CavemanMode | 'off';
   enableCompression?: boolean;
-  compressionLevel?: 'off' | 'normal' | 'aggressive' | 'ultra';
+  shellCompressionLevel?: 'off' | 'normal' | 'aggressive' | 'ultra';
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
   const cavemanMode = opts?.cavemanMode;
-  const enableCompression = opts?.enableCompression !== false && opts?.compressionLevel !== 'off';
-  const compressionLevel = opts?.compressionLevel ?? 'normal';
+  const enableCompression = opts?.enableCompression !== false && opts?.shellCompressionLevel !== 'off';
+  const shellCompressionLevel = opts?.shellCompressionLevel ?? 'normal';
 
   let content = STEERING_CONTENT;
 
   // Insert compression section before the "If .kirograph/ does NOT exist" section
-  if (enableCompression && compressionLevel !== 'off') {
-    const section = buildCompressionSection(compressionLevel as 'normal' | 'aggressive' | 'ultra');
+  if (enableCompression && shellCompressionLevel !== 'off') {
+    const section = buildCompressionSection(shellCompressionLevel as 'normal' | 'aggressive' | 'ultra');
     content = content.replace(
       '---\n\n## If `.kirograph/` does NOT exist',
       section.trim() + '\n\n---\n\n## If `.kirograph/` does NOT exist',
