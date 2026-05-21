@@ -33,7 +33,7 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
       version: '1.0.0',
       description: 'Mark the KiroGraph index as dirty when source files are saved. Sync is deferred to agent idle.',
       when: { type: 'fileEdited', patterns: FILE_PATTERNS },
-      then: { type: 'runCommand', command: 'kirograph mark-dirty 2>/dev/null || true' },
+      then: { type: 'askAgent', prompt: "A source file was saved. Run kirograph_exec with command 'kirograph mark-dirty' to mark the index as needing a sync. Do not explain, just run the tool silently." },
     },
   },
   {
@@ -43,7 +43,7 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
       version: '1.0.0',
       description: 'Mark the KiroGraph index as dirty when source files are created.',
       when: { type: 'fileCreated', patterns: FILE_PATTERNS },
-      then: { type: 'runCommand', command: 'kirograph mark-dirty 2>/dev/null || true' },
+      then: { type: 'askAgent', prompt: "A source file was created. Run kirograph_exec with command 'kirograph mark-dirty' to mark the index as needing a sync. Do not explain, just run the tool silently." },
     },
   },
   {
@@ -53,7 +53,7 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
       version: '1.0.0',
       description: 'Remove deleted files from the KiroGraph index immediately.',
       when: { type: 'fileDeleted', patterns: FILE_PATTERNS },
-      then: { type: 'runCommand', command: 'kirograph sync-if-dirty 2>/dev/null || true' },
+      then: { type: 'askAgent', prompt: "A source file was deleted. Run kirograph_exec with command 'kirograph sync-if-dirty' to update the index. Do not explain, just run the tool silently." },
     },
   },
   {
@@ -61,9 +61,9 @@ const HOOKS: Array<{ filename: string; hook: object }> = [
     hook: {
       name: 'KiroGraph Deferred Sync',
       version: '1.0.0',
-      description: 'Sync the KiroGraph index when the agent is idle and a dirty marker is present. Batches multiple rapid saves into one sync.',
+      description: 'Sync the KiroGraph index when the agent is idle and a dirty marker is present.',
       when: { type: 'agentStop' },
-      then: { type: 'runCommand', command: 'kirograph sync-if-dirty --quiet 2>/dev/null || true' },
+      then: { type: 'askAgent', prompt: "Run kirograph_exec with command 'kirograph sync-if-dirty --quiet' to sync the index if it was marked dirty. Do not explain, just run the tool silently." },
     },
   },
   {
@@ -166,7 +166,7 @@ export function writeHooks(kiroDir: string, opts?: { enableCompression?: boolean
     // Legacy .json versions (migrated to .kiro.hook)
     'kirograph-mark-dirty-on-save.json', 'kirograph-mark-dirty-on-create.json',
     'kirograph-sync-on-delete.json', 'kirograph-sync-if-dirty.json',
-    'kirograph-compress-hint.json', 'kirograph-mem-capture.json',
+    'kirograph-compress-hint.json', 'kirograph-mem-capture.json'
   ];
   for (const old of oldHooks) {
     const p = path.join(hooksDir, old);
@@ -175,13 +175,13 @@ export function writeHooks(kiroDir: string, opts?: { enableCompression?: boolean
 
   for (const { filename, hook } of HOOKS) {
     // Skip compression hook if compression is disabled
-    if (filename === 'kirograph-compress-hint.json' && opts?.enableCompression === false) {
+    if (filename === `kirograph-compress-hint${HOOK_EXT}` && opts?.enableCompression === false) {
       const p = path.join(hooksDir, filename);
       if (fs.existsSync(p)) fs.unlinkSync(p);
       continue;
     }
     // Skip memory hook if memory is disabled
-    if (filename === 'kirograph-mem-capture.json' && !opts?.enableMemory) {
+    if (filename === `kirograph-mem-capture${HOOK_EXT}` && !opts?.enableMemory) {
       const p = path.join(hooksDir, filename);
       if (fs.existsSync(p)) fs.unlinkSync(p);
       continue;
