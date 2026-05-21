@@ -48,6 +48,6 @@ export interface TokenSavingsRecord {
   compressedTokens: number;
   strategy: string;
   sessionId: string;
-  /** Source of the saving: 'exec' for compression, 'graph' for MCP graph tools */
-  source?: 'exec' | 'graph';
+  /** Source of the saving: 'exec' for compression, 'graph' for MCP graph tools, 'memory' for memory tools */
+  source?: 'exec' | 'graph' | 'memory';
 }

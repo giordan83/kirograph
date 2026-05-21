@@ -290,6 +290,8 @@ export default class KiroGraph {
 
   getProjectRoot(): string { return this.projectRoot; }
 
+  getDatabase(): GraphDatabase { return this.db; }
+
   close(): void {
     this.vectors.close();
     this.lock.release();

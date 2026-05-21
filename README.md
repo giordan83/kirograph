@@ -80,6 +80,29 @@ Enable via `kirograph install` or directly in `.kirograph/config.json`:
 
 See the [Architecture Analysis](#architecture-analysis-opt-in-1) section below for full details.
 
+### Memory (opt-in)
+
+When `enableMemory: true` is set, KiroGraph stores persistent observations across sessions — decisions, errors, patterns, and architecture notes. Observations are:
+
+- **Compressed** with the caveman grammar (if caveman mode is enabled) — deterministic, no LLM tokens spent
+- **Linked to code symbols** — identifiers in observation text are matched against the graph and stored as stable `qualified_name` references
+- **Embedded** with the configured semantic engine — enabling natural-language search over past observations
+- **Deduplicated** — SHA-256 content hash prevents storing the same observation twice
+
+Memory surfaces automatically in `kirograph_context` and `kirograph_impact` results when relevant observations are linked to the symbols being queried. The agent can also search memory directly via `kirograph_mem_search` or store new observations via `kirograph_mem_store`.
+
+Zero LLM tokens on write. ~150-350 tokens per search (vs ~2000-5000 tokens to re-discover context by reading files).
+
+Enable via `kirograph install` or directly in `.kirograph/config.json`:
+
+```json
+{
+  "enableMemory": true
+}
+```
+
+See the [Memory](#memory-requires-enablememory-true) section below for full details.
+
 ## Installation
 
 ### From npm (not yet available on npm registry)
@@ -201,7 +224,9 @@ Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
         "kirograph_status", "kirograph_files", "kirograph_dead_code",
         "kirograph_circular_deps", "kirograph_path", "kirograph_type_hierarchy",
         "kirograph_architecture", "kirograph_coupling", "kirograph_package",
-        "kirograph_hotspots", "kirograph_surprising", "kirograph_diff"
+        "kirograph_hotspots", "kirograph_surprising", "kirograph_diff",
+        "kirograph_mem_search", "kirograph_mem_store",
+        "kirograph_mem_timeline", "kirograph_mem_status"
       ]
     }
   }
@@ -218,8 +243,11 @@ Four hooks keep the index fresh automatically in the Kiro IDE:
 | `kirograph-mark-dirty-on-create.json` | `fileCreated` | `kirograph mark-dirty` |
 | `kirograph-sync-on-delete.json` | `fileDeleted` | `kirograph sync-if-dirty` |
 | `kirograph-sync-if-dirty.json` | `agentStop` | `kirograph sync-if-dirty --quiet` |
+| `kirograph-mem-capture.json` | `agentStop` | Prompts agent to store observations *(only when `enableMemory: true`)* |
 
 File changes are batched: saves and creates write a dirty marker; the actual sync runs when the agent stops. Deletes sync immediately. This means no overhead during active editing.
+
+When memory is enabled, the `kirograph-mem-capture` hook fires at session end and prompts the agent to review what happened and store any important decisions, errors, or patterns via `kirograph_mem_store`. This is how memory accumulates automatically — the agent decides what's worth remembering, the hook ensures it's always asked.
 
 Hooks fire for: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`, `.cs`, `.rb`, `.php`, `.swift`, `.kt`, `.dart`, `.ex`, `.exs`
 
@@ -531,6 +559,50 @@ Show token savings statistics from compressed command outputs.
 
 Returns total commands, original/compressed token counts, savings percentage, breakdown by command family, and recent command history.
 
+### `kirograph_mem_search` *(requires `enableMemory: true`)*
+
+Search project memory for past decisions, errors, patterns, and context.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | required | Natural language search query |
+| `kind` | string | - | Filter: `decision`, `error`, `pattern`, `architecture`, `summary`, `note` |
+| `limit` | number | 10 | Max results |
+| `sessionId` | string | - | Filter to specific session |
+| `projectPath` | string | cwd | Project root path |
+
+**How it works:** Hybrid search combining FTS5 keyword matching and vector cosine similarity (using the configured semantic engine). Results are ranked by a blended score (configurable via `memorySearchAlpha`). Falls back to FTS-only if embeddings are disabled or model mismatch is detected.
+
+### `kirograph_mem_store` *(requires `enableMemory: true`)*
+
+Store an observation in project memory. Content is automatically compressed (if caveman mode is on) and linked to relevant code symbols.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `content` | string | required | Observation text |
+| `kind` | string | `note` | `decision`, `error`, `pattern`, `architecture`, `summary`, `note` |
+| `projectPath` | string | cwd | Project root path |
+
+**How it works:** Strips `<private>` blocks → applies caveman compression (if enabled) → computes SHA-256 hash for deduplication → stores in `mem_observations` → detects symbol identifiers and creates `mem_links` → embeds with the configured model. Zero LLM tokens consumed.
+
+### `kirograph_mem_timeline` *(requires `enableMemory: true`)*
+
+List recent sessions and their observations chronologically.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | 5 | Number of sessions to show |
+| `sessionId` | string | - | Show observations for a specific session |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_mem_status` *(requires `enableMemory: true`)*
+
+Memory subsystem health: session count, observations, embedding coverage, model mismatch detection.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
 ## CLI Reference
 
 ### Setup
@@ -809,6 +881,8 @@ The `kirograph_gain` MCP tool exposes the same stats to the agent.
 | `kirograph_dead_code` | Not feasible manually (read every file) | 5× output, min 15,000 |
 | `kirograph_hotspots` | Not feasible manually (count edges for every symbol) | 5× output, min 15,000 |
 | `kirograph_architecture` | Not feasible manually | 4× output, min 7,500 |
+| `kirograph_mem_search` | Re-read 3-5 files to recall past decisions + grep | ~5,800 tokens |
+| `kirograph_mem_timeline` | Ask user or re-read session history | ~2,300 tokens |
 
 Constants used: 1,500 tokens per average source file (~200 lines), 800 tokens per grep result set, 2,000 tokens per directory listing. These are conservative estimates; in practice agents often read more files, retry failed searches, and explore dead ends.
 
@@ -929,6 +1003,46 @@ kirograph path --format json          # JSON output
 ```
 
 The command resolves symbol names using the same fuzzy search as `kirograph query`, preferring real symbol kinds (class, function, method…) over import/file nodes. The result shows each hop with file and line.
+
+### Memory *(requires `enableMemory: true`)*
+
+Persistent cross-session observations — search, store, and manage project memory from the CLI.
+
+```bash
+# Search (mirrors kirograph_mem_search)
+kirograph mem search "payment retry"              # hybrid FTS + vector search
+kirograph mem search "auth bug" --kind error      # filter by kind
+kirograph mem search "refactor" --limit 5         # limit results
+kirograph mem search "token" --format json        # JSON output
+
+# Store (mirrors kirograph_mem_store)
+kirograph mem store "decided to use idempotency keys for payments"
+kirograph mem store "auth bug: token refresh missing" --kind error
+kirograph mem store --kind decision < decision.txt   # pipe from stdin
+
+# Timeline (mirrors kirograph_mem_timeline)
+kirograph mem timeline                    # last 5 sessions
+kirograph mem timeline --limit 10         # more sessions
+kirograph mem timeline --session <id>     # specific session
+kirograph mem timeline --format json
+
+# Status (mirrors kirograph_mem_status)
+kirograph mem status                      # health dashboard
+
+# Maintenance
+kirograph mem prune --older-than 90d      # cleanup old observations
+kirograph mem export --format jsonl       # machine-readable export (importable)
+kirograph mem export --format md          # human-readable export
+kirograph mem import backup.jsonl         # restore from backup (deduplicates)
+kirograph mem reembed                     # re-embed after model change
+kirograph mem reembed --batch 50          # control batch size
+kirograph mem lint                        # find stale links, model mismatch
+kirograph mem lint --fix                  # auto-repair issues
+```
+
+**How observations are stored:** Text → strip `<private>` blocks → caveman compress (if enabled) → SHA-256 dedup check → store → detect symbol identifiers → link to graph → embed. Zero LLM tokens.
+
+**How observations surface:** `kirograph_context` and `kirograph_impact` automatically include relevant memory observations (max 3, above relevance threshold 0.3) when memory is enabled. No extra tool call needed.
 
 ### Graph Export
 

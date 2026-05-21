@@ -304,6 +304,7 @@ export interface SteeringOptions {
   cavemanMode?: CavemanMode | 'off';
   enableCompression?: boolean;
   shellCompressionLevel?: 'off' | 'normal' | 'aggressive' | 'ultra';
+  enableMemory?: boolean;
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
@@ -331,6 +332,27 @@ function buildSteeringContent(opts?: SteeringOptions): string {
   const caveman = cavemanMode && cavemanMode !== 'off' ? CAVEMAN_RULES[cavemanMode] : null;
   if (caveman) {
     content = content.trimEnd() + '\n\n' + caveman + '\n';
+  }
+
+  // Memory section
+  if (opts?.enableMemory) {
+    const memorySection = `
+## Memory
+
+KiroGraph has persistent memory. Use \`kirograph_mem_search\` to recall past decisions,
+errors, and patterns before making changes. Use \`kirograph_mem_store\` to save important
+observations (architecture decisions, bug root causes, patterns discovered).
+
+Memory is searchable via hybrid FTS + vector search. Observations are automatically
+linked to code symbols in the graph and surface in \`kirograph_context\` and
+\`kirograph_impact\` results when relevant.
+
+**When to store:** After fixing a bug, making an architecture decision, discovering a pattern,
+encountering a non-obvious error, or learning something about the codebase that future sessions
+should know. Keep observations concise — one fact per store call. A hook will also remind you
+at session end.
+`;
+    content = content.trimEnd() + '\n\n' + memorySection.trim() + '\n';
   }
 
   return content;

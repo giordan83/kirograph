@@ -56,6 +56,25 @@ export class GraphDatabase {
     this.runMigrations();
   }
 
+  /**
+   * Apply memory schema tables. Called when enableMemory is true.
+   * Safe to call multiple times (CREATE IF NOT EXISTS).
+   */
+  applyMemorySchema(): void {
+    const schemaPath = path.join(__dirname, '../db/memory-schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      const sql = fs.readFileSync(schemaPath, 'utf8');
+      this.db.exec(sql);
+    }
+  }
+
+  /**
+   * Get the raw database handle (for MemoryDatabase).
+   */
+  getRawDb(): any {
+    return this.db;
+  }
+
   private runMigrations(): void {
     // Record initial schema version if not present
     const versionRow = this.db.get('SELECT version FROM schema_versions ORDER BY version DESC LIMIT 1');

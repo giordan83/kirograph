@@ -8,6 +8,7 @@
  *
  * Asset pipeline runs after transpilation:
  *   - src/db/schema.sql        → dist/db/schema.sql
+ *   - src/db/memory-schema.sql → dist/db/memory-schema.sql
  *   - src/extraction/wasm/*.wasm → dist/extraction/wasm/
  */
 
@@ -46,6 +47,7 @@ function copyAssets(): void {
   // schema.sql
   fs.mkdirSync(path.join(dist, 'db'), { recursive: true });
   fs.copyFileSync(path.join(src, 'db', 'schema.sql'), path.join(dist, 'db', 'schema.sql'));
+  fs.copyFileSync(path.join(src, 'db', 'memory-schema.sql'), path.join(dist, 'db', 'memory-schema.sql'));
 
   // tree-sitter wasm files
   const wasmSrc = path.join(src, 'extraction', 'wasm');

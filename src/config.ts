@@ -49,6 +49,22 @@ export interface KiroGraphConfig {
    * Set to 0 to disable the warning. Default: 10.
    */
   syncWarningThreshold: number;
+  /** Enable persistent cross-session memory. Default: false. */
+  enableMemory: boolean;
+  /** FTS/vector blend for memory search: 0 = FTS only, 1 = vector only. Default: 0.5. */
+  memorySearchAlpha: number;
+  /** Store uncompressed originals when caveman is on. Default: false. */
+  memoryKeepRaw: boolean;
+  /** Auto-prune threshold (max observations). 0 = no limit. Default: 10000. */
+  memoryMaxObservations: number;
+  /** Seconds of inactivity before auto-closing a session. Default: 7200. */
+  memorySessionTimeout: number;
+  /** Max observations shown in kirograph_context. Default: 3. */
+  memoryContextLimit: number;
+  /** Min relevance score to include memory in context. Default: 0.3. */
+  memoryContextThreshold: number;
+  /** Glob patterns for paths to never capture in memory. Default: []. */
+  memoryExcludePatterns: string[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -62,6 +78,8 @@ const KNOWN_FIELDS = new Set<string>([
   'useVecIndex', 'semanticEngine', 'typesenseDashboard', 'qdrantDashboard',
   'minLogLevel', 'frameworkHints', 'fuzzyResolutionThreshold',
   'enableArchitecture', 'architectureLayers', 'cavemanMode', 'shellCompressionLevel', 'syncWarningThreshold',
+  'enableMemory', 'memorySearchAlpha', 'memoryKeepRaw', 'memoryMaxObservations',
+  'memorySessionTimeout', 'memoryContextLimit', 'memoryContextThreshold', 'memoryExcludePatterns',
   // Legacy aliases (still accepted, mapped during validation)
   'enableCompression', 'compressionLevel',
 ]);
@@ -108,6 +126,14 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     cavemanMode: 'off',
     shellCompressionLevel: 'normal',
     syncWarningThreshold: 10,
+    enableMemory: false,
+    memorySearchAlpha: 0.5,
+    memoryKeepRaw: false,
+    memoryMaxObservations: 10000,
+    memorySessionTimeout: 7200,
+    memoryContextLimit: 3,
+    memoryContextThreshold: 0.3,
+    memoryExcludePatterns: [],
   };
 }
 
@@ -201,6 +227,35 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     ? Math.round(raw.syncWarningThreshold)
     : defaults.syncWarningThreshold;
 
+  // ── Memory config ─────────────────────────────────────────────────────────
+  const enableMemory = typeof raw.enableMemory === 'boolean'
+    ? raw.enableMemory
+    : defaults.enableMemory;
+  const memorySearchAlpha = typeof raw.memorySearchAlpha === 'number'
+    && raw.memorySearchAlpha >= 0 && raw.memorySearchAlpha <= 1
+    ? raw.memorySearchAlpha
+    : defaults.memorySearchAlpha;
+  const memoryKeepRaw = typeof raw.memoryKeepRaw === 'boolean'
+    ? raw.memoryKeepRaw
+    : defaults.memoryKeepRaw;
+  const memoryMaxObservations = typeof raw.memoryMaxObservations === 'number' && raw.memoryMaxObservations >= 0
+    ? Math.round(raw.memoryMaxObservations)
+    : defaults.memoryMaxObservations;
+  const memorySessionTimeout = typeof raw.memorySessionTimeout === 'number' && raw.memorySessionTimeout > 0
+    ? Math.round(raw.memorySessionTimeout)
+    : defaults.memorySessionTimeout;
+  const memoryContextLimit = typeof raw.memoryContextLimit === 'number' && raw.memoryContextLimit >= 0
+    ? Math.round(raw.memoryContextLimit)
+    : defaults.memoryContextLimit;
+  const memoryContextThreshold = typeof raw.memoryContextThreshold === 'number'
+    && raw.memoryContextThreshold >= 0 && raw.memoryContextThreshold <= 1
+    ? raw.memoryContextThreshold
+    : defaults.memoryContextThreshold;
+  const memoryExcludePatterns = Array.isArray(raw.memoryExcludePatterns)
+    && raw.memoryExcludePatterns.every((p: unknown) => typeof p === 'string')
+    ? (raw.memoryExcludePatterns as string[])
+    : defaults.memoryExcludePatterns;
+
   // Validate glob patterns — exclude unsafe regex patterns
   const include = _validatePatterns(raw.include, defaults.include);
   const exclude = _validatePatterns(raw.exclude, defaults.exclude);
@@ -227,6 +282,14 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     cavemanMode,
     shellCompressionLevel,
     syncWarningThreshold,
+    enableMemory,
+    memorySearchAlpha,
+    memoryKeepRaw,
+    memoryMaxObservations,
+    memorySessionTimeout,
+    memoryContextLimit,
+    memoryContextThreshold,
+    memoryExcludePatterns,
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
   };
 }

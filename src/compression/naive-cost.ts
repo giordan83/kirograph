@@ -126,6 +126,30 @@ export function estimateNaiveCost(toolName: string, outputTokens: number, args?:
       return Math.max(outputTokens * 3, AVG_FILE_TOKENS * 5);
     }
 
+    case 'kirograph_mem_search': {
+      // Without memory, agent would re-read files to rediscover past decisions.
+      // Typically 3-5 files + grep for related context.
+      const limit = (args?.limit as number) || 10;
+      const filesEstimate = Math.min(Math.ceil(limit / 2), 5);
+      return filesEstimate * AVG_FILE_TOKENS + AVG_GREP_TOKENS;
+    }
+
+    case 'kirograph_mem_store': {
+      // Storing has no direct naive equivalent — the knowledge would simply be lost.
+      // We don't count savings on store; savings are realized on future searches.
+      return null;
+    }
+
+    case 'kirograph_mem_timeline': {
+      // Agent would ask user or re-read previous session context.
+      return AVG_FILE_TOKENS + AVG_GREP_TOKENS;
+    }
+
+    case 'kirograph_mem_status': {
+      // Lightweight status check, minimal naive cost.
+      return 500;
+    }
+
     // kirograph_exec and kirograph_gain are tracked separately
     default:
       return null;

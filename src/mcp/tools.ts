@@ -38,6 +38,21 @@ function writeSessionMarker(projectRoot: string): void {
   } catch { /* best-effort */ }
 }
 
+/** Format a timestamp as a human-readable relative age. */
+function formatAge(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -331,6 +346,66 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // ── Memory tools (require enableMemory=true) ────────────────────────────────
+  {
+    name: 'kirograph_mem_search',
+    description: 'Search project memory for past decisions, errors, patterns, and context. Returns observations ranked by relevance.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural language search query' },
+        kind: {
+          type: 'string',
+          description: 'Filter by observation kind',
+          enum: ['decision', 'error', 'pattern', 'architecture', 'summary', 'note'],
+        },
+        limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
+        sessionId: { type: 'string', description: 'Filter to specific session' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'kirograph_mem_store',
+    description: 'Store an observation in project memory. Content is automatically compressed (if caveman mode is on) and linked to relevant code symbols.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Observation text' },
+        kind: {
+          type: 'string',
+          description: 'Observation kind',
+          enum: ['decision', 'error', 'pattern', 'architecture', 'summary', 'note'],
+          default: 'note',
+        },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'kirograph_mem_timeline',
+    description: 'List recent sessions and their observations chronologically.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Number of sessions to show (default: 5)', default: 5 },
+        sessionId: { type: 'string', description: 'Show observations for a specific session' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_mem_status',
+    description: 'Memory subsystem health: session count, observations, embedding coverage, storage size.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
 ];
 
 export class ToolHandler {
@@ -371,7 +446,7 @@ export class ToolHandler {
       const text = await this.dispatch(toolName, args);
       const truncated = truncate(text);
 
-      // Track graph tool savings (skip exec/gain — they track themselves)
+      // Track graph/memory tool savings (skip exec/gain — they track themselves)
       if (toolName !== 'kirograph_exec' && toolName !== 'kirograph_gain') {
         try {
           const projectRoot = (args.projectPath as string) || this.defaultCg?.getProjectRoot() || process.cwd();
@@ -381,7 +456,11 @@ export class ToolHandler {
           const naiveCost = estimateNaiveCost(toolName, outputTokens, args);
           if (naiveCost !== null && naiveCost > outputTokens) {
             const tracker = new TokenTracker(projectRoot);
-            tracker.recordGraphSaving(toolName, outputTokens, naiveCost);
+            if (toolName.startsWith('kirograph_mem_')) {
+              tracker.recordMemorySaving(toolName, outputTokens, naiveCost);
+            } else {
+              tracker.recordGraphSaving(toolName, outputTokens, naiveCost);
+            }
           }
         } catch { /* non-critical */ }
       }
@@ -465,13 +544,16 @@ export class ToolHandler {
       ];
 
       // Source breakdown
-      if (stats.bySource.exec.count > 0 || stats.bySource.graph.count > 0) {
+      if (stats.bySource.exec.count > 0 || stats.bySource.graph.count > 0 || stats.bySource.memory.count > 0) {
         lines.push('', 'By source:');
         if (stats.bySource.graph.count > 0) {
           lines.push(`  Graph tools: ${stats.bySource.graph.count} calls, ~${stats.bySource.graph.saved.toLocaleString()} tokens saved (vs file reads/grep)`);
         }
         if (stats.bySource.exec.count > 0) {
           lines.push(`  Compression: ${stats.bySource.exec.count} calls, ~${stats.bySource.exec.saved.toLocaleString()} tokens saved (vs raw output)`);
+        }
+        if (stats.bySource.memory.count > 0) {
+          lines.push(`  Memory: ${stats.bySource.memory.count} calls, ~${stats.bySource.memory.saved.toLocaleString()} tokens saved (vs re-discovering context)`);
         }
       }
 
@@ -536,6 +618,46 @@ export class ToolHandler {
             }
           }
         }
+
+        // Memory integration: surface relevant observations if memory is enabled
+        try {
+          const { loadConfig } = await import('../config');
+          const projectRoot = cg.getProjectRoot();
+          const config = await loadConfig(projectRoot);
+          if (config.enableMemory) {
+            const { MemoryManager } = await import('../memory/index');
+            const db = cg.getDatabase();
+            db.applyMemorySchema();
+            const mem = new MemoryManager(config, db.getRawDb());
+            mem.initialize();
+
+            // Collect qualified names from entry points and related nodes
+            const qualifiedNames = [
+              ...ctx.entryPoints.map((n: any) => n.qualifiedName),
+              ...ctx.relatedNodes.slice(0, 5).map((n: any) => n.qualifiedName),
+            ].filter(Boolean);
+
+            const contextLimit = config.memoryContextLimit ?? 3;
+            const contextThreshold = config.memoryContextThreshold ?? 0.3;
+
+            // Try linked observations first, fall back to search
+            let memResults = mem.getLinkedObservations(qualifiedNames, contextLimit, contextThreshold);
+            if (memResults.length === 0) {
+              // Fall back to searching by task description
+              memResults = (await mem.search(args.task as string, { limit: contextLimit }))
+                .filter(r => r.score >= contextThreshold);
+            }
+
+            if (memResults.length > 0) {
+              lines.push('', '## Related Memory');
+              for (const r of memResults.slice(0, contextLimit)) {
+                const age = formatAge(r.observation.createdAt);
+                lines.push(`- [${r.observation.kind}] ${r.observation.content} (${age})`);
+              }
+            }
+          }
+        } catch { /* memory is non-critical — don't fail context on memory errors */ }
+
         return lines.join('\n');
       }
 
@@ -569,8 +691,41 @@ export class ToolHandler {
         const node = results[0].node;
         const affected = await cg.getImpactRadius(node.id, (args.depth as number) ?? 2);
         if (affected.length === 0) return `No dependents found for \`${node.name}\`.`;
-        return `Changing \`${node.name}\` may affect ${affected.length} symbol(s):\n` +
+
+        let output = `Changing \`${node.name}\` may affect ${affected.length} symbol(s):\n` +
           affected.map(n => `- ${mapKind(n.kind)} \`${n.name}\` — ${n.filePath}:${n.startLine}`).join('\n');
+
+        // Memory integration: surface observations linked to the target symbol
+        try {
+          const { loadConfig } = await import('../config');
+          const projectRoot = cg.getProjectRoot();
+          const config = await loadConfig(projectRoot);
+          if (config.enableMemory) {
+            const { MemoryManager } = await import('../memory/index');
+            const db = cg.getDatabase();
+            db.applyMemorySchema();
+            const mem = new MemoryManager(config, db.getRawDb());
+            mem.initialize();
+
+            const contextLimit = config.memoryContextLimit ?? 3;
+            const contextThreshold = config.memoryContextThreshold ?? 0.3;
+            const memResults = mem.getLinkedObservations(
+              [node.qualifiedName],
+              contextLimit,
+              contextThreshold
+            );
+
+            if (memResults.length > 0) {
+              output += '\n\nRelated Memory:';
+              for (const r of memResults) {
+                const age = formatAge(r.observation.createdAt);
+                output += `\n- [${r.observation.kind}] ${r.observation.content} (${age})`;
+              }
+            }
+          }
+        } catch { /* memory is non-critical */ }
+
+        return output;
       }
 
       case 'kirograph_node': {
@@ -1014,6 +1169,114 @@ export class ToolHandler {
           }
           if (diff.removedNodes.length > 30) lines.push(`  …and ${diff.removedNodes.length - 30} more`);
         }
+        return lines.join('\n');
+      }
+
+      // ── Memory tools ────────────────────────────────────────────────────────
+
+      case 'kirograph_mem_search': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled. Set enableMemory: true in .kirograph/config.json';
+
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+
+        const results = await mem.search(args.query as string, {
+          limit: (args.limit as number) ?? 10,
+          kind: args.kind as any,
+          sessionId: args.sessionId as string | undefined,
+        });
+
+        if (results.length === 0) return `No memory observations found for "${args.query}".`;
+
+        return results.map((r, i) => {
+          const age = formatAge(r.observation.createdAt);
+          return `${i + 1}. [${r.observation.kind}] ${r.observation.content} (${age})`;
+        }).join('\n');
+      }
+
+      case 'kirograph_mem_store': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled. Set enableMemory: true in .kirograph/config.json';
+
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+
+        const id = await mem.store({
+          content: args.content as string,
+          kind: (args.kind as any) ?? 'note',
+          source: 'agent',
+        });
+
+        if (!id) return 'Observation already exists (duplicate content).';
+        return `Stored observation ${id} [${(args.kind as string) ?? 'note'}]`;
+      }
+
+      case 'kirograph_mem_timeline': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled. Set enableMemory: true in .kirograph/config.json';
+
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+
+        const { sessions, observations } = mem.timeline({
+          limit: (args.limit as number) ?? 5,
+          sessionId: args.sessionId as string | undefined,
+        });
+
+        if (sessions.length === 0) return 'No memory sessions found.';
+
+        const lines: string[] = [];
+        for (const session of sessions) {
+          const start = new Date(session.startedAt).toISOString().slice(0, 16).replace('T', ' ');
+          const status = session.endedAt ? 'ended' : 'active';
+          const obs = observations.get(session.id) ?? [];
+          lines.push(`## ${start} [${session.ide ?? 'unknown'}] (${status}, ${obs.length} observations)`);
+          for (const o of obs.slice(0, 5)) {
+            lines.push(`  - [${o.kind}] ${o.content.slice(0, 120)}`);
+          }
+          if (obs.length > 5) lines.push(`  …and ${obs.length - 5} more`);
+        }
+        return lines.join('\n');
+      }
+
+      case 'kirograph_mem_status': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled. Set enableMemory: true in .kirograph/config.json';
+
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+
+        const stats = mem.getStats();
+        const lines = [
+          'KiroGraph Memory Status',
+          `  Sessions: ${stats.sessions} (${stats.activeSessions} active)`,
+          `  Observations: ${stats.observations}`,
+          `  Symbol links: ${stats.links}`,
+          `  Embeddings: ${stats.vectors} / ${stats.embeddableCount}`,
+          `  Model mismatch: ${stats.modelMismatch ? '⚠ yes — run kirograph mem reembed' : 'no'}`,
+          `  Caveman compression: ${config.cavemanMode !== 'off' ? config.cavemanMode : 'off (storing raw)'}`,
+        ];
         return lines.join('\n');
       }
 

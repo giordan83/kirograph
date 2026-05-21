@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.15.0] - 2026-05-21: Memory
+
+### Added
+
+- **Memory subsystem** (`enableMemory: true`): persistent cross-session observations stored in isolated `mem_*` tables. Zero LLM tokens on write, minimal tokens on read. Inspired by [cavemem](https://github.com/JuliusBrussee/cavemem).
+  - **`kirograph_mem_search` MCP tool**: Hybrid FTS5 + vector search over observations. Supports filtering by kind and session.
+  - **`kirograph_mem_store` MCP tool**: Store observations with automatic caveman compression (if enabled), symbol detection, and embedding.
+  - **`kirograph_mem_timeline` MCP tool**: Chronological session and observation listing.
+  - **`kirograph_mem_status` MCP tool**: Memory health — session count, observations, embedding coverage, model mismatch detection.
+  - **CLI mirrors all MCP tools**: `kirograph mem {search,store,timeline,status,prune,export,import,reembed,lint}`.
+  - **Observations linked to code symbols**: Detected identifiers in observation text are matched against the graph and stored as `qualified_name` links (stable across reindex).
+  - **`kirograph_context` enhanced**: Surfaces relevant memory observations alongside code symbols when memory is enabled (capped at 3 observations, 500 tokens).
+  - **`kirograph_impact` enhanced**: Shows related memory observations for the target symbol ("why it was built this way" alongside "what breaks").
+  - **`kirograph-mem-capture` hook**: `agentStop` hook that prompts the agent to store important observations at session end. Memory accumulates automatically — the agent decides what's worth remembering.
+  - **Caveman compression conditional**: Observations compressed only if `cavemanMode` is not `off`. Uses the same level the user chose during install.
+  - **Deduplication**: SHA-256 content hash prevents storing the same observation twice.
+  - **Privacy**: `<private>...</private>` blocks stripped at write boundary. Path exclusion patterns via `memoryExcludePatterns` config.
+  - **Auto-session management**: Sessions auto-created on first write, auto-closed after configurable inactivity timeout (default: 2 hours).
+  - **`kirograph mem lint`**: Health checks — stale symbol links, embedding model mismatch, orphan observations, FTS desync, stale sessions. `--fix` flag for auto-repair.
+  - **`kirograph mem reembed`**: Re-embed all observations when the embedding model changes.
+  - **`kirograph mem export/import`**: JSONL (round-trip) and Markdown (human-readable) export formats.
+  - **Token savings tracking**: Memory tools tracked as `'memory'` source in `kirograph_gain` with naive cost heuristics.
+- **Installer prompt**: "Enable memory: persistent cross-session observations?" added to the interactive installer.
+- **Steering file memory section**: Teaches the agent to use `kirograph_mem_search` and `kirograph_mem_store`. Conditionally included when memory is enabled.
+- **8 new config fields**: `enableMemory`, `memorySearchAlpha`, `memoryKeepRaw`, `memoryMaxObservations`, `memorySessionTimeout`, `memoryContextLimit`, `memoryContextThreshold`, `memoryExcludePatterns`.
+
+### Changed
+
+- MCP tool count: 20 → 24 (`kirograph_mem_search`, `kirograph_mem_store`, `kirograph_mem_timeline`, `kirograph_mem_status`).
+- `kirograph_gain` output now shows three source categories: Graph tools, Compression, Memory.
+- `TokenSavingsRecord.source` type: `'exec' | 'graph'` → `'exec' | 'graph' | 'memory'`.
+- `GraphDatabase` exposes `applyMemorySchema()` and `getRawDb()` for memory module access.
+- `KiroGraph` class exposes `getDatabase()` accessor.
+- Installer `installLate` signature extended with `enableMemory` parameter.
+
 ## [0.14.0] - 2026-05-19: Shell Compression
 
 ### Added

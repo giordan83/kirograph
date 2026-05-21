@@ -3,7 +3,7 @@
  *
  * The default target wires up Kiro:
  *  1. .kiro/settings/mcp.json        — registers the MCP server (IDE + CLI)
- *  2. .kiro/hooks/*.json             — auto-sync hooks for Kiro IDE
+ *  2. .kiro/hooks/*.kiro.hook       — auto-sync hooks for Kiro IDE
  *  3. .kiro/steering/kirograph.md    — teaches Kiro to use the graph tools (IDE + CLI)
  *  4. .kiro/agents/kirograph.json    — custom agent config for Kiro CLI
  */
@@ -44,6 +44,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
     const alreadyInitialized = fs.existsSync(path.join(cwd, '.kirograph'));
     let cavemanMode: CavemanMode | 'off' = 'off';
     let shellCompressionLevel: 'off' | 'normal' | 'aggressive' | 'ultra' = 'normal';
+    let enableMemory = false;
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
     let qdrantDashboard = false;
@@ -53,18 +54,21 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         const config = await loadConfig(cwd);
         cavemanMode = config.cavemanMode ?? 'off';
         shellCompressionLevel = config.shellCompressionLevel ?? 'normal';
+        enableMemory = config.enableMemory ?? false;
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
         console.log(`  • enableEmbeddings: ${config.enableEmbeddings}`);
         console.log(`  • enableArchitecture: ${config.enableArchitecture}`);
         console.log(`  • cavemanMode: ${cavemanMode}`);
         console.log(`  • shellCompressionLevel: ${shellCompressionLevel}`);
+        console.log(`  • enableMemory: ${enableMemory}`);
       } else {
         shouldOfferIndex = true;
         const patch = await promptConfigOptions(rl);
         await updateConfig(cwd, patch);
         cavemanMode = patch.cavemanMode ?? 'off';
         shellCompressionLevel = patch.shellCompressionLevel ?? 'normal';
+        enableMemory = patch.enableMemory ?? false;
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
 
@@ -137,9 +141,10 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         console.log(`  • enableArchitecture: ${patch.enableArchitecture}`);
         console.log(`  • cavemanMode: ${cavemanMode}`);
         console.log(`  • shellCompressionLevel: ${shellCompressionLevel}`);
+        console.log(`  • enableMemory: ${enableMemory}`);
       }
 
-      installer.installLate(cwd, cavemanMode, shellCompressionLevel);
+      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`\n  ✗ Failed to write configuration: ${reason}`);

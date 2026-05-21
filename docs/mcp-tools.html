@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KiroGraph: MCP Tools Reference</title>
-  <meta name="description" content="Full reference for all 20 KiroGraph MCP tools: parameters, types, defaults, and descriptions.">
+  <meta name="description" content="Full reference for all 24 KiroGraph MCP tools: parameters, types, defaults, and descriptions.">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/logo.png">
 </head>
@@ -372,6 +372,70 @@
       </div>
     </div>
 
+    <!-- kirograph_mem_search -->
+    <div class="tool-card" id="tool-mem-search">
+      <h3>kirograph_mem_search <span class="badge">enableMemory</span></h3>
+      <p class="tool-desc">Search project memory for past decisions, errors, patterns, and context. Hybrid FTS + vector search.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>query</code></td><td>string</td><td><em>required</em></td><td>Natural language search query</td></tr>
+            <tr><td><code>kind</code></td><td>string</td><td>—</td><td><code>decision</code>, <code>error</code>, <code>pattern</code>, <code>architecture</code>, <code>summary</code>, <code>note</code></td></tr>
+            <tr><td><code>limit</code></td><td>number</td><td>10</td><td>Max results</td></tr>
+            <tr><td><code>sessionId</code></td><td>string</td><td>—</td><td>Filter to specific session</td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- kirograph_mem_store -->
+    <div class="tool-card" id="tool-mem-store">
+      <h3>kirograph_mem_store <span class="badge">enableMemory</span></h3>
+      <p class="tool-desc">Store an observation in project memory. Auto-compressed, symbol-linked, and embedded.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>content</code></td><td>string</td><td><em>required</em></td><td>Observation text</td></tr>
+            <tr><td><code>kind</code></td><td>string</td><td><code>note</code></td><td><code>decision</code>, <code>error</code>, <code>pattern</code>, <code>architecture</code>, <code>summary</code>, <code>note</code></td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- kirograph_mem_timeline -->
+    <div class="tool-card" id="tool-mem-timeline">
+      <h3>kirograph_mem_timeline <span class="badge">enableMemory</span></h3>
+      <p class="tool-desc">List recent sessions and their observations chronologically.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>limit</code></td><td>number</td><td>5</td><td>Number of sessions to show</td></tr>
+            <tr><td><code>sessionId</code></td><td>string</td><td>—</td><td>Show observations for a specific session</td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- kirograph_mem_status -->
+    <div class="tool-card" id="tool-mem-status">
+      <h3>kirograph_mem_status <span class="badge">enableMemory</span></h3>
+      <p class="tool-desc">Memory subsystem health: sessions, observations, embeddings, model mismatch.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 
   <!-- Right sidebar TOC -->
@@ -398,6 +462,10 @@
       <a href="#tool-diff" class="sidebar-link">kirograph_diff</a>
       <a href="#tool-exec" class="sidebar-link">kirograph_exec</a>
       <a href="#tool-gain" class="sidebar-link">kirograph_gain</a>
+      <a href="#tool-mem-search" class="sidebar-link">kirograph_mem_search</a>
+      <a href="#tool-mem-store" class="sidebar-link">kirograph_mem_store</a>
+      <a href="#tool-mem-timeline" class="sidebar-link">kirograph_mem_timeline</a>
+      <a href="#tool-mem-status" class="sidebar-link">kirograph_mem_status</a>
     </div>
   </aside>
 

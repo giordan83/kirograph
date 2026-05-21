@@ -23,7 +23,7 @@ export function installClaudeEarly(projectRoot: string): void {
   console.log(`  ✓ Claude MCP server registered in ${mcpPath}`);
 }
 
-export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off'): void {
+export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', _shellCompressionLevel?: string, _enableMemory?: boolean): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'claude.md');
   ensureDir(path.dirname(instructionsPath));
   fs.writeFileSync(instructionsPath, buildAgentInstructions(cavemanMode));

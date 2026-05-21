@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import { KiroGraphConfig } from '../../config';
 type CavemanMode = 'lite' | 'full' | 'ultra';
 import { ask, askBool, arrowSelect, dim, reset, violet } from './prompts';
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel'> & { embeddingModel?: string; embeddingDim?: number };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -52,7 +52,7 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     'Enables semantic/similarity-based code search. Increases indexing time; the chosen embedding model is downloaded automatically on first use.',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal' };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false };
 
   if (enableEmbeddings) {
     // ── Model selection ────────────────────────────────────────────────────────
@@ -151,6 +151,11 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     { value: 'ultra',      label: 'ultra',      description: 'Maximum compression: counts and summaries only' },
   ]);
   patch.shellCompressionLevel = compressionChoice as KiroGraphConfig['shellCompressionLevel'];
+
+  (patch as any).enableMemory = await askBool(rl,
+    'Enable memory: persistent cross-session observations?',
+    'Stores decisions, errors, and patterns across sessions. Observations are compressed (if caveman is on), linked to code symbols, and searchable via kirograph_mem_* tools. Zero LLM tokens on write.',
+  );
 
   return patch;
 }
