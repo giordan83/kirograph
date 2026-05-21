@@ -8,62 +8,17 @@ import { logWarn } from '../../errors';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const FILE_PATTERNS = [
-  '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx',
-  '**/*.py', '**/*.go', '**/*.rs', '**/*.java',
-  '**/*.cs', '**/*.rb', '**/*.php', '**/*.swift',
-  '**/*.kt', '**/*.dart',
-  '**/*.ex', '**/*.exs',
-  '**/*.scala', '**/*.sc', '**/*.lua', '**/*.zig',
-  '**/*.sh', '**/*.bash', '**/*.ml', '**/*.mli',
-  '**/*.elm', '**/*.sol', '**/*.vue', '**/*.m',
-  '**/*.yaml', '**/*.yml',
-  '**/*.tf', '**/*.tfvars',
-  '**/*.css', '**/*.scss', '**/*.sass',
-  '**/*.html',
-];
-
 const HOOK_EXT = '.kiro.hook';
 
 const HOOKS: Array<{ filename: string; hook: object }> = [
   {
-    filename: `kirograph-mark-dirty-on-save${HOOK_EXT}`,
-    hook: {
-      name: 'KiroGraph Mark Dirty on Save',
-      version: '1.0.0',
-      description: 'Mark the KiroGraph index as dirty when source files are saved. Sync is deferred to agent idle.',
-      when: { type: 'fileEdited', patterns: FILE_PATTERNS },
-      then: { type: 'askAgent', prompt: "A source file was saved. Run kirograph_exec with command 'kirograph mark-dirty' to mark the index as needing a sync. Do not explain, just run the tool silently." },
-    },
-  },
-  {
-    filename: `kirograph-mark-dirty-on-create${HOOK_EXT}`,
-    hook: {
-      name: 'KiroGraph Mark Dirty on Create',
-      version: '1.0.0',
-      description: 'Mark the KiroGraph index as dirty when source files are created.',
-      when: { type: 'fileCreated', patterns: FILE_PATTERNS },
-      then: { type: 'askAgent', prompt: "A source file was created. Run kirograph_exec with command 'kirograph mark-dirty' to mark the index as needing a sync. Do not explain, just run the tool silently." },
-    },
-  },
-  {
-    filename: `kirograph-sync-on-delete${HOOK_EXT}`,
-    hook: {
-      name: 'KiroGraph Sync on Delete',
-      version: '1.0.0',
-      description: 'Remove deleted files from the KiroGraph index immediately.',
-      when: { type: 'fileDeleted', patterns: FILE_PATTERNS },
-      then: { type: 'askAgent', prompt: "A source file was deleted. Run kirograph_exec with command 'kirograph sync-if-dirty' to update the index. Do not explain, just run the tool silently." },
-    },
-  },
-  {
     filename: `kirograph-sync-if-dirty${HOOK_EXT}`,
     hook: {
-      name: 'KiroGraph Deferred Sync',
+      name: 'KiroGraph Sync on Agent Stop',
       version: '1.0.0',
-      description: 'Sync the KiroGraph index when the agent is idle and a dirty marker is present.',
+      description: 'Sync the KiroGraph index when the agent stops, picking up any file edits, creates, or deletes from the session.',
       when: { type: 'agentStop' },
-      then: { type: 'askAgent', prompt: "Run kirograph_exec with command 'kirograph sync-if-dirty --quiet' to sync the index if it was marked dirty. Do not explain, just run the tool silently." },
+      then: { type: 'askAgent', prompt: "If any source file was created, edited, or deleted during this session, run kirograph_exec with command 'kirograph sync --quiet' to sync the index. If no files were changed, do nothing. Do not explain, just run the tool silently." },
     },
   },
   {
@@ -166,7 +121,11 @@ export function writeHooks(kiroDir: string, opts?: { enableCompression?: boolean
     // Legacy .json versions (migrated to .kiro.hook)
     'kirograph-mark-dirty-on-save.json', 'kirograph-mark-dirty-on-create.json',
     'kirograph-sync-on-delete.json', 'kirograph-sync-if-dirty.json',
-    'kirograph-compress-hint.json', 'kirograph-mem-capture.json'
+    'kirograph-compress-hint.json', 'kirograph-mem-capture.json',
+    // Removed per-file hooks (consolidated into agentStop sync)
+    `kirograph-mark-dirty-on-save${HOOK_EXT}`,
+    `kirograph-mark-dirty-on-create${HOOK_EXT}`,
+    `kirograph-sync-on-delete${HOOK_EXT}`,
   ];
   for (const old of oldHooks) {
     const p = path.join(hooksDir, old);
