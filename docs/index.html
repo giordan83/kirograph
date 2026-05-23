@@ -142,8 +142,8 @@
 
       <div class="card">
         <span class="card-icon"><i data-lucide="wrench"></i></span>
-        <h3>18 MCP Tools</h3>
-        <p>Context building, symbol search, call graphs, type hierarchies, impact analysis, dead code, circular deps, architecture, coupling metrics, snapshots, and more, all auto-approved in Kiro.</p>
+        <h3>24 MCP Tools</h3>
+        <p>Context building, symbol search, call graphs, type hierarchies, impact analysis, dead code, circular deps, architecture, coupling metrics, snapshots, memory, and more, all auto-approved in Kiro.</p>
       </div>
 
       <div class="card">
@@ -212,6 +212,12 @@
         <p>Find the most-connected symbols and non-obvious cross-file coupling. Useful for identifying load-bearing code and unexpected dependencies before making changes.</p>
       </div>
 
+      <div class="card">
+        <span class="card-icon"><i data-lucide="brain"></i></span>
+        <h3>Persistent Memory</h3>
+        <p>Cross-session observations stored locally with zero LLM tokens on write. Decisions, errors, and patterns are auto-linked to code symbols and surfaced in <code>kirograph_context</code> when relevant. Opt-in via <code>enableMemory</code>.</p>
+      </div>
+
     </div>
   </div>
 </section>
@@ -251,6 +257,7 @@
             <span class="diagram-chip">type_hierarchy</span>
             <span class="diagram-chip">path</span>
             <span class="diagram-chip">architecture</span>
+            <span class="diagram-chip">memory</span>
           </div>
         </div>
         <div class="diagram-sub" style="margin: 0;">SQLite Graph DB (.kirograph/kirograph.db)</div>
