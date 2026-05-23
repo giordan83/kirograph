@@ -9,8 +9,30 @@ dist/
 kirograph-graph.html
 .kiro
 
+AGENTS.md
 # claude
 .claude
+CLAUDE.md
+.mcp.json
+# cline
+.clinerules
+# antigravity
+.agents
+GEMINI.md
+# roo
+.roo
+#windsurf
+.windsurf
+# kilo
+.kilo
+# junie
+.junie
+# continue
+.continue
+# warp
+.warp
+# trae
+.trae
 
 # map
 *.js.map

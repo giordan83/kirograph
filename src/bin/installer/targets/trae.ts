@@ -29,7 +29,8 @@ export function installTraeLate(projectRoot: string, cavemanMode?: CavemanMode |
   const rulesDir = path.join(projectRoot, '.trae', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, 'kirograph.md');
-  fs.writeFileSync(rulePath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory)));
+  const frontmatter = '---\nalwaysApply: true\n---\n\n';
+  fs.writeFileSync(rulePath, frontmatter + buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory)));
   console.log(`  ✓ Trae rule written to ${rulePath}`);
 }
 

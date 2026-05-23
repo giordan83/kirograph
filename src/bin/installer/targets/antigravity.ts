@@ -14,6 +14,7 @@ import {
   buildInstructionOpts,
   readJson,
   writeJson,
+  printMcpSetup,
   upsertGeneratedBlock,
   removeGeneratedBlock,
 } from '../common';
@@ -92,17 +93,7 @@ export function uninitAntigravity(projectRoot: string): void {
 }
 
 export function printAntigravityNextSteps(projectRoot: string): void {
-  const escapedPath = projectRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   console.log('\n  Done! KiroGraph instructions are in GEMINI.md.');
   console.log('  Auto-sync hook installed in .agents/hooks.json');
-  console.log('\n  Add the MCP server to Antigravity:');
-  console.log('  Edit ~/.gemini/antigravity/mcp_config.json and add:');
-  console.log('    {');
-  console.log('      "mcpServers": {');
-  console.log('        "kirograph": {');
-  console.log(`          "command": "kirograph",`);
-  console.log(`          "args": ["serve", "--mcp", "--path", "${escapedPath}"]`);
-  console.log('        }');
-  console.log('      }');
-  console.log('    }\n');
+  printMcpSetup('~/.gemini/antigravity/mcp_config.json', projectRoot);
 }

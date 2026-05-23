@@ -1,3 +1,11 @@
+/**
+ * Windsurf target.
+ *
+ * MCP: user-scoped at ~/.codeium/windsurf/mcp_config.json (print instructions)
+ * Rules: .windsurf/rules/kirograph.md (workspace-level, with frontmatter)
+ * Hooks: .windsurf/hooks.json (workspace-level)
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { CavemanMode } from '../caveman';
@@ -6,16 +14,11 @@ import {
   buildInstructionOpts,
   readJson,
   writeJson,
-  KIROGRAPH_COMMAND,
-  KIROGRAPH_MCP_ARGS,
-  removeMcpServersConfig,
-  upsertGeneratedBlock,
-  removeGeneratedBlock,
-  writeMcpServersConfig,
+  printMcpSetup,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
-const WINDSURF_BLOCK_ID = 'windsurf';
+const WINDSURF_RULES_FILE = 'kirograph.md';
 
 function buildWindsurfHooks(): object {
   return {
@@ -27,13 +30,19 @@ function buildWindsurfHooks(): object {
   };
 }
 
-export function installWindsurfEarly(projectRoot: string): void {
-  const mcpPath = path.join(projectRoot, '.windsurf', 'mcp.json');
-  writeMcpServersConfig(mcpPath, {
-    command: KIROGRAPH_COMMAND,
-    args: KIROGRAPH_MCP_ARGS,
-  });
-  console.log(`  ✓ Windsurf MCP server registered in ${mcpPath}`);
+function buildWindsurfRule(instructions: string): string {
+  const frontmatter = [
+    '---',
+    'trigger: always_on',
+    '---',
+    '',
+  ].join('\n');
+  return frontmatter + instructions;
+}
+
+export function installWindsurfEarly(_projectRoot: string): void {
+  // Windsurf MCP is user-scoped at ~/.codeium/windsurf/mcp_config.json.
+  // We print the setup instructions in printNextSteps.
 }
 
 export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -44,11 +53,22 @@ export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMo
   fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
   console.log(`  ✓ Windsurf instructions written to ${instructionsPath}`);
 
-  const rulesPath = path.join(projectRoot, '.windsurfrules');
-  const changed = upsertGeneratedBlock(rulesPath, WINDSURF_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
-  console.log(changed
-    ? `  ✓ .windsurfrules updated with KiroGraph instructions`
-    : `  ✓ .windsurfrules already up to date`);
+  // Write rules file inside .windsurf/rules/ with frontmatter
+  const rulesDir = path.join(projectRoot, '.windsurf', 'rules');
+  ensureDir(rulesDir);
+  const rulePath = path.join(rulesDir, WINDSURF_RULES_FILE);
+  fs.writeFileSync(rulePath, buildWindsurfRule(buildAgentInstructions(opts)));
+  console.log(`  ✓ Windsurf rule written to ${rulePath}`);
+
+  // Remove legacy .windsurfrules if it exists and was created by us
+  const legacyPath = path.join(projectRoot, '.windsurfrules');
+  if (fs.existsSync(legacyPath)) {
+    const content = fs.readFileSync(legacyPath, 'utf8');
+    if (content.includes('kirograph')) {
+      fs.unlinkSync(legacyPath);
+      console.log(`  ✓ Removed legacy .windsurfrules (migrated to .windsurf/rules/)`);
+    }
+  }
 
   // Write hooks
   const hooksPath = path.join(projectRoot, '.windsurf', 'hooks.json');
@@ -68,14 +88,21 @@ export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMo
 }
 
 export function uninitWindsurf(projectRoot: string): void {
-  const mcpPath = path.join(projectRoot, '.windsurf', 'mcp.json');
-  if (removeMcpServersConfig(mcpPath)) {
-    console.log(`  ✓ Removed kirograph from .windsurf/mcp.json`);
+  // Remove rule file
+  const rulePath = path.join(projectRoot, '.windsurf', 'rules', WINDSURF_RULES_FILE);
+  if (fs.existsSync(rulePath)) {
+    fs.unlinkSync(rulePath);
+    console.log(`  ✓ Removed .windsurf/rules/${WINDSURF_RULES_FILE}`);
   }
 
-  const rulesPath = path.join(projectRoot, '.windsurfrules');
-  if (removeGeneratedBlock(rulesPath, WINDSURF_BLOCK_ID)) {
-    console.log(`  ✓ Removed KiroGraph block from .windsurfrules`);
+  // Remove legacy .windsurfrules block
+  const legacyPath = path.join(projectRoot, '.windsurfrules');
+  if (fs.existsSync(legacyPath)) {
+    const content = fs.readFileSync(legacyPath, 'utf8');
+    if (content.includes('kirograph')) {
+      fs.unlinkSync(legacyPath);
+      console.log(`  ✓ Removed legacy .windsurfrules`);
+    }
   }
 
   // Remove kirograph hooks
@@ -99,8 +126,8 @@ export function uninitWindsurf(projectRoot: string): void {
   }
 }
 
-export function printWindsurfNextSteps(): void {
-  console.log('\n  Done! Restart Windsurf for the MCP server and hooks to load.');
-  console.log('  KiroGraph instructions are in .windsurfrules');
-  console.log('  Auto-sync hook runs after each Cascade response.\n');
+export function printWindsurfNextSteps(projectRoot: string): void {
+  console.log('\n  Done! KiroGraph rule is in .windsurf/rules/kirograph.md');
+  console.log('  Auto-sync hook is in .windsurf/hooks.json');
+  printMcpSetup('~/.codeium/windsurf/mcp_config.json', projectRoot);
 }

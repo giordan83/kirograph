@@ -3,6 +3,7 @@ import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import {
   ensureDir,
+  printMcpCommand,
   upsertGeneratedBlock,
   removeGeneratedBlock,
 } from '../common';
@@ -39,6 +40,5 @@ export function uninitGoose(projectRoot: string): void {
 export function printGooseNextSteps(projectRoot: string): void {
   const escapedPath = projectRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   console.log('\n  Done! KiroGraph instructions are in AGENTS.md.');
-  console.log('  Add the MCP server to Goose with:');
-  console.log(`    goose mcp add kirograph -- kirograph serve --mcp --path "${escapedPath}"\n`);
+  printMcpCommand(`goose mcp add kirograph -- kirograph serve --mcp --path "${escapedPath}"`);
 }

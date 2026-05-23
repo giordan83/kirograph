@@ -1,34 +1,27 @@
+/**
+ * Cline target.
+ *
+ * MCP: .cline/mcp_settings.json
+ * Rules: .clinerules/kirograph.md (directory-based, not a flat file)
+ * Hooks: .cline/hooks/task_completed (executable script)
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
-  KIROGRAPH_COMMAND,
-  KIROGRAPH_MCP_ARGS,
-  KIROGRAPH_SERVER_NAME,
-  readJson,
-  writeJson,
-  upsertGeneratedBlock,
-  removeGeneratedBlock,
+  printMcpSetup,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
-const CLINE_BLOCK_ID = 'cline';
+const CLINE_RULES_FILE = 'kirograph.md';
 const CLINE_HOOK_SCRIPT = '#!/bin/sh\nkirograph sync --quiet 2>/dev/null || true\n';
 
-export function installClineEarly(projectRoot: string): void {
-  const mcpPath = path.join(projectRoot, '.cline', 'mcp_settings.json');
-  ensureDir(path.dirname(mcpPath));
-  const config = readJson(mcpPath);
-  config.mcpServers = config.mcpServers ?? {};
-  config.mcpServers[KIROGRAPH_SERVER_NAME] = {
-    command: KIROGRAPH_COMMAND,
-    args: KIROGRAPH_MCP_ARGS,
-    disabled: false,
-  };
-  writeJson(mcpPath, config);
-  console.log(`  ✓ Cline MCP server registered in ${mcpPath}`);
+export function installClineEarly(_projectRoot: string): void {
+  // Cline MCP is user-scoped at ~/.cline/mcp.json.
+  // We print the setup instructions in printNextSteps.
 }
 
 export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -39,13 +32,18 @@ export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode 
   fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
   console.log(`  ✓ Cline instructions written to ${instructionsPath}`);
 
-  const rulesPath = path.join(projectRoot, '.clinerules');
-  const changed = upsertGeneratedBlock(rulesPath, CLINE_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
-  console.log(changed
-    ? `  ✓ .clinerules updated with KiroGraph instructions`
-    : `  ✓ .clinerules already up to date`);
+  // Write rules file inside .clinerules/ directory
+  const rulesDir = path.join(projectRoot, '.clinerules');
+  // If .clinerules exists as a flat file (legacy), remove it first
+  if (fs.existsSync(rulesDir) && fs.statSync(rulesDir).isFile()) {
+    fs.unlinkSync(rulesDir);
+  }
+  ensureDir(rulesDir);
+  const rulePath = path.join(rulesDir, CLINE_RULES_FILE);
+  fs.writeFileSync(rulePath, buildAgentInstructions(opts));
+  console.log(`  ✓ Cline rule written to ${rulePath}`);
 
-  // Write hook script — Cline uses executable scripts in .clinerules/hooks/
+  // Write hook script
   const hooksDir = path.join(projectRoot, '.clinerules', 'hooks');
   ensureDir(hooksDir);
   const hookPath = path.join(hooksDir, 'task_completed');
@@ -54,21 +52,14 @@ export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode 
 }
 
 export function uninitCline(projectRoot: string): void {
-  const mcpPath = path.join(projectRoot, '.cline', 'mcp_settings.json');
-  if (fs.existsSync(mcpPath)) {
-    const config = readJson(mcpPath);
-    if (config.mcpServers?.[KIROGRAPH_SERVER_NAME]) {
-      delete config.mcpServers[KIROGRAPH_SERVER_NAME];
-      writeJson(mcpPath, config);
-      console.log(`  ✓ Removed kirograph from .cline/mcp_settings.json`);
-    }
+  // Remove rule file
+  const rulePath = path.join(projectRoot, '.clinerules', CLINE_RULES_FILE);
+  if (fs.existsSync(rulePath)) {
+    fs.unlinkSync(rulePath);
+    console.log(`  ✓ Removed .clinerules/${CLINE_RULES_FILE}`);
   }
 
-  const rulesPath = path.join(projectRoot, '.clinerules');
-  if (removeGeneratedBlock(rulesPath, CLINE_BLOCK_ID)) {
-    console.log(`  ✓ Removed KiroGraph block from .clinerules`);
-  }
-
+  // Remove hook
   const hookPath = path.join(projectRoot, '.clinerules', 'hooks', 'task_completed');
   if (fs.existsSync(hookPath)) {
     const content = fs.readFileSync(hookPath, 'utf8');
@@ -79,7 +70,7 @@ export function uninitCline(projectRoot: string): void {
   }
 }
 
-export function printClineNextSteps(): void {
-  console.log('\n  Done! Restart Cline for the MCP server and hooks to load.');
-  console.log('  Auto-sync hook runs on task completion.\n');
+export function printClineNextSteps(projectRoot: string): void {
+  console.log('\n  Done! KiroGraph rule and hook are in .clinerules/');
+  printMcpSetup('~/.cline/mcp.json', projectRoot);
 }

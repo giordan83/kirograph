@@ -6,6 +6,7 @@ import {
   buildInstructionOpts,
   readJson,
   writeJson,
+  printMcpCommand,
   removeGeneratedBlock,
   upsertGeneratedBlock,
 } from '../common';
@@ -105,10 +106,5 @@ export function printCodexNextSteps(projectRoot: string): void {
   const escapedPath = projectRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   console.log('\n  Done! Codex project instructions and hooks are installed.');
   console.log('  Auto-sync hook runs on Stop event.');
-  console.log('  Add the MCP server to Codex with:');
-  console.log(`    codex mcp add kirograph -- kirograph serve --mcp --path "${escapedPath}"`);
-  console.log('\n  Or add this to ~/.codex/config.toml:');
-  console.log('    [mcp_servers.kirograph]');
-  console.log('    command = "kirograph"');
-  console.log(`    args = ["serve", "--mcp", "--path", "${escapedPath}"]\n`);
+  printMcpCommand(`codex mcp add kirograph -- kirograph serve --mcp --path "${escapedPath}"`);
 }

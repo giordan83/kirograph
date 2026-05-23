@@ -3,6 +3,7 @@ import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import {
   ensureDir,
+  printMcpCommand,
   upsertGeneratedBlock,
   removeGeneratedBlock,
 } from '../common';
@@ -39,9 +40,5 @@ export function uninitAider(projectRoot: string): void {
 export function printAiderNextSteps(projectRoot: string): void {
   const escapedPath = projectRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   console.log('\n  Done! KiroGraph instructions are in CONVENTIONS.md.');
-  console.log('  Add the MCP server to Aider with:');
-  console.log(`    aider --mcp "kirograph serve --mcp --path ${escapedPath}"`);
-  console.log('\n  Or add to .aider.conf.yml:');
-  console.log('    mcp-servers:');
-  console.log(`      - kirograph serve --mcp --path ${escapedPath}\n`);
+  printMcpCommand(`aider --mcp "kirograph serve --mcp --path ${escapedPath}"`);
 }

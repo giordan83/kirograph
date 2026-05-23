@@ -113,3 +113,33 @@ export function buildInstructionOpts(cavemanMode?: CavemanMode | 'off', shellCom
     hasHooks: hasHooks ?? false,
   };
 }
+
+const violet = '\x1b[38;5;99m';
+const resetAnsi = '\x1b[0m';
+const dimAnsi = '\x1b[2m';
+const boldAnsi = '\x1b[1m';
+
+/**
+ * Print a highlighted MCP config JSON block for targets that need user-scoped setup.
+ */
+export function printMcpSetup(configPath: string, projectRoot: string): void {
+  const escapedPath = projectRoot.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  console.log(`\n  ${dimAnsi}Add the MCP server manually:${resetAnsi}`);
+  console.log(`  ${dimAnsi}Edit${resetAnsi} ${violet}${boldAnsi}${configPath}${resetAnsi} ${dimAnsi}and add:${resetAnsi}`);
+  console.log(`  ${violet}{${resetAnsi}`);
+  console.log(`  ${violet}  "mcpServers": {${resetAnsi}`);
+  console.log(`  ${violet}    "kirograph": {${resetAnsi}`);
+  console.log(`  ${violet}      "command": "kirograph",${resetAnsi}`);
+  console.log(`  ${violet}      "args": ["serve", "--mcp", "--path", "${escapedPath}"]${resetAnsi}`);
+  console.log(`  ${violet}    }${resetAnsi}`);
+  console.log(`  ${violet}  }${resetAnsi}`);
+  console.log(`  ${violet}}${resetAnsi}\n`);
+}
+
+/**
+ * Print a highlighted CLI command for MCP registration.
+ */
+export function printMcpCommand(command: string): void {
+  console.log(`\n  ${dimAnsi}Add the MCP server with:${resetAnsi}`);
+  console.log(`  ${violet}${boldAnsi}${command}${resetAnsi}\n`);
+}

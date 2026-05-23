@@ -3,6 +3,7 @@ import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import {
   ensureDir,
+  printMcpCommand,
   upsertGeneratedBlock,
   removeGeneratedBlock,
 } from '../common';
@@ -38,7 +39,6 @@ export function uninitReplit(projectRoot: string): void {
 
 export function printReplitNextSteps(projectRoot: string): void {
   console.log('\n  Done! KiroGraph instructions are in AGENTS.md.');
-  console.log('  Configure the MCP server in your Replit workspace:');
-  console.log('    Add to .replit [mcp] section or use the Replit MCP UI.');
-  console.log(`    Command: kirograph serve --mcp --path "${projectRoot}"\n`);
+  printMcpCommand(`kirograph serve --mcp --path "${projectRoot}"`);
+  console.log('  Configure this command in your Replit workspace MCP settings.');
 }

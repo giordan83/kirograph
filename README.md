@@ -293,41 +293,41 @@ The MCP server exposes 24 tools (search, context, callers, callees, impact, node
 
 ### Supported Targets (33)
 
-| Target | Command | MCP Config | Instructions |
-|--------|---------|-----------|--------------|
-| **Kiro** (full support) | `kirograph install` | `.kiro/settings/mcp.json` | `.kiro/steering/kirograph.md` + hooks |
-| Cursor | `--target cursor` | `.cursor/mcp.json` | `.cursor/rules/kirograph.mdc` |
-| Windsurf | `--target windsurf` | `.windsurf/mcp.json` | `.windsurfrules` |
-| GitHub Copilot | `--target copilot` | `.github/copilot-mcp.json` | `.github/copilot-instructions.md` |
-| Cline | `--target cline` | `.cline/mcp_settings.json` | `.clinerules` |
-| Roo Code | `--target roo` | `.roo/mcp.json` | `.roorules` |
-| Kilo Code | `--target kilo` | `.kilo/mcp_settings.json` | `.kilorules` |
-| Claude Code | `--target claude` | `.mcp.json` | `CLAUDE.md` (import) |
-| Codex CLI | `--target codex` | `.codex/hooks.json` | `AGENTS.md` |
-| OpenCode | `--target opencode` | `.opencode.json` | `.opencode.json` (instructions) + plugin |
-| Antigravity | `--target antigravity` | Print command | `GEMINI.md` + `.agents/hooks.json` |
-| Gemini CLI | `--target gemini-cli` | `.gemini/settings.json` | `GEMINI.md` |
-| JetBrains Junie | `--target junie` | `.junie/mcp.json` | `.junie/guidelines.md` |
-| Continue | `--target continue` | `.continue/config.json` | `.continue/rules/kirograph.md` |
-| Warp | `--target warp` | `.warp/mcp.json` | `.warp/rules/kirograph.md` |
-| Trae | `--target trae` | `.trae/mcp.json` | `.trae/rules/kirograph.md` |
-| Augment Code | `--target augment` | `.augment/mcp.json` | `augment-guidelines.md` |
-| Sourcegraph Amp | `--target amp` | `.amp/config.json` | `.amp/instructions.md` |
-| Tabnine | `--target tabnine` | `.tabnine/mcp.json` | `.tabnine/instructions.md` |
-| Devin | `--target devin` | `.devin/config.json` | `AGENTS.md` |
-| OpenHands | `--target openhands` | `.openhands/config.json` | `AGENTS.md` |
-| Replit Agent | `--target replit` | Print command | `AGENTS.md` |
-| Block Goose | `--target goose` | Print `goose mcp add` | `AGENTS.md` |
-| Aider | `--target aider` | Print CLI flag | `CONVENTIONS.md` |
-| Mistral Vibe | `--target mistral-vibe` | Print command | `.kirograph/mistral-vibe.md` |
-| IBM Bob | `--target ibm-bob` | Print command | `.kirograph/ibm-bob.md` |
-| Crush | `--target crush` | Print command | `.kirograph/crush.md` |
-| Droid Factory | `--target droid-factory` | Print command | `.kirograph/droid-factory.md` |
-| ForgeCode | `--target forgecode` | Print command | `.kirograph/forgecode.md` |
-| iFlow CLI | `--target iflow` | Print command | `.kirograph/iflow.md` |
-| Qwen Code | `--target qwen` | Print command | `.kirograph/qwen.md` |
-| Atlassian Rovo Dev | `--target rovo` | Print command | `.kirograph/rovo.md` |
-| Qoder | `--target qoder` | Print command | `.kirograph/qoder.md` |
+| Target | Command | MCP Config | Instructions | Pattern |
+|--------|---------|-----------|--------------|---------|
+| **🎯 Kiro** (full support) | `kirograph install` | `.kiro/settings/mcp.json` | `Steering + CLI agent` | Full |
+| Cursor | `--target cursor` | `.cursor/mcp.json` | `.cursor/rules/kirograph.mdc` | A |
+| GitHub Copilot | `--target copilot` | `.github/copilot-mcp.json` | `.github/copilot-instructions.md` | A |
+| Roo Code | `--target roo` | `.roo/mcp.json` | `.roo/rules/kirograph.md` | A |
+| JetBrains Junie | `--target junie` | `.junie/mcp/mcp.json` | `.junie/AGENTS.md` | A |
+| Continue | `--target continue` | `.continue/mcpServers/kirograph.json` | `.continue/rules/kirograph.md` | A |
+| Warp | `--target warp` | `.warp/.mcp.json` | `AGENTS.md` | A |
+| Trae | `--target trae` | `.trae/mcp.json` | `.trae/rules/kirograph.md` | A |
+| Augment Code | `--target augment` | `.augment/mcp.json` | `augment-guidelines.md` | A |
+| Sourcegraph Amp | `--target amp` | `.amp/config.json` | `.amp/instructions.md` | A |
+| Tabnine | `--target tabnine` | `.tabnine/mcp.json` | `.tabnine/instructions.md` | A |
+| Claude Code | `--target claude` | `.mcp.json` | `CLAUDE.md` | B |
+| Codex CLI | `--target codex` | `.codex/hooks.json` | `AGENTS.md` | B |
+| Gemini CLI | `--target gemini-cli` | `.gemini/settings.json` | `GEMINI.md` | C |
+| OpenCode | `--target opencode` | `.opencode.json` | `.opencode.json (instructions)` | C |
+| Kilo Code | `--target kilo` | `kilo.json` | `.kilo/rules/kirograph.md` | C |
+| Devin | `--target devin` | `.devin/config.json` | `AGENTS.md` | C |
+| OpenHands | `--target openhands` | `.openhands/config.json` | `AGENTS.md` | C |
+| Windsurf | `--target windsurf` | Print command | `.windsurf/rules/kirograph.md` | D |
+| Cline | `--target cline` | Print command | `.clinerules/kirograph.md` | D |
+| Antigravity | `--target antigravity` | Print command | `GEMINI.md` | D |
+| Aider | `--target aider` | Print CLI flag | `CONVENTIONS.md` | D |
+| Replit Agent | `--target replit` | Print command | `AGENTS.md` | D |
+| Block Goose | `--target goose` | Print command | `AGENTS.md` | D |
+| Mistral Vibe | `--target mistral-vibe` | Print command | `.kirograph/mistral-vibe.md` | D |
+| IBM Bob | `--target ibm-bob` | Print command | `.kirograph/ibm-bob.md` | D |
+| Crush | `--target crush` | Print command | `.kirograph/crush.md` | D |
+| Droid Factory | `--target droid-factory` | Print command | `.kirograph/droid-factory.md` | D |
+| ForgeCode | `--target forgecode` | Print command | `.kirograph/forgecode.md` | D |
+| iFlow CLI | `--target iflow` | Print command | `.kirograph/iflow.md` | D |
+| Qwen Code | `--target qwen` | Print command | `.kirograph/qwen.md` | D |
+| Atlassian Rovo Dev | `--target rovo` | Print command | `.kirograph/rovo.md` | D |
+| Qoder | `--target qoder` | Print command | `.kirograph/qoder.md` | D |
 
 ### Integration Patterns
 
