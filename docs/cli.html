@@ -184,6 +184,36 @@ kirograph snapshot diff --format json # JSON output</code></pre>
 kirograph export --open               # Open in browser immediately
 kirograph export --output ./report    # Custom output directory</code></pre>
 
+    <h3 id="cli-memory">Memory</h3>
+    <pre><code># Search (hybrid FTS + vector)
+kirograph mem search &lt;query&gt;                          # hybrid search
+kirograph mem search &lt;query&gt; --kind error             # filter by kind
+kirograph mem search &lt;query&gt; --limit 5                # limit results
+kirograph mem search &lt;query&gt; --format json            # JSON output
+
+# Store observations
+kirograph mem store "decided to use idempotency keys for payments"
+kirograph mem store "auth bug: token refresh missing" --kind error
+kirograph mem store --kind decision &lt; decision.txt    # pipe from stdin
+
+# Timeline
+kirograph mem timeline                    # last 5 sessions
+kirograph mem timeline --limit 10         # more sessions
+kirograph mem timeline --session &lt;id&gt;     # observations for specific session
+kirograph mem timeline --format json
+
+# Status
+kirograph mem status                      # health dashboard
+
+# Maintenance
+kirograph mem prune [--older-than 90d]    # cleanup old observations
+kirograph mem reembed                     # re-embed all with current model
+kirograph mem reembed --batch 50          # control batch size
+kirograph mem lint                        # find stale links, model mismatch, orphans
+kirograph mem export [--format jsonl|md]  # export for backup/reading
+kirograph mem import &lt;file.jsonl&gt;         # restore from JSONL backup (deduplicates)</code></pre>
+    <p>Requires <code>enableMemory: true</code> in <code>.kirograph/config.json</code>.</p>
+
   </main>
 
   <!-- Right sidebar TOC -->
@@ -204,6 +234,7 @@ kirograph export --output ./report    # Custom output directory</code></pre>
       <a href="#cli-insights" class="sidebar-link">Graph Insights</a>
       <a href="#cli-snapshots" class="sidebar-link">Snapshots &amp; Diff</a>
       <a href="#cli-export" class="sidebar-link">Export Dashboard</a>
+      <a href="#cli-memory" class="sidebar-link">Memory</a>
     </div>
   </aside>
 

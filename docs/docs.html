@@ -68,6 +68,7 @@
     </div>
     <div class="sidebar-section">
       <div class="sidebar-heading">Advanced</div>
+      <a href="#memory" class="sidebar-link">Memory</a>
       <a href="#caveman-mode" class="sidebar-link">Caveman Mode</a>
       <a href="#shell-compression" class="sidebar-link">Shell Compression</a>
       <a href="#compression-caveman" class="sidebar-link" style="padding-left:2rem">Coexistence with Caveman</a>
@@ -461,9 +462,86 @@ cd kirograph && npm uninstall -g .</code></pre>
           <tr><td><code>extractDocstrings</code></td><td>boolean</td><td><code>true</code></td><td>Extract docstrings/comments during indexing</td></tr>
           <tr><td><code>trackCallSites</code></td><td>boolean</td><td><code>true</code></td><td>Track precise call-site locations</td></tr>
           <tr><td><code>exclude</code></td><td>string[]</td><td>-</td><td>Glob patterns to exclude from indexing</td></tr>
+          <tr><td><code>enableMemory</code></td><td>boolean</td><td><code>false</code></td><td>Enable persistent cross-session memory</td></tr>
+          <tr><td><code>memorySearchAlpha</code></td><td>number</td><td><code>0.5</code></td><td>FTS/vector blend for memory search</td></tr>
+          <tr><td><code>memorySessionTimeout</code></td><td>number</td><td><code>7200</code></td><td>Seconds before auto-closing inactive session</td></tr>
+          <tr><td><code>memoryContextLimit</code></td><td>number</td><td><code>3</code></td><td>Max observations in <code>kirograph_context</code></td></tr>
+          <tr><td><code>memoryContextThreshold</code></td><td>number</td><td><code>0.3</code></td><td>Min score to include memory in context</td></tr>
         </tbody>
       </table>
     </div>
+
+    <!-- ── Memory ── -->
+    <h2 id="memory">Memory (opt-in)</h2>
+
+    <p>When <code>enableMemory: true</code> is set in <code>.kirograph/config.json</code>, KiroGraph stores persistent observations across sessions. Decisions, errors, patterns, and architecture notes are captured with <strong>zero LLM tokens on write</strong> (compression is deterministic, symbol linking is programmatic, embedding uses the local model) and minimal tokens on read.</p>
+
+    <h3>How it works</h3>
+    <p>The write path runs entirely without LLM involvement:</p>
+    <ol>
+      <li>An observation is received (via hook or manual <code>kirograph_mem_store</code> call)</li>
+      <li>If caveman mode is enabled, the text is compressed deterministically using the configured level</li>
+      <li>A content hash deduplicates against existing observations</li>
+      <li>Symbol names in the text are detected and linked to graph nodes via <code>qualified_name</code></li>
+      <li>The observation is embedded using the same local model and semantic engine as code symbols</li>
+    </ol>
+    <p>On read, <code>kirograph_mem_search</code> performs hybrid FTS + vector search. Linked observations also surface automatically in <code>kirograph_context</code> and <code>kirograph_impact</code> results.</p>
+
+    <h3>MCP Tools</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>kirograph_mem_search</code></td><td>Hybrid search over observations (FTS + vector, configurable alpha blend)</td></tr>
+          <tr><td><code>kirograph_mem_store</code></td><td>Store an observation with auto-compression, symbol linking, and embedding</td></tr>
+          <tr><td><code>kirograph_mem_timeline</code></td><td>List recent sessions and their observations chronologically</td></tr>
+          <tr><td><code>kirograph_mem_status</code></td><td>Memory subsystem health: sessions, observations, embedding coverage</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>CLI Commands</h3>
+    <pre><code># Search (mirrors kirograph_mem_search)
+kirograph mem search &lt;query&gt;
+kirograph mem search &lt;query&gt; --kind error --limit 5
+
+# Store (mirrors kirograph_mem_store)
+kirograph mem store "decided to use idempotency keys for payments"
+kirograph mem store "auth bug: token refresh missing" --kind error
+
+# Timeline &amp; status
+kirograph mem timeline
+kirograph mem status
+
+# Maintenance (CLI-only)
+kirograph mem prune --older-than 90d
+kirograph mem reembed
+kirograph mem lint
+kirograph mem export --format jsonl</code></pre>
+
+    <h3>Session management</h3>
+    <p>Sessions are managed automatically. On the first <code>kirograph_mem_store</code> call, KiroGraph checks for an active session (same IDE, started within the configured timeout). If none exists, a new session is created. The <code>agentStop</code> hook closes the session automatically.</p>
+    <p>The inactivity timeout defaults to 2 hours and is configurable via <code>memorySessionTimeout</code> (in seconds).</p>
+
+    <h3>Configuration</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>enableMemory</code></td><td>boolean</td><td><code>false</code></td><td>Enable persistent memory</td></tr>
+          <tr><td><code>memorySearchAlpha</code></td><td>number</td><td><code>0.5</code></td><td>FTS/vector blend (0 = pure FTS, 1 = pure vector)</td></tr>
+          <tr><td><code>memoryKeepRaw</code></td><td>boolean</td><td><code>false</code></td><td>Store uncompressed originals when caveman is on</td></tr>
+          <tr><td><code>memoryMaxObservations</code></td><td>number</td><td><code>10000</code></td><td>Auto-prune threshold</td></tr>
+          <tr><td><code>memorySessionTimeout</code></td><td>number</td><td><code>7200</code></td><td>Seconds of inactivity before auto-closing a session</td></tr>
+          <tr><td><code>memoryContextLimit</code></td><td>number</td><td><code>3</code></td><td>Max observations shown in <code>kirograph_context</code></td></tr>
+          <tr><td><code>memoryContextThreshold</code></td><td>number</td><td><code>0.3</code></td><td>Min relevance score to include in context</td></tr>
+          <tr><td><code>memoryExcludePatterns</code></td><td>string[]</td><td><code>[]</code></td><td>Glob patterns for paths to never capture</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Privacy</h3>
+    <p>Wrap sensitive content in <code>&lt;private&gt;...&lt;/private&gt;</code> blocks — they are stripped before storage. All data stays in the local <code>.kirograph/kirograph.db</code> file, same as the rest of the graph.</p>
 
     <!-- ── Caveman Mode ── -->
     <h2 id="caveman-mode">Caveman Mode</h2>

@@ -19,5 +19,9 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_type_hierarchy',
   'kirograph_exec',
   'kirograph_gain',
+  'kirograph_mem_search',
+  'kirograph_mem_store',
+  'kirograph_mem_timeline',
+  'kirograph_mem_status',
 ];
 
