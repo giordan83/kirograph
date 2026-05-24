@@ -48,6 +48,7 @@ function copyAssets(): void {
   fs.mkdirSync(path.join(dist, 'db'), { recursive: true });
   fs.copyFileSync(path.join(src, 'db', 'schema.sql'), path.join(dist, 'db', 'schema.sql'));
   fs.copyFileSync(path.join(src, 'db', 'memory-schema.sql'), path.join(dist, 'db', 'memory-schema.sql'));
+  fs.copyFileSync(path.join(src, 'db', 'docs-schema.sql'), path.join(dist, 'db', 'docs-schema.sql'));
 
   // tree-sitter wasm files
   const wasmSrc = path.join(src, 'extraction', 'wasm');

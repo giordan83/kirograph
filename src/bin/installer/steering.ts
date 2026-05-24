@@ -305,6 +305,7 @@ export interface SteeringOptions {
   enableCompression?: boolean;
   shellCompressionLevel?: 'off' | 'normal' | 'aggressive' | 'ultra';
   enableMemory?: boolean;
+  enableDocs?: boolean;
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
@@ -353,6 +354,29 @@ should know. Keep observations concise — one fact per store call. A hook will 
 at session end.
 `;
     content = content.trimEnd() + '\n\n' + memorySection.trim() + '\n';
+  }
+
+  // Documentation section
+  if (opts?.enableDocs) {
+    const docsSection = `
+## Documentation
+
+KiroGraph indexes project documentation by heading structure. Use \`kirograph_docs_search\`
+to find relevant doc sections instead of reading entire files. Use \`kirograph_docs_section\`
+to retrieve the exact section you need by ID.
+
+**Available tools:**
+- \`kirograph_docs_toc\` — table of contents for a file or the whole project
+- \`kirograph_docs_search\` — search sections by query (independent from code search)
+- \`kirograph_docs_section\` — retrieve full content of a section by ID
+- \`kirograph_docs_outline\` — heading hierarchy for a single document
+- \`kirograph_docs_refs\` — find code symbols referenced by a doc section (or vice versa)
+
+**When to use:** Before reading a documentation file directly, check if \`kirograph_docs_search\`
+or \`kirograph_docs_outline\` can give you the specific section you need. This saves tokens
+and gives you structured navigation instead of raw file content.
+`;
+    content = content.trimEnd() + '\n\n' + docsSection.trim() + '\n';
   }
 
   return content;

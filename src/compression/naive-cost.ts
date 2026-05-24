@@ -150,6 +150,38 @@ export function estimateNaiveCost(toolName: string, outputTokens: number, args?:
       return 500;
     }
 
+    // ── Docs tools ────────────────────────────────────────────────────────────
+
+    case 'kirograph_docs_toc': {
+      // Agent would read all doc files to understand structure.
+      // Conservative: 3-5 doc files fully read.
+      return AVG_FILE_TOKENS * 4 + AVG_FILE_TOKENS; // docs are ~2500 tokens avg
+    }
+
+    case 'kirograph_docs_search': {
+      // Agent would grep across all doc files + read top matches.
+      const limit = (args?.limit as number) || 10;
+      const filesEstimate = Math.min(Math.ceil(limit / 2), 5);
+      return AVG_GREP_TOKENS + filesEstimate * AVG_FILE_TOKENS;
+    }
+
+    case 'kirograph_docs_section': {
+      // Agent would read the full file to find the relevant section.
+      // With context=true, agent would also read parent/child files.
+      const withContext = args?.context as boolean;
+      return withContext ? AVG_FILE_TOKENS * 3 : AVG_FILE_TOKENS * 2;
+    }
+
+    case 'kirograph_docs_outline': {
+      // Agent would read the full file to understand its structure.
+      return AVG_FILE_TOKENS * 2;
+    }
+
+    case 'kirograph_docs_refs': {
+      // Agent would grep for symbol names across docs + read code files.
+      return AVG_GREP_TOKENS * 3 + AVG_FILE_TOKENS * 2;
+    }
+
     // kirograph_exec and kirograph_gain are tracked separately
     default:
       return null;

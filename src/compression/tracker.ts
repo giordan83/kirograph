@@ -28,6 +28,7 @@ export interface GainStats {
     exec: { count: number; saved: number };
     graph: { count: number; saved: number };
     memory: { count: number; saved: number };
+    docs: { count: number; saved: number };
   };
 }
 
@@ -59,7 +60,7 @@ export class TokenTracker {
   /**
    * Record a compression result.
    */
-  record(command: string, originalTokens: number, compressedTokens: number, strategy: string, source: 'exec' | 'graph' | 'memory' = 'exec'): void {
+  record(command: string, originalTokens: number, compressedTokens: number, strategy: string, source: 'exec' | 'graph' | 'memory' | 'docs' = 'exec'): void {
     const record: TokenSavingsRecord = {
       timestamp: Date.now(),
       command: command.slice(0, 200), // Truncate long commands
@@ -99,6 +100,16 @@ export class TokenTracker {
   }
 
   /**
+   * Record a docs tool saving.
+   * @param toolName - The MCP tool that was called
+   * @param outputTokens - Actual tokens returned by the tool
+   * @param naiveCost - Estimated tokens the agent would have used without docs indexing
+   */
+  recordDocsSaving(toolName: string, outputTokens: number, naiveCost: number): void {
+    this.record(toolName, naiveCost, outputTokens, `docs:${toolName}`, 'docs');
+  }
+
+  /**
    * Get aggregated statistics for a time period.
    */
   getStats(period: 'session' | 'today' | 'week' | 'all'): GainStats {
@@ -113,14 +124,14 @@ export class TokenTracker {
         savingsPercent: 0,
         byFamily: {},
         recentCommands: [],
-        bySource: { exec: { count: 0, saved: 0 }, graph: { count: 0, saved: 0 }, memory: { count: 0, saved: 0 } },
+        bySource: { exec: { count: 0, saved: 0 }, graph: { count: 0, saved: 0 }, memory: { count: 0, saved: 0 }, docs: { count: 0, saved: 0 } },
       };
     }
 
     let totalOriginal = 0;
     let totalCompressed = 0;
     const byFamily = new Map<string, { count: number; totalOriginal: number; totalCompressed: number }>();
-    const bySource = { exec: { count: 0, saved: 0 }, graph: { count: 0, saved: 0 }, memory: { count: 0, saved: 0 } };
+    const bySource = { exec: { count: 0, saved: 0 }, graph: { count: 0, saved: 0 }, memory: { count: 0, saved: 0 }, docs: { count: 0, saved: 0 } };
 
     for (const r of records) {
       totalOriginal += r.originalTokens;
@@ -133,7 +144,7 @@ export class TokenTracker {
       existing.totalCompressed += r.compressedTokens;
       byFamily.set(family, existing);
 
-      const source = (r.source || 'exec') as 'exec' | 'graph' | 'memory';
+      const source = (r.source || 'exec') as 'exec' | 'graph' | 'memory' | 'docs';
       if (bySource[source]) {
         bySource[source].count++;
         bySource[source].saved += r.originalTokens - r.compressedTokens;

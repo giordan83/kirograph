@@ -220,6 +220,19 @@ export class IndexPipeline {
         opts?.onProgress?.({ phase: 'architecture', current: 1, total: 1 });
       }
 
+      // Index documentation (if enabled)
+      if (this.config.enableDocs) {
+        try {
+          const { DocsIndexer } = await import('../docs/indexer');
+          this.db.applyDocsSchema();
+          const docsIndexer = new DocsIndexer(this.db.getRawDb(), this.config, this.projectRoot);
+          await docsIndexer.indexAll({
+            force: opts?.force,
+            onProgress: msg => opts?.onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } }),
+          });
+        } catch { /* docs indexing is non-critical */ }
+      }
+
       this.lock.clearDirty();
       return { success: errors.length === 0, filesIndexed, nodesCreated, edgesCreated, errors, duration: Date.now() - start };
     } finally {
@@ -403,6 +416,18 @@ export class IndexPipeline {
           onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } })
         );
         onProgress?.({ phase: 'architecture', current: 1, total: 1 });
+      }
+
+      // Re-index documentation (if enabled)
+      if (this.config.enableDocs) {
+        try {
+          const { DocsIndexer } = await import('../docs/indexer');
+          this.db.applyDocsSchema();
+          const docsIndexer = new DocsIndexer(this.db.getRawDb(), this.config, this.projectRoot);
+          await docsIndexer.indexAll({
+            onProgress: msg => onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } }),
+          });
+        } catch { /* docs indexing is non-critical */ }
       }
 
       this.lock.clearDirty();

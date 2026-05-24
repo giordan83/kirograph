@@ -69,6 +69,7 @@
     <div class="sidebar-section">
       <div class="sidebar-heading">Advanced</div>
       <a href="#memory" class="sidebar-link">Memory</a>
+      <a href="#documentation" class="sidebar-link">Documentation</a>
       <a href="#caveman-mode" class="sidebar-link">Caveman Mode</a>
       <a href="#shell-compression" class="sidebar-link">Shell Compression</a>
       <a href="#compression-caveman" class="sidebar-link" style="padding-left:2rem">Coexistence with Caveman</a>
@@ -145,6 +146,7 @@ cd kirograph && npm uninstall -g .</code></pre>
       <li>Whether to enable embeddings (semantic search)</li>
       <li>Embedding model and semantic engine</li>
       <li>Whether to enable architecture analysis</li>
+      <li>Whether to enable documentation indexing</li>
       <li>Caveman mode level</li>
       <li>Shell compression (on/off)</li>
       <li>Whether to run an initial index immediately</li>
@@ -189,6 +191,11 @@ cd kirograph && npm uninstall -g .</code></pre>
 
     <h3 id="architecture-layer">Architecture layer (opt-in)</h3>
     <p>When <code>enableArchitecture: true</code>, KiroGraph detects packages and architectural layers (api, service, data, ui, shared) and computes coupling metrics (Ca, Ce, instability) between them. Results stored in <code>arch_*</code> tables in <code>kirograph.db</code>.</p>
+
+    <h3 id="documentation-layer">Documentation layer (opt-in)</h3>
+    <p>When <code>enableDocs: true</code>, KiroGraph indexes project documentation by heading hierarchy and section structure. Instead of reading entire doc files, agents retrieve exactly the section they need via stable section IDs.</p>
+    <p>Supports 9 formats: Markdown (.md, .mdx, .cheatmd), reStructuredText (.rst), AsciiDoc (.adoc), RDoc (.rdoc), Org-mode (.org), HTML (.html), plain text (.txt), and OpenAPI/Swagger specs (content-detected in .yaml/.json files).</p>
+    <p>Sections are cross-referenced to code symbols via backtick detection, CamelCase/snake_case pattern matching, and stored as <code>doc_code_refs</code> using stable <code>qualified_name</code> keys.</p>
 
     <!-- ── Languages & Frameworks ── -->
     <h2 id="languages">Supported Languages</h2>
@@ -456,6 +463,13 @@ cd kirograph && npm uninstall -g .</code></pre>
           <tr><td><code>embeddingDim</code></td><td>number</td><td><code>768</code></td><td>Embedding dimension (auto-corrected on mismatch)</td></tr>
           <tr><td><code>enableArchitecture</code></td><td>boolean</td><td><code>false</code></td><td>Enable architecture analysis layer</td></tr>
           <tr><td><code>architectureLayers</code></td><td>object</td><td>-</td><td>Override layer glob patterns</td></tr>
+          <tr><td><code>enableDocs</code></td><td>boolean</td><td><code>false</code></td><td>Enable documentation indexing (section-level retrieval)</td></tr>
+          <tr><td><code>docsInclude</code></td><td>string[]</td><td><code>["**/*.md", ...]</code></td><td>Glob patterns for doc files to include</td></tr>
+          <tr><td><code>docsExclude</code></td><td>string[]</td><td><code>["node_modules/**", ...]</code></td><td>Glob patterns for doc files to exclude</td></tr>
+          <tr><td><code>docsLinkCode</code></td><td>boolean</td><td><code>true</code></td><td>Auto-link doc sections to code symbols</td></tr>
+          <tr><td><code>docsContextLimit</code></td><td>number</td><td><code>0</code></td><td>Max doc sections in kirograph_context (0 = disabled)</td></tr>
+          <tr><td><code>docsMaxFileSize</code></td><td>number</td><td><code>1048576</code></td><td>Max doc file size in bytes</td></tr>
+          <tr><td><code>docsSummarization</code></td><td>string</td><td><code>"first-sentence"</code></td><td>Summary strategy: <code>embedding</code>, <code>first-sentence</code>, <code>off</code></td></tr>
           <tr><td><code>cavemanMode</code></td><td>string</td><td><code>"off"</code></td><td>Communication compression: <code>off</code>, <code>lite</code>, <code>full</code>, <code>ultra</code></td></tr>
           <tr><td><code>shellCompressionLevel</code></td><td>string</td><td><code>"normal"</code></td><td>Shell command compression level: <code>off</code>, <code>normal</code>, <code>aggressive</code>, <code>ultra</code></td></tr>
           <tr><td><code>syncWarningThreshold</code></td><td>number</td><td><code>10</code></td><td>Pending-file count above which <code>kirograph_status</code> warns. Set <code>0</code> to disable.</td></tr>
@@ -542,6 +556,115 @@ kirograph mem export --format jsonl</code></pre>
 
     <h3>Privacy</h3>
     <p>Wrap sensitive content in <code>&lt;private&gt;...&lt;/private&gt;</code> blocks — they are stripped before storage. All data stays in the local <code>.kirograph/kirograph.db</code> file, same as the rest of the graph.</p>
+
+    <!-- ── Documentation ── -->
+    <h2 id="documentation">Documentation (opt-in)</h2>
+
+    <p>When <code>enableDocs: true</code> is set in <code>.kirograph/config.json</code>, KiroGraph indexes project documentation by heading hierarchy and section structure. Instead of reading entire doc files, agents retrieve exactly the section they need via stable section IDs — saving <strong>92–97% of tokens</strong> compared to reading full files.</p>
+
+    <h3>How it works</h3>
+    <p>The indexing pipeline:</p>
+    <ol>
+      <li>Scans the project for documentation files matching <code>docsInclude</code> / <code>docsExclude</code> patterns</li>
+      <li>Detects the format (Markdown, RST, AsciiDoc, etc.) and parses headings into a section hierarchy</li>
+      <li>Generates stable section IDs: <code>{file_path}::{ancestor-chain/slug}#{level}</code></li>
+      <li>Computes SHA-256 content hashes for incremental re-indexing (skips unchanged files)</li>
+      <li>If <code>docsLinkCode: true</code>, detects code symbol references (backtick patterns, CamelCase, snake_case) and stores cross-references via <code>qualified_name</code></li>
+      <li>Stores everything in <code>doc_sections</code> and <code>doc_code_refs</code> tables in the same SQLite DB</li>
+    </ol>
+    <p>On read, agents use <code>kirograph_docs_search</code> (FTS5) to find sections, <code>kirograph_docs_section</code> to retrieve content, and <code>kirograph_docs_refs</code> to navigate code ↔ docs cross-references.</p>
+
+    <h3>Supported formats</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Format</th><th>Extensions</th><th>Parsing strategy</th></tr></thead>
+        <tbody>
+          <tr><td>Markdown</td><td><code>.md</code>, <code>.mdx</code>, <code>.cheatmd</code></td><td>ATX (<code>#</code>) + setext headings</td></tr>
+          <tr><td>reStructuredText</td><td><code>.rst</code></td><td>Adornment-based heading detection</td></tr>
+          <tr><td>AsciiDoc</td><td><code>.adoc</code>, <code>.asciidoc</code></td><td><code>=</code> heading hierarchy</td></tr>
+          <tr><td>RDoc</td><td><code>.rdoc</code></td><td><code>=</code> heading hierarchy (Ruby)</td></tr>
+          <tr><td>Org-mode</td><td><code>.org</code></td><td><code>*</code> heading hierarchy</td></tr>
+          <tr><td>HTML</td><td><code>.html</code>, <code>.htm</code></td><td><code>&lt;h1&gt;</code>–<code>&lt;h6&gt;</code> headings</td></tr>
+          <tr><td>Plain text</td><td><code>.txt</code></td><td>ALL CAPS + underline detection</td></tr>
+          <tr><td>OpenAPI/Swagger</td><td><code>.yaml</code>, <code>.yml</code>, <code>.json</code></td><td>Operations grouped by tag (content-detected)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>MCP Tools</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>kirograph_docs_toc</code></td><td>Table of contents for a file or the whole project (flat or tree)</td></tr>
+          <tr><td><code>kirograph_docs_search</code></td><td>FTS5 search across documentation sections (independent from code search)</td></tr>
+          <tr><td><code>kirograph_docs_section</code></td><td>Retrieve full content of a section by stable ID, with optional context (ancestors + children)</td></tr>
+          <tr><td><code>kirograph_docs_outline</code></td><td>Heading hierarchy for a single document</td></tr>
+          <tr><td><code>kirograph_docs_refs</code></td><td>Bidirectional code ↔ doc cross-references</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>CLI Commands</h3>
+    <pre><code># Table of contents
+kirograph docs toc                          # whole project
+kirograph docs toc README.md                # single file
+kirograph docs toc README.md --tree         # nested tree
+
+# Search
+kirograph docs search "authentication"
+kirograph docs search "config" --file docs/guide.md --limit 5
+
+# Retrieve a section
+kirograph docs section "README.md::installation#1"
+kirograph docs section "README.md::installation#1" --context
+
+# Outline
+kirograph docs outline docs/api.md
+
+# Cross-references
+kirograph docs refs "docs/auth.md::oauth/token-refresh#2"
+
+# Maintenance
+kirograph docs reindex                      # force full re-index
+kirograph docs lint                         # health checks
+kirograph docs reembed                      # re-embed with current model</code></pre>
+
+    <h3>Context integration (opt-in)</h3>
+    <p>By default, <code>kirograph_context</code> does <strong>not</strong> include doc sections — the agent uses <code>kirograph_docs_*</code> tools explicitly. If you want docs to surface automatically in context results, set <code>docsContextLimit</code> to a value greater than 0 during install (or in config).</p>
+    <p>When enabled, <code>kirograph_context</code> queries <code>doc_code_refs</code> for the symbols it found and includes up to N relevant doc sections (above <code>docsContextThreshold</code> score).</p>
+
+    <h3>Configuration</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>enableDocs</code></td><td>boolean</td><td><code>false</code></td><td>Enable documentation indexing</td></tr>
+          <tr><td><code>docsInclude</code></td><td>string[]</td><td><code>["**/*.md", ...]</code></td><td>Glob patterns for doc files to include</td></tr>
+          <tr><td><code>docsExclude</code></td><td>string[]</td><td><code>["node_modules/**", ...]</code></td><td>Glob patterns for doc files to exclude</td></tr>
+          <tr><td><code>docsLinkCode</code></td><td>boolean</td><td><code>true</code></td><td>Auto-link doc sections to code symbols</td></tr>
+          <tr><td><code>docsContextLimit</code></td><td>number</td><td><code>0</code></td><td>Max doc sections in <code>kirograph_context</code> (0 = disabled)</td></tr>
+          <tr><td><code>docsContextThreshold</code></td><td>number</td><td><code>0.3</code></td><td>Min relevance score for context inclusion</td></tr>
+          <tr><td><code>docsMaxFileSize</code></td><td>number</td><td><code>1048576</code></td><td>Max doc file size in bytes (1 MB)</td></tr>
+          <tr><td><code>docsSummarization</code></td><td>string</td><td><code>"first-sentence"</code></td><td>Summary strategy: <code>embedding</code>, <code>first-sentence</code>, <code>off</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Token savings</h3>
+    <p>Documentation tools are tracked in <code>kirograph_gain</code> as a separate "Docs tools" source category. Typical savings per call:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Without kirograph</th><th>With kirograph</th><th>Savings</th></tr></thead>
+        <tbody>
+          <tr><td><code>kirograph_docs_toc</code></td><td>~10,000 tokens</td><td>~400–800</td><td>92–96%</td></tr>
+          <tr><td><code>kirograph_docs_search</code></td><td>~8,000–13,000</td><td>~300–600</td><td>93–97%</td></tr>
+          <tr><td><code>kirograph_docs_section</code></td><td>~2,500</td><td>~200–800</td><td>68–92%</td></tr>
+          <tr><td><code>kirograph_docs_outline</code></td><td>~2,500</td><td>~200–400</td><td>84–92%</td></tr>
+          <tr><td><code>kirograph_docs_refs</code></td><td>~7,400</td><td>~300–500</td><td>93–96%</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- ── Caveman Mode ── -->
     <h2 id="caveman-mode">Caveman Mode</h2>

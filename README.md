@@ -103,6 +103,26 @@ Enable via `kirograph install` or directly in `.kirograph/config.json`:
 
 See the [Memory](#memory-requires-enablememory-true) section below for full details.
 
+### Documentation indexing (opt-in)
+
+When `enableDocs: true` is set, KiroGraph indexes project documentation by heading hierarchy and section structure. Instead of reading entire doc files, agents retrieve exactly the section they need via stable section IDs.
+
+- **9 format parsers**: Markdown, MDX, reStructuredText, AsciiDoc, RDoc, Org-mode, HTML, plain text, OpenAPI/Swagger
+- **Code ↔ docs cross-references**: Backtick references, CamelCase identifiers, and snake_case patterns in docs are resolved against the code graph
+- **Section-level FTS search**: Independent from code search (`kirograph_docs_search`)
+- **Stable section IDs**: `{file_path}::{ancestor-chain/slug}#{level}` — stable across re-indexing
+- **Token savings**: 92–97% reduction vs reading full doc files (tracked in `kirograph_gain`)
+
+Enable via `kirograph install` or directly in `.kirograph/config.json`:
+
+```json
+{
+  "enableDocs": true
+}
+```
+
+See the [Documentation](#documentation-requires-enabledocs-true) section below for full details.
+
 ## Installation
 
 ### From npm (not yet available on npm registry)
@@ -597,6 +617,56 @@ Memory subsystem health: session count, observations, embedding coverage, model 
 |-----------|------|---------|-------------|
 | `projectPath` | string | cwd | Project root path |
 
+### `kirograph_docs_toc` *(requires `enableDocs: true`)*
+
+Get table of contents for a documentation file or the whole project. Returns section IDs, titles, levels, and summaries.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file` | string | - | Filter to a specific doc file (relative path). Omit for project-wide TOC. |
+| `tree` | boolean | false | Return nested tree structure |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_docs_search` *(requires `enableDocs: true`)*
+
+Search documentation sections by query. Returns matching sections ranked by relevance. Independent from `kirograph_search` (code-only).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | required | Search query (natural language or keywords) |
+| `file` | string | - | Narrow search to a specific doc file |
+| `limit` | number | 10 | Max results |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_docs_section` *(requires `enableDocs: true`)*
+
+Retrieve full content of a documentation section by its stable ID. Use `context=true` to also get ancestor headings and child summaries.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | string | required | Section ID (from `kirograph_docs_toc` or `kirograph_docs_search` results) |
+| `context` | boolean | false | Include ancestor heading chain and child summaries |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_docs_outline` *(requires `enableDocs: true`)*
+
+Get the heading hierarchy for a single documentation file. Lighter than full TOC when you know which file is relevant.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file` | string | required | Relative path to the doc file |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_docs_refs` *(requires `enableDocs: true`)*
+
+Find code symbols referenced by a doc section, or doc sections that reference a code symbol. Bidirectional lookup.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `sectionId` | string | - | Doc section ID (find code symbols it references) |
+| `nodeId` | string | - | Code symbol qualified name (find doc sections that reference it) |
+| `projectPath` | string | cwd | Project root path |
+
 ## CLI Reference
 
 ### Setup
@@ -1037,6 +1107,42 @@ kirograph mem lint --fix                  # auto-repair issues
 **How observations are stored:** Text → strip `<private>` blocks → caveman compress (if enabled) → SHA-256 dedup check → store → detect symbol identifiers → link to graph → embed. Zero LLM tokens.
 
 **How observations surface:** `kirograph_context` and `kirograph_impact` automatically include relevant memory observations (max 3, above relevance threshold 0.3) when memory is enabled. No extra tool call needed.
+
+### Documentation *(requires `enableDocs: true`)*
+
+Section-level documentation navigation — search, browse, and retrieve doc sections from the CLI.
+
+```bash
+# Table of contents
+kirograph docs toc                          # whole project
+kirograph docs toc README.md                # single file
+kirograph docs toc README.md --tree         # nested tree structure
+kirograph docs toc --json                   # JSON output
+
+# Search (mirrors kirograph_docs_search)
+kirograph docs search "authentication"
+kirograph docs search "config" --file docs/guide.md
+kirograph docs search "install" --limit 5
+
+# Retrieve a section (mirrors kirograph_docs_section)
+kirograph docs section "README.md::installation#1"
+kirograph docs section "README.md::installation#1" --context
+
+# Outline (mirrors kirograph_docs_outline)
+kirograph docs outline docs/api.md
+
+# Cross-references (mirrors kirograph_docs_refs)
+kirograph docs refs "docs/auth.md::oauth/token-refresh#2"
+
+# Maintenance
+kirograph docs reindex                      # force full re-index
+kirograph docs lint                         # health checks (broken refs, stale sections)
+kirograph docs reembed                      # re-embed with current model
+```
+
+**How sections are identified:** Each section gets a stable ID in the format `{file_path}::{ancestor-chain/slug}#{level}`. IDs remain stable across re-indexing as long as the file path, heading text, heading level, and parent chain don't change.
+
+**How code linking works:** When `docsLinkCode: true` (default), the indexer scans section content for backtick references (`` `functionName` ``), CamelCase identifiers, and snake_case patterns, then resolves them against the code graph. Matches are stored as `doc_code_refs` using `qualified_name` (stable across reindex).
 
 ### Graph Export
 

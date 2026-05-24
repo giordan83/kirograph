@@ -406,6 +406,70 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // ── Docs tools (require enableDocs=true) ────────────────────────────────────
+  {
+    name: 'kirograph_docs_toc',
+    description: 'Get table of contents for a documentation file or the whole project. Returns section IDs, titles, levels, and summaries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Filter to a specific doc file (relative path). Omit for project-wide TOC.' },
+        tree: { type: 'boolean', description: 'Return nested tree structure (default: false, flat list)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_docs_search',
+    description: 'Search documentation sections by query. Returns matching sections ranked by relevance. Independent from kirograph_search (code-only).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (natural language or keywords)' },
+        file: { type: 'string', description: 'Narrow search to a specific doc file (relative path)' },
+        limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'kirograph_docs_section',
+    description: 'Retrieve full content of a documentation section by its stable ID. Use context=true to also get ancestor headings and child summaries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Section ID (from kirograph_docs_toc or kirograph_docs_search results)' },
+        context: { type: 'boolean', description: 'Include ancestor heading chain and child summaries (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'kirograph_docs_outline',
+    description: 'Get the heading hierarchy for a single documentation file. Lighter than full TOC when you know which file is relevant.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Relative path to the doc file' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['file'],
+    },
+  },
+  {
+    name: 'kirograph_docs_refs',
+    description: 'Find code symbols referenced by a doc section, or doc sections that reference a code symbol. Bidirectional lookup.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sectionId: { type: 'string', description: 'Doc section ID (find code symbols it references)' },
+        nodeId: { type: 'string', description: 'Code symbol qualified name (find doc sections that reference it)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
 ];
 
 export class ToolHandler {
@@ -458,6 +522,8 @@ export class ToolHandler {
             const tracker = new TokenTracker(projectRoot);
             if (toolName.startsWith('kirograph_mem_')) {
               tracker.recordMemorySaving(toolName, outputTokens, naiveCost);
+            } else if (toolName.startsWith('kirograph_docs_')) {
+              tracker.recordDocsSaving(toolName, outputTokens, naiveCost);
             } else {
               tracker.recordGraphSaving(toolName, outputTokens, naiveCost);
             }
@@ -544,10 +610,13 @@ export class ToolHandler {
       ];
 
       // Source breakdown
-      if (stats.bySource.exec.count > 0 || stats.bySource.graph.count > 0 || stats.bySource.memory.count > 0) {
+      if (stats.bySource.exec.count > 0 || stats.bySource.graph.count > 0 || stats.bySource.memory.count > 0 || stats.bySource.docs.count > 0) {
         lines.push('', 'By source:');
         if (stats.bySource.graph.count > 0) {
           lines.push(`  Graph tools: ${stats.bySource.graph.count} calls, ~${stats.bySource.graph.saved.toLocaleString()} tokens saved (vs file reads/grep)`);
+        }
+        if (stats.bySource.docs.count > 0) {
+          lines.push(`  Docs tools: ${stats.bySource.docs.count} calls, ~${stats.bySource.docs.saved.toLocaleString()} tokens saved (vs reading full doc files)`);
         }
         if (stats.bySource.exec.count > 0) {
           lines.push(`  Compression: ${stats.bySource.exec.count} calls, ~${stats.bySource.exec.saved.toLocaleString()} tokens saved (vs raw output)`);
@@ -657,6 +726,47 @@ export class ToolHandler {
             }
           }
         } catch { /* memory is non-critical — don't fail context on memory errors */ }
+
+        // Docs integration: surface relevant doc sections if enabled and docsContextLimit > 0
+        try {
+          const projectRoot2 = cg.getProjectRoot();
+          const config2 = await (await import('../config')).loadConfig(projectRoot2);
+          if (config2.enableDocs && config2.docsContextLimit > 0) {
+            const db2 = cg.getDatabase();
+            db2.applyDocsSchema();
+            const { DocsQueries } = await import('../docs/queries');
+            const docsQueries = new DocsQueries(db2.getRawDb(), projectRoot2);
+
+            // Collect qualified names from entry points
+            const qNames = ctx.entryPoints.map((n: any) => n.qualifiedName).filter(Boolean);
+
+            if (qNames.length > 0) {
+              // Find doc sections that reference these symbols
+              const docRefs = docsQueries.getRefs({ qualifiedName: qNames[0] });
+              const additionalRefs = qNames.slice(1, 5).flatMap(qn => docsQueries.getRefs({ qualifiedName: qn }));
+              const allDocRefs = [...docRefs, ...additionalRefs];
+
+              // Deduplicate by section ID and take top N
+              const seenSections = new Set<string>();
+              const uniqueRefs = allDocRefs.filter(r => {
+                if (seenSections.has(r.sectionId)) return false;
+                seenSections.add(r.sectionId);
+                return r.confidence >= config2.docsContextThreshold;
+              }).slice(0, config2.docsContextLimit);
+
+              if (uniqueRefs.length > 0) {
+                lines.push('', '## Related Documentation');
+                for (const ref of uniqueRefs) {
+                  const section = docsQueries.getSection(ref.sectionId);
+                  if (section) {
+                    const summary = section.section.summary ?? section.section.title;
+                    lines.push(`- [${ref.refType}] ${summary} — ${section.section.filePath} (ID: ${ref.sectionId})`);
+                  }
+                }
+              }
+            }
+          }
+        } catch { /* docs is non-critical */ }
 
         return lines.join('\n');
       }
@@ -779,6 +889,22 @@ export class ToolHandler {
             : `  Architecture: enabled (not yet analyzed — run kirograph index)`
           : `  Architecture: disabled`;
 
+        // Docs stats
+        let docsLine = '  Documentation: disabled';
+        try {
+          const { loadConfig: loadCfg } = await import('../config');
+          const cfg = await loadCfg(cg.getProjectRoot());
+          if (cfg.enableDocs) {
+            const db = cg.getDatabase();
+            db.applyDocsSchema();
+            const rawDb = db.getRawDb();
+            const docFiles = rawDb.get('SELECT COUNT(DISTINCT file_path) as cnt FROM doc_sections')?.cnt ?? 0;
+            const docSections = rawDb.get('SELECT COUNT(*) as cnt FROM doc_sections')?.cnt ?? 0;
+            const docRefs = rawDb.get('SELECT COUNT(*) as cnt FROM doc_code_refs')?.cnt ?? 0;
+            docsLine = `  Documentation: enabled — ${docFiles} files, ${docSections} sections, ${docRefs} code refs`;
+          }
+        } catch { /* non-critical */ }
+
         // Sync state warning
         const threshold = stats.syncWarningThreshold ?? 10;
         const pendingFiles: number = stats.pendingFiles ?? 0;
@@ -813,6 +939,7 @@ export class ToolHandler {
           langLine ? `  By language: ${langLine}` : '',
           frameworkLine,
           archLine,
+          docsLine,
           `  DB size: ${dbMb} MB`,
           ...semanticLines,
           ...syncLines,
@@ -1278,6 +1405,160 @@ export class ToolHandler {
           `  Caveman compression: ${config.cavemanMode !== 'off' ? config.cavemanMode : 'off (storing raw)'}`,
         ];
         return lines.join('\n');
+      }
+
+      // ── Docs tools ────────────────────────────────────────────────────────────
+
+      case 'kirograph_docs_toc': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableDocs) return 'Documentation indexing is not enabled. Set enableDocs: true in .kirograph/config.json and run kirograph index.';
+
+        const { DocsQueries } = await import('../docs/queries');
+        const db = cg.getDatabase();
+        db.applyDocsSchema();
+        const docs = new DocsQueries(db.getRawDb(), projectRoot);
+
+        const toc = docs.getToc({ file: args.file as string | undefined, tree: args.tree as boolean | undefined });
+        if (toc.length === 0) return args.file ? `No sections found in "${args.file}".` : 'No documentation indexed. Run kirograph index.';
+
+        const lines: string[] = [];
+        const renderEntry = (entry: any, indent: string) => {
+          const prefix = '#'.repeat(entry.level || 1);
+          const summary = entry.summary ? ` — ${entry.summary}` : '';
+          lines.push(`${indent}${prefix} ${entry.title}${summary}`);
+          lines.push(`${indent}  ID: ${entry.id}`);
+          if (entry.children?.length) {
+            for (const child of entry.children) renderEntry(child, indent + '  ');
+          }
+        };
+
+        if (args.tree) {
+          for (const entry of toc) renderEntry(entry, '');
+        } else {
+          for (const entry of toc) {
+            const prefix = '#'.repeat(entry.level || 1);
+            const summary = entry.summary ? ` — ${entry.summary}` : '';
+            lines.push(`${prefix} ${entry.title} [${entry.filePath}]${summary}`);
+            lines.push(`  ID: ${entry.id}`);
+          }
+        }
+
+        return lines.join('\n');
+      }
+
+      case 'kirograph_docs_search': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableDocs) return 'Documentation indexing is not enabled. Set enableDocs: true in .kirograph/config.json and run kirograph index.';
+
+        const { DocsQueries } = await import('../docs/queries');
+        const db = cg.getDatabase();
+        db.applyDocsSchema();
+        const docs = new DocsQueries(db.getRawDb(), projectRoot, config);
+
+        const results = await docs.searchSections(args.query as string, {
+          file: args.file as string | undefined,
+          limit: (args.limit as number) ?? 10,
+        });
+
+        if (results.length === 0) return `No documentation sections found matching "${args.query}".`;
+
+        return results.map((r, i) => {
+          const summary = r.section.summary ? `\n  ${r.section.summary}` : '';
+          return `${i + 1}. ${r.section.title} [${r.section.filePath}]${summary}\n  ID: ${r.section.id}`;
+        }).join('\n\n');
+      }
+
+      case 'kirograph_docs_section': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableDocs) return 'Documentation indexing is not enabled. Set enableDocs: true in .kirograph/config.json and run kirograph index.';
+
+        const { DocsQueries } = await import('../docs/queries');
+        const db = cg.getDatabase();
+        db.applyDocsSchema();
+        const docs = new DocsQueries(db.getRawDb(), projectRoot);
+
+        const result = docs.getSection(args.id as string, { context: args.context as boolean | undefined });
+        if (!result) return `Section "${args.id}" not found.`;
+
+        const lines: string[] = [];
+
+        if (result.ancestors?.length) {
+          lines.push('Breadcrumb: ' + result.ancestors.map(a => a.title).join(' > ') + ' > ' + result.section.title);
+          lines.push('');
+        }
+
+        lines.push(result.content);
+
+        if (result.children?.length) {
+          lines.push('', '## Child sections:');
+          for (const child of result.children) {
+            const summary = child.summary ? ` — ${child.summary}` : '';
+            lines.push(`  - ${child.title}${summary} (ID: ${child.id})`);
+          }
+        }
+
+        return lines.join('\n');
+      }
+
+      case 'kirograph_docs_outline': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableDocs) return 'Documentation indexing is not enabled. Set enableDocs: true in .kirograph/config.json and run kirograph index.';
+
+        const { DocsQueries } = await import('../docs/queries');
+        const db = cg.getDatabase();
+        db.applyDocsSchema();
+        const docs = new DocsQueries(db.getRawDb(), projectRoot);
+
+        const outline = docs.getOutline(args.file as string);
+        if (outline.length === 0) return `No sections found in "${args.file}". Is the file indexed?`;
+
+        const lines: string[] = [`Outline: ${args.file}`, ''];
+        const renderOutline = (entries: any[], indent: string) => {
+          for (const entry of entries) {
+            const summary = entry.summary ? ` — ${entry.summary}` : '';
+            lines.push(`${indent}${'#'.repeat(entry.level || 1)} ${entry.title}${summary}`);
+            if (entry.children?.length) renderOutline(entry.children, indent + '  ');
+          }
+        };
+        renderOutline(outline, '');
+
+        return lines.join('\n');
+      }
+
+      case 'kirograph_docs_refs': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableDocs) return 'Documentation indexing is not enabled. Set enableDocs: true in .kirograph/config.json and run kirograph index.';
+
+        const { DocsQueries } = await import('../docs/queries');
+        const db = cg.getDatabase();
+        db.applyDocsSchema();
+        const docs = new DocsQueries(db.getRawDb(), projectRoot);
+
+        const refs = docs.getRefs({
+          sectionId: args.sectionId as string | undefined,
+          qualifiedName: args.nodeId as string | undefined,
+        });
+
+        if (refs.length === 0) {
+          if (args.sectionId) return `No code references found in section "${args.sectionId}".`;
+          if (args.nodeId) return `No documentation sections reference "${args.nodeId}".`;
+          return 'Provide either sectionId or nodeId to look up cross-references.';
+        }
+
+        return refs.map(r => {
+          const direction = args.sectionId ? `→ ${r.qualifiedName}` : `← ${r.sectionTitle ?? r.sectionId}`;
+          return `[${r.refType}] ${direction} (confidence: ${r.confidence.toFixed(2)})`;
+        }).join('\n');
       }
 
       default:

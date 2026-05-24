@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.16.0] - 2026-05-24: Documentation Navigation
+
+### Added
+
+- **Documentation module** (`enableDocs: true`): indexes project documentation by heading hierarchy for section-level retrieval. Inspired by [jDocMunch-MCP](https://github.com/jgravelle/jdocmunch-mcp), implemented natively in TypeScript with full kirograph integration.
+  - **`kirograph_docs_toc` MCP tool**: Table of contents for a file or the whole project. Flat or tree mode.
+  - **`kirograph_docs_search` MCP tool**: FTS5-powered search across documentation sections. Independent from code search.
+  - **`kirograph_docs_section` MCP tool**: Retrieve full content of a section by stable ID. Optional context mode (ancestor chain + child summaries).
+  - **`kirograph_docs_outline` MCP tool**: Heading hierarchy for a single document.
+  - **`kirograph_docs_refs` MCP tool**: Bidirectional code ↔ doc cross-references via `qualified_name`.
+  - **9 format parsers**: Markdown (.md, .mdx, .cheatmd), reStructuredText (.rst), AsciiDoc (.adoc, .asciidoc), RDoc (.rdoc), Org-mode (.org), HTML (.html, .htm), Plain text (.txt), OpenAPI/Swagger (.yaml, .yml, .json — content-detected).
+  - **Code linker**: Detects backtick references, CamelCase identifiers, and snake_case patterns in doc content, resolves against the code graph, stores as `doc_code_refs`.
+  - **`kirograph_context` enrichment** (opt-in): When `docsContextLimit > 0`, relevant doc sections are surfaced alongside code symbols. Disabled by default — user chooses the cap during install.
+  - **CLI mirrors all MCP tools**: `kirograph docs {toc,search,section,outline,refs,reindex,lint,reembed}`.
+  - **`kirograph docs lint`**: Health checks — broken code refs, stale sections, FTS desync, orphan refs.
+  - **Stable section IDs**: Format `{file_path}::{ancestor-chain/slug}#{level}`. Stable across re-indexing when path, heading text, level, and parent chain don't change.
+  - **Incremental indexing**: Content hash (SHA-256) per section. Only re-indexes files that changed on disk.
+  - **Token savings tracking**: Docs tools tracked as `'docs'` source in `kirograph_gain` with naive cost heuristics (92–97% savings vs reading full doc files).
+  - **`kirograph_status` enhanced**: Shows docs stats (files, sections, code refs) when enabled.
+  - **Sync pipeline integration**: Docs are re-indexed automatically during `kirograph index` and `kirograph sync`.
+- **Installer prompt**: "Documentation indexing (section-level retrieval)?" added to the interactive installer. Follow-up prompt for `docsContextLimit` when enabled.
+- **Steering file docs section**: Teaches the agent to use `kirograph_docs_*` tools. Conditionally included when docs is enabled.
+- **8 new config fields**: `enableDocs`, `docsInclude`, `docsExclude`, `docsLinkCode`, `docsContextLimit`, `docsContextThreshold`, `docsMaxFileSize`, `docsSummarization`.
+
+### Changed
+
+- MCP tool count: 24 → 29 (`kirograph_docs_toc`, `kirograph_docs_search`, `kirograph_docs_section`, `kirograph_docs_outline`, `kirograph_docs_refs`).
+- `kirograph_gain` output now shows four source categories: Graph tools, Docs tools, Compression, Memory.
+- `TokenSavingsRecord.source` type: `'exec' | 'graph' | 'memory'` → `'exec' | 'graph' | 'memory' | 'docs'`.
+- `GraphDatabase` exposes `applyDocsSchema()` for docs module access.
+- Installer `installLate` signature extended with `enableDocs` parameter.
+- Build script copies `docs-schema.sql` to dist.
+
+---
+
 ## [0.15.0] - 2026-05-21: Memory
 
 ### Added
