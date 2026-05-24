@@ -36,6 +36,7 @@ import { register as registerCompression } from './commands/compression';
 import { register as registerExec } from './commands/exec';
 import { register as registerMemory } from './commands/memory';
 import { register as registerDocs } from './commands/docs';
+import { register as registerData } from './commands/data';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -117,6 +118,7 @@ registerCompression(program);
 registerExec(program);
 registerMemory(program);
 registerDocs(program);
+registerData(program);
 
 // Show banner + help when called with no arguments, otherwise parse normally
 if (process.argv.length === 2) {

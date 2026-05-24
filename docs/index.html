@@ -136,14 +136,14 @@
     <div class="section-header">
       <span class="label">Features</span>
       <h2>Everything you need to supercharge Kiro</h2>
-      <p>A complete semantic index with 24 node kinds, 13 edge types, and four indexing layers.</p>
+      <p>A complete semantic index with 24 node kinds, 13 edge types, and five indexing layers.</p>
     </div>
     <div class="cards-grid">
 
       <div class="card">
         <span class="card-icon"><i data-lucide="wrench"></i></span>
-        <h3>29 MCP Tools</h3>
-        <p>Context building, symbol search, call graphs, type hierarchies, impact analysis, dead code, circular deps, architecture, coupling metrics, snapshots, memory, documentation navigation, and more, all auto-approved in Kiro.</p>
+        <h3>37 MCP Tools</h3>
+        <p>Context building, symbol search, call graphs, type hierarchies, impact analysis, dead code, circular deps, architecture, coupling metrics, snapshots, memory, documentation navigation, data querying, and more, all auto-approved in Kiro.</p>
       </div>
 
       <div class="card">
@@ -155,7 +155,7 @@
       <div class="card">
         <span class="card-icon"><i data-lucide="webhook"></i></span>
         <h3>Auto-sync Hooks</h3>
-        <p>A single <code>agentStop</code> hook keeps the index fresh automatically. An optional <code>preToolUse</code> hook reminds the agent to use <code>kirograph_exec</code> for shell compression. No watcher process needed.</p>
+        <p>A single <code>agentStop</code> hook keeps the index fresh automatically. An optional <code>preToolUse</code> hook reminds the agent to use <code>kirograph_exec</code> for shell compression. An optional memory hook prompts the agent to store observations at session end. No watcher process needed.</p>
       </div>
 
       <div class="card">
@@ -224,6 +224,12 @@
         <p>Indexes project docs by heading hierarchy for section-level retrieval. 9 format parsers, code ↔ docs cross-references, FTS search, and stable section IDs. 92–97% token savings vs reading full files. Opt-in via <code>enableDocs</code>.</p>
       </div>
 
+      <div class="card">
+        <span class="card-icon"><i data-lucide="table-2"></i></span>
+        <h3>Data Navigation</h3>
+        <p>Indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) for structured querying. Column profiling, server-side aggregations, and filtered row retrieval. 95–99% token savings vs reading raw data files. Opt-in via <code>enableData</code>.</p>
+      </div>
+
     </div>
   </div>
 </section>
@@ -233,7 +239,7 @@
   <div class="container">
     <div class="section-header">
       <span class="label">How It Works</span>
-      <h2>Four indexing layers, one query interface</h2>
+      <h2>Five indexing layers, one query interface</h2>
       <p>KiroGraph parses your codebase with tree-sitter, stores everything in SQLite, and exposes it through MCP tools and CLI commands.</p>
     </div>
 
@@ -272,7 +278,7 @@
 
       <!-- Indexing layers -->
       <div class="diagram-box">
-        <h4>Four Indexing Layers</h4>
+        <h4>Five Indexing Layers</h4>
         <div class="box-content" style="display: grid; gap: 0.5rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <span class="badge badge-green">Structural</span>
@@ -289,6 +295,10 @@
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <span class="badge badge-blue">Documentation</span>
             <span style="font-size: 0.85rem; color: var(--text-muted);">section-level retrieval · 9 formats · code refs · opt-in</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="badge" style="background: rgba(210,153,34,0.15); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3);">Data</span>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">tabular data profiling + querying · 6 formats · opt-in</span>
           </div>
         </div>
       </div>

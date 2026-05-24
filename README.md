@@ -31,7 +31,7 @@ The index is kept fresh automatically via Kiro hooks when using the Kiro integra
 
 ## How Indexing Works
 
-Indexing has three layers: **structural** (always on), **semantic** (opt-in), and **architecture** (opt-in).
+Indexing has five layers: **structural** (always on), **semantic** (opt-in), **architecture** (opt-in), **documentation** (opt-in), and **data** (opt-in).
 
 ### Structural indexing
 
@@ -122,6 +122,27 @@ Enable via `kirograph install` or directly in `.kirograph/config.json`:
 ```
 
 See the [Documentation](#documentation-requires-enabledocs-true) section below for full details.
+
+### Data indexing (opt-in)
+
+When `enableData: true` is set, KiroGraph indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) that live alongside your code — test fixtures, seed data, configuration tables, sample datasets. Inspired by [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/).
+
+- **Streaming parser**: never loads full files into memory. Processes line-by-line (CSV/JSONL) or in chunks (Excel/Parquet)
+- **Column profiling**: type inference, cardinality, null percentages, min/max, sample values
+- **Server-side computation**: filters, aggregations, and joins run in SQLite. Only results enter the context window
+- **Incremental**: content hash (SHA-256) skips unchanged files on re-index
+- **Token savings**: 95–99% reduction vs reading raw data files (tracked in `kirograph_gain`)
+- **Optional format deps**: CSV/TSV/JSONL/JSON are built-in (zero deps). Excel requires `xlsx`, Parquet requires `parquetjs-lite`
+
+Enable via `kirograph install` or directly in `.kirograph/config.json`:
+
+```json
+{
+  "enableData": true
+}
+```
+
+See the [Data](#data-requires-enabledata-true) section below for full details.
 
 ## Installation
 
@@ -247,7 +268,12 @@ Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
         "kirograph_hotspots", "kirograph_surprising", "kirograph_diff",
         "kirograph_exec", "kirograph_gain"
         "kirograph_mem_search", "kirograph_mem_store",
-        "kirograph_mem_timeline", "kirograph_mem_status"
+        "kirograph_mem_timeline", "kirograph_mem_status",
+        "kirograph_docs_toc", "kirograph_docs_search",
+        "kirograph_docs_section", "kirograph_docs_outline", "kirograph_docs_refs",
+        "kirograph_data_list", "kirograph_data_describe",
+        "kirograph_data_query", "kirograph_data_aggregate", "kirograph_data_search",
+        "kirograph_data_join", "kirograph_data_correlations", "kirograph_data_quality"
       ]
     }
   }
@@ -256,12 +282,13 @@ Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
 
 ### IDE Hooks (`.kiro/hooks/`)
 
-Up to two hooks are installed (`.kiro.hook` extension):
+Up to three hooks are installed (`.kiro.hook` extension):
 
 | Hook file | Event | Type | Behavior |
 |-----------|-------|------|----------|
 | `kirograph-sync-if-dirty.kiro.hook` | `agentStop` | `runCommand` | Runs `kirograph sync --quiet` when the agent stops, syncing any file changes from the session. The sync command skips unchanged files via content hashing, so it's fast even when nothing changed. |
 | `kirograph-compress-hint.kiro.hook` | `preToolUse` (shell) | `askAgent` | Reminds the agent to use `kirograph_exec` for commands that benefit from token compression (git, gh, test, lint, build, docker, aws, grep). Only installed when shell compression is enabled. |
+| `kirograph-mem-capture.kiro.hook` | `agentStop` | `askAgent` | Prompts the agent to store important observations (decisions, errors, patterns) in memory at the end of each session. Only installed when memory is enabled. |
 
 The sync hook replaces the previous per-file approach (mark-dirty-on-save, mark-dirty-on-create, sync-on-delete). A single `agentStop` hook handles all file changes in one pass with zero overhead during active editing.
 
@@ -274,6 +301,8 @@ A custom agent for Kiro CLI that wires up the MCP server, references the steerin
 | `agentSpawn` | `kirograph sync-if-dirty --quiet` (catches edits made between sessions) |
 | `userPromptSubmit` | `kirograph sync-if-dirty --quiet` (keeps graph fresh within a session) |
 | `stop` | `kirograph sync-if-dirty --quiet` (deferred flush, mirrors IDE `agentStop`) |
+
+> Note: The CLI agent format only supports `command` hooks (shell commands), not `askAgent` prompts. Memory capture and compression hints are handled via the steering file instructions instead — the agent reads them from `.kiro/steering/kirograph.md` which is referenced as a resource.
 
 Use it with:
 
@@ -667,6 +696,93 @@ Find code symbols referenced by a doc section, or doc sections that reference a 
 | `nodeId` | string | - | Code symbol qualified name (find doc sections that reference it) |
 | `projectPath` | string | cwd | Project root path |
 
+### `kirograph_data_list` *(requires `enableData: true`)*
+
+List all indexed datasets with row counts, column counts, and file sizes.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_describe` *(requires `enableData: true`)*
+
+Full schema profile for a dataset: column names, inferred types, cardinality, null percentages, min/max values, and sample values.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID (from `kirograph_data_list`) |
+| `column` | string | - | Deep dive on a single column |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_query` *(requires `enableData: true`)*
+
+Filtered row retrieval with structured operators. Multiple filters are ANDed. All queries use parameterized SQL (zero injection surface).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID |
+| `filters` | Filter[] | - | Array of `{column, op, value}`. Ops: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `in`, `is_null`, `between` |
+| `columns` | string[] | all | Column projection |
+| `limit` | number | 500 | Max rows (hard cap: 500) |
+| `offset` | number | 0 | Pagination offset |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_aggregate` *(requires `enableData: true`)*
+
+Server-side GROUP BY aggregation. Computation happens in SQLite; only results enter the context window.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID |
+| `groupBy` | string[] | required | Columns to group by |
+| `metrics` | Metric[] | required | Array of `{column, op}`. Ops: `count`, `sum`, `avg`, `min`, `max`, `count_distinct` |
+| `filters` | Filter[] | - | Pre-aggregation filters |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_search` *(requires `enableData: true`)*
+
+Search column names and sample values by keyword within a dataset.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID |
+| `query` | string | required | Search keyword |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_join` *(requires `enableData: true`)*
+
+SQL JOIN across two indexed datasets. Combines data without loading either file into context.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `left` | string | required | Left dataset ID |
+| `right` | string | required | Right dataset ID |
+| `leftColumn` | string | required | Join column from left dataset |
+| `rightColumn` | string | required | Join column from right dataset |
+| `type` | string | `inner` | Join type: `inner`, `left`, `right` |
+| `columns` | string[] | all | Column projection (prefix with dataset ID) |
+| `limit` | number | 100 | Max rows (hard cap: 500) |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_correlations` *(requires `enableData: true`)*
+
+Pairwise Pearson correlations between numeric columns. Discovers hidden relationships without loading data.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID |
+| `threshold` | number | 0.3 | Min absolute correlation to include |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_data_quality` *(requires `enableData: true`)*
+
+Data quality triage: rank columns by composite risk score (null rate, cardinality anomalies, type issues).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset` | string | required | Dataset ID |
+| `projectPath` | string | cwd | Project root path |
+
 ## CLI Reference
 
 ### Setup
@@ -949,6 +1065,11 @@ The `kirograph_gain` MCP tool exposes the same stats to the agent.
 | `kirograph_architecture` | Not feasible manually | 4× output, min 7,500 |
 | `kirograph_mem_search` | Re-read 3-5 files to recall past decisions + grep | ~5,800 tokens |
 | `kirograph_mem_timeline` | Ask user or re-read session history | ~2,300 tokens |
+| `kirograph_data_list` | Run ls/find on data files + inspect each | ~3,500 tokens |
+| `kirograph_data_describe` | Read the full data file to understand schema | ~45,000 tokens |
+| `kirograph_data_query` | Read the full file and scan for matching rows | ~45,000 tokens |
+| `kirograph_data_aggregate` | Read the full file + reason about aggregation | ~52,500 tokens |
+| `kirograph_data_search` | Read file headers + grep for values | ~9,100 tokens |
 
 Constants used: 1,500 tokens per average source file (~200 lines), 800 tokens per grep result set, 2,000 tokens per directory listing. These are conservative estimates; in practice agents often read more files, retry failed searches, and explore dead ends.
 
@@ -1146,6 +1267,65 @@ kirograph docs reembed                      # re-embed with current model
 
 **How code linking works:** When `docsLinkCode: true` (default), the indexer scans section content for backtick references (`` `functionName` ``), CamelCase identifiers, and snake_case patterns, then resolves them against the code graph. Matches are stored as `doc_code_refs` using `qualified_name` (stable across reindex).
 
+### Data *(requires `enableData: true`)*
+
+Tabular data navigation — list, describe, query, aggregate, search, join, correlate, and inspect data quality from the CLI.
+
+```bash
+# List datasets
+kirograph data list                         # all indexed datasets
+kirograph data list --json                  # JSON output
+
+# Describe schema
+kirograph data describe tests-fixtures-users           # full schema + column profiles + validation rules + sample hints
+kirograph data describe tests-fixtures-users --column email  # deep dive on one column
+kirograph data describe tests-fixtures-users --json
+
+# Query rows
+kirograph data query orders --filter status:eq:shipped --limit 10
+kirograph data query users --filter age:gt:18 --columns name,email
+kirograph data query products --filter price:between:10:50 --json
+
+# Aggregate
+kirograph data aggregate orders --group-by region --metric sum:amount
+kirograph data aggregate users --group-by role --metric count:id --metric avg:age
+kirograph data aggregate orders --group-by status --metric count_distinct:customer_id --json
+
+# Search columns
+kirograph data search orders "price"        # find columns matching "price"
+kirograph data search users "email"         # find columns matching "email"
+
+# Join two datasets
+kirograph data join users orders --left-col id --right-col user_id
+kirograph data join users orders --left-col id --right-col user_id --type left --limit 50
+
+# Correlations
+kirograph data correlations sales-data                  # Pearson correlations between numeric columns
+kirograph data correlations sales-data --threshold 0.5  # only strong correlations
+
+# Quality
+kirograph data quality orders               # rank columns by risk (null rate, cardinality anomalies)
+
+# History & drift
+kirograph data history orders               # show schema change history
+kirograph data drift orders                 # compare last two indexes (added/removed/changed columns)
+
+# Indexing
+kirograph data index                        # incremental index (skips unchanged files)
+kirograph data reindex                      # force re-index all data files
+
+# Maintenance
+kirograph data lint                         # validate index integrity (row counts, stale files, missing deps)
+```
+
+**How datasets are identified:** Each data file gets a stable ID derived from its relative path: `tests/fixtures/users.csv` → `tests-fixtures-users`. IDs remain stable across re-indexing.
+
+**Filter format (CLI):** `column:op:value` — e.g. `age:gt:18`, `status:eq:active`, `price:between:10:50`. Multiple `--filter` flags are ANDed.
+
+**Metric format (CLI):** `op:column` — e.g. `sum:amount`, `avg:price`, `count:id`, `count_distinct:customer_id`.
+
+**How code linking works:** When `dataLinkCode: true` (default), the indexer scans source files for references to data file paths (`readFileSync('data/users.csv')`, `pd.read_csv(...)`, SQL `COPY FROM`, etc.) and stores matches in `data_code_refs`. This enables test fixture awareness in `kirograph affected` and dataset schema enrichment in `kirograph_context`.
+
 ### Graph Export
 
 Export the full graph as an interactive dashboard. three files served from a local directory, no server required, works offline.
@@ -1248,23 +1428,59 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| **Indexing** | | | |
 | `languages` | string[] | `[]` | Limit indexing to specific languages (empty = all) |
 | `include` | string[] | `[]` | Glob patterns to include (empty = include everything not excluded) |
 | `exclude` | string[] | see below | Glob patterns to exclude |
 | `maxFileSize` | number | `1048576` | Skip files larger than this (bytes) |
 | `extractDocstrings` | boolean | `true` | Extract JSDoc, docstrings, and comments |
 | `trackCallSites` | boolean | `true` | Record line/column for call edges |
+| `frameworkHints` | string[] | auto | Override framework detection (e.g. `["react", "express"]`) |
+| `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
+| `syncWarningThreshold` | number | `10` | Warn in `kirograph_status` when pending files exceed this count |
+| **Semantic Search** | | | |
 | `enableEmbeddings` | boolean | `false` | Generate semantic embeddings (opt-in) |
 | `embeddingModel` | string | `nomic-ai/nomic-embed-text-v1.5` | HuggingFace `feature-extraction` model ID |
 | `embeddingDim` | number | `768` | Output dimension of the chosen embedding model |
-| `semanticEngine` | string | `cosine` | Search engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, `qdrant`, or `typesense` |
+| `semanticEngine` | string | `cosine` | Engine: `cosine`, `sqlite-vec`, `orama`, `pglite`, `lancedb`, `qdrant`, `typesense` |
 | `useVecIndex` | boolean | `false` | Deprecated alias for `semanticEngine: "sqlite-vec"` |
-| `enableArchitecture` | boolean | `false` | Enable architecture analysis (package graph + layer detection, opt-in) |
+| `typesenseDashboard` | boolean | `false` | Open Typesense dashboard after indexing |
+| `qdrantDashboard` | boolean | `false` | Open Qdrant dashboard after indexing |
+| **Architecture** | | | |
+| `enableArchitecture` | boolean | `false` | Enable architecture analysis (package graph + layer detection) |
 | `architectureLayers` | object | - | Custom layer definitions: `{ "layerName": ["glob/**"] }` |
+| **Memory** | | | |
+| `enableMemory` | boolean | `false` | Enable persistent cross-session memory |
+| `memorySearchAlpha` | number | `0.5` | Blend weight for hybrid search (0 = FTS only, 1 = vector only) |
+| `memoryKeepRaw` | boolean | `true` | Store original text alongside compressed version |
+| `memoryMaxObservations` | number | `10000` | Max observations before auto-pruning oldest |
+| `memorySessionTimeout` | number | `3600000` | Session timeout in ms (default 1 hour) |
+| `memoryContextLimit` | number | `3` | Max observations surfaced in `kirograph_context` |
+| `memoryContextThreshold` | number | `0.3` | Min relevance score to surface in context |
+| `memoryExcludePatterns` | string[] | `[]` | Glob patterns for files to exclude from symbol linking |
+| **Documentation** | | | |
+| `enableDocs` | boolean | `false` | Enable documentation indexing (section-level retrieval) |
+| `docsInclude` | string[] | `["**/*.md", ...]` | Glob patterns for doc files to include |
+| `docsExclude` | string[] | `["node_modules/**", ...]` | Glob patterns for doc files to exclude |
+| `docsLinkCode` | boolean | `true` | Auto-link doc sections to code symbols |
+| `docsContextLimit` | number | `0` | Max doc sections in `kirograph_context` (0 = disabled) |
+| `docsContextThreshold` | number | `0.5` | Min confidence for doc refs in context |
+| `docsMaxFileSize` | number | `1048576` | Max doc file size in bytes |
+| `docsSummarization` | string | `first-sentence` | Summary strategy: `embedding`, `first-sentence`, `off` |
+| **Data** | | | |
+| `enableData` | boolean | `false` | Enable tabular data indexing and querying |
+| `dataInclude` | string[] | `["**/*.csv", ...]` | Glob patterns for data files to include |
+| `dataExclude` | string[] | `["node_modules/**", ...]` | Glob patterns for data files to exclude |
+| `dataLinkCode` | boolean | `true` | Auto-link data files to code symbols via path detection |
+| `dataContextLimit` | number | `0` | Max datasets in `kirograph_context` (0 = disabled) |
+| `dataMaxFileSize` | number | `52428800` | Max data file size in bytes (50MB) |
+| `dataMaxRows` | number | `1000000` | Max rows to index per file |
+| `dataQueryLimit` | number | `500` | Max rows returned per query (hard cap) |
+| `dataMaxResponseTokens` | number | `8000` | Max token budget per data tool response |
+| **Agent Behavior** | | | |
+| `cavemanMode` | string | `off` | Communication style: `off`, `lite`, `full`, `ultra` |
+| `shellCompressionLevel` | string | `normal` | Shell compression: `off`, `normal`, `aggressive`, `ultra` |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
-| `fuzzyResolutionThreshold` | number | `0.5` | Name matching threshold for cross-file resolution (0.0–1.0) |
-| `cavemanMode` | string | `off` | Agent communication style: `off`, `lite`, `full`, `ultra` |
-| `shellCompressionLevel` | string | `normal` | Shell command compression level: `off`, `normal`, `aggressive`, `ultra` |
 
 Default exclude patterns: `node_modules/**`, `dist/**`, `build/**`, `.git/**`, `*.min.js`, `.kirograph/**`
 
@@ -1668,6 +1884,7 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 
 - [cavemem](https://github.com/JuliusBrussee/cavemem) by [Julius Brussee](https://www.linkedin.com/in/julius-brussee/): the memory module's hook-based observation capture, deterministic compression, and SQLite storage pattern.
 - [jDocMunch-MCP](https://github.com/jgravelle/jdocmunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/): the documentation module's section-first retrieval approach, stable section IDs, and byte-offset addressing.
+- [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/): the data module's column profiling, streaming parsers, and server-side aggregation approach.
 
 ### Contributors
 

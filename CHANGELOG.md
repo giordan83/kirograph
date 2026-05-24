@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.17.0] - 2026-05-24: Data Navigation
+
+### Added
+
+- **Data module** (`enableData: true`): indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) for structured querying. Inspired by [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp), implemented natively in TypeScript with full kirograph integration.
+  - **`kirograph_data_list` MCP tool**: List all indexed datasets with row counts, column counts, and file sizes.
+  - **`kirograph_data_describe` MCP tool**: Full schema profile — column names, inferred types, cardinality, null percentages, min/max, sample values, NL summaries, validation rules, and sample data generation hints.
+  - **`kirograph_data_query` MCP tool**: Filtered row retrieval with 10 structured operators (eq, neq, gt, gte, lt, lte, contains, in, is_null, between). Parameterized SQL, zero injection surface. Anti-loop detection warns on excessive pagination.
+  - **`kirograph_data_aggregate` MCP tool**: Server-side GROUP BY — count, sum, avg, min, max, count_distinct. Computation in SQLite, only results enter context.
+  - **`kirograph_data_search` MCP tool**: Search column names and sample values by keyword within a dataset.
+  - **`kirograph_data_join` MCP tool**: Cross-dataset SQL JOIN (inner, left, right) with column projection.
+  - **`kirograph_data_correlations` MCP tool**: Pairwise Pearson correlations between numeric columns. Discovers hidden relationships without loading data.
+  - **`kirograph_data_quality` MCP tool**: Data quality triage — rank columns by composite risk score (null rate, cardinality anomalies, type issues).
+  - **6 format parsers**: CSV/TSV (built-in, streaming), JSONL/NDJSON (built-in, streaming), JSON array (built-in, streaming), Excel .xlsx/.xls (optional dep: `xlsx`), Parquet (optional dep: `parquetjs-lite`).
+  - **Column profiler**: Type inference (string, integer, float, boolean, date, null), cardinality, null counting, min/max, mean, sample values, auto-generated NL summaries.
+  - **Streaming parser**: Never loads full file into memory. Processes line-by-line (CSV/JSONL) or in chunks (Excel/Parquet).
+  - **Incremental indexing**: Content hash (SHA-256) per file. Only re-indexes files that changed on disk.
+  - **Code ↔ data linker** (`src/data/linker.ts`): Detects file path references in source code (Node.js `readFileSync`, Python `pd.read_csv`, SQL `COPY FROM`, generic path strings). Populates `data_code_refs` during indexing.
+  - **`kirograph_context` enrichment** (opt-in): When `dataContextLimit > 0`, relevant dataset schemas are surfaced alongside code symbols. Disabled by default.
+  - **Test fixture awareness**: `kirograph affected` now includes test files that reference changed data files via `data_code_refs`.
+  - **Schema drift detection**: `data_dataset_history` table tracks profile snapshots on each re-index. `kirograph data drift` compares latest two snapshots (added/removed/changed columns, row count delta).
+  - **Validation rules extraction**: Infers validation rules from column profiles (required, type, range, enum, uniqueness).
+  - **Sample data generation hints**: From column profiles, provides hints for generating realistic test data.
+  - **NL summaries**: Auto-generated natural-language summaries for each column based on profile patterns.
+  - **Anti-loop detection**: Warns when agent paginates row-by-row (>5 sequential queries with incrementing offsets).
+  - **Token budget enforcement**: Responses exceeding `dataMaxResponseTokens` are truncated with a clear message.
+  - **CLI** (13 commands): `kirograph data {list,describe,query,aggregate,search,index,reindex,join,correlations,quality,history,drift,lint}`.
+  - **Token savings tracking**: Data tools tracked as `'data'` source in `kirograph_gain` with naive cost heuristics (95–99% savings vs reading raw data files).
+  - **`kirograph_status` enhanced**: Shows data stats (datasets, rows, columns, source size) when enabled.
+  - **Sync pipeline integration**: Data files are re-indexed automatically during `kirograph index` and `kirograph sync` with dedicated progress phase.
+  - **Architecture layer auto-assignment**: Data files are assigned to a `data` layer when architecture analysis is enabled.
+- **Installer prompt**: "Tabular data indexing?" added to the interactive installer. Follow-up prompts for Excel/Parquet optional deps and `dataContextLimit`.
+- **Steering file data section**: Teaches the agent to use `kirograph_data_*` tools. Conditionally included when data is enabled.
+- **9 new config fields**: `enableData`, `dataInclude`, `dataExclude`, `dataLinkCode`, `dataContextLimit`, `dataMaxFileSize`, `dataMaxRows`, `dataQueryLimit`, `dataMaxResponseTokens`.
+
+### Changed
+
+- MCP tool count: 29 → 37 (`kirograph_data_list`, `kirograph_data_describe`, `kirograph_data_query`, `kirograph_data_aggregate`, `kirograph_data_search`, `kirograph_data_join`, `kirograph_data_correlations`, `kirograph_data_quality`).
+- `kirograph_gain` output now shows five source categories: Graph tools, Docs tools, Data tools, Compression, Memory.
+- `TokenSavingsRecord.source` type: `'exec' | 'graph' | 'memory' | 'docs'` → `'exec' | 'graph' | 'memory' | 'docs' | 'data'`.
+- `IndexProgress.phase` type extended with `'docs'` and `'data'` phases.
+- Progress rendering: docs and data indexing now have dedicated progress output (previously incorrectly used the `architecture` phase).
+- `GraphDatabase` exposes `applyDataSchema()` for data module access.
+- Installer `installLate` signature extended with `enableData` parameter.
+- `ConfigPatch` type extended with `enableData` and `dataContextLimit`.
+- Build script copies `data-schema.sql` to dist.
+- `KIROGRAPH_TOOL_NAMES` updated with 8 new data tools.
+
+---
+
 ## [0.16.0] - 2026-05-24: Documentation Navigation
 
 ### Added

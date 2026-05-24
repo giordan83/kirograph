@@ -7,7 +7,7 @@ import { installCodexEarly, installCodexLate, printCodexNextSteps, uninitCodex }
 export interface TargetInstaller {
   label: string;
   installEarly(projectRoot: string): void;
-  installLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean): void;
+  installLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean): void;
   printNextSteps(projectRoot: string): void;
   uninit?(projectRoot: string): void;
 }

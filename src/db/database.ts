@@ -81,6 +81,18 @@ export class GraphDatabase {
   }
 
   /**
+   * Apply data schema tables. Called when enableData is true.
+   * Safe to call multiple times (CREATE IF NOT EXISTS).
+   */
+  applyDataSchema(): void {
+    const schemaPath = path.join(__dirname, '../db/data-schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      const sql = fs.readFileSync(schemaPath, 'utf8');
+      this.db.exec(sql);
+    }
+  }
+
+  /**
    * Get the raw database handle (for MemoryDatabase).
    */
   getRawDb(): any {
