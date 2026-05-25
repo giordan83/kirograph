@@ -1,12 +1,12 @@
 # Integrations
 
-## Using with Kiro
+## Using with Kiro (Primary)
 
 `kirograph install` or `kirograph install --target kiro` sets up four things in your Kiro workspace (all coexist, so you can switch between IDE and CLI freely):
 
 ### MCP Server (`.kiro/settings/mcp.json`)
 
-Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
+Registers the KiroGraph MCP server with all tools auto-approved. Used by both the IDE and the CLI agent:
 
 ```json
 {
@@ -41,15 +41,13 @@ Up to three hooks are installed (`.kiro.hook` extension):
 
 | Hook file | Event | Type | Behavior |
 |-----------|-------|------|----------|
-| `kirograph-sync-if-dirty.kiro.hook` | `agentStop` | `runCommand` | Runs `kirograph sync --quiet` when the agent stops, syncing any file changes from the session. The sync command skips unchanged files via content hashing, so it's fast even when nothing changed. |
-| `kirograph-compress-hint.kiro.hook` | `preToolUse` (shell) | `askAgent` | Reminds the agent to use `kirograph_exec` for commands that benefit from token compression (git, gh, test, lint, build, docker, aws, grep). Only installed when shell compression is enabled. |
-| `kirograph-mem-capture.kiro.hook` | `agentStop` | `askAgent` | Prompts the agent to store important observations (decisions, errors, patterns) in memory at the end of each session. Only installed when memory is enabled. |
-
-The sync hook replaces the previous per-file approach (mark-dirty-on-save, mark-dirty-on-create, sync-on-delete). A single `agentStop` hook handles all file changes in one pass with zero overhead during active editing.
+| `kirograph-sync-if-dirty.kiro.hook` | `agentStop` | `runCommand` | Runs `kirograph sync --quiet` when the agent stops. Skips unchanged files via content hashing. |
+| `kirograph-compress-hint.kiro.hook` | `preToolUse` (shell) | `askAgent` | Reminds the agent to use `kirograph_exec` for commands that benefit from token compression. Only installed when shell compression is enabled. |
+| `kirograph-mem-capture.kiro.hook` | `agentStop` | `askAgent` | Prompts the agent to store important observations in memory at the end of each session. Only installed when memory is enabled. |
 
 ### CLI Agent Config (`.kiro/agents/kirograph.json`)
 
-A custom agent for Kiro CLI that wires up the MCP server, references the steering file as a resource, and handles sync in the CLI's own hook format. The CLI has no file-watch events, so syncing is handled at session boundaries:
+A custom agent for Kiro CLI with session-boundary sync hooks:
 
 | Event | Action |
 |-------|--------|
@@ -57,62 +55,109 @@ A custom agent for Kiro CLI that wires up the MCP server, references the steerin
 | `userPromptSubmit` | `kirograph sync-if-dirty --quiet` (keeps graph fresh within a session) |
 | `stop` | `kirograph sync-if-dirty --quiet` (deferred flush, mirrors IDE `agentStop`) |
 
-> Note: The CLI agent format only supports `command` hooks (shell commands), not `askAgent` prompts. Memory capture and compression hints are handled via the steering file instructions instead.
-
 Use it with:
 
 ```bash
 kiro-cli --agent kirograph
 ```
 
-Or swap to it inside an active session:
+Or swap inside an active session:
 
 ```
 /agent swap kirograph
 ```
 
-> Note: restart `kiro-cli` after running `kirograph install` for the agent to be picked up.
-
 ### Steering File (`.kiro/steering/kirograph.md`)
 
-Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists. The CLI agent has the same instructions inlined directly in its `prompt` field.
+Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists.
 
 ---
 
 ## Other Tools (Experimental)
 
-> **⚠️ Not fully tested, community-contributed.** The integrations below are outside the original scope of KiroGraph. They are provided as-is. Issues and PRs related to these targets are welcome, but there is no guarantee they will be supported or merged without active help from the contributor.
+> **⚠️ Community-contributed, vibecoded, unverified.** These integrations are provided as-is. PRs welcome for fixes and corrections.
 
-KiroGraph can also be installed for other MCP-capable coding agents. All targets share the same `.kirograph/` data; if the project is already initialized, installing another target only writes that tool's integration files and reuses the existing graph.
-
-```bash
-kirograph install --target claude  # wire up Claude Code MCP + project memory
-kirograph install --target codex   # write Codex instructions and print MCP config
-```
-
-### Using with Claude Code
+KiroGraph can be installed for any MCP-capable coding agent. All targets share the same `.kirograph/` data — installing another target only writes that tool's integration files and reuses the existing graph.
 
 ```bash
-kirograph install --target claude
+kirograph install --target <name>
 ```
 
-This writes:
+### Supported Targets (33)
 
-- `.mcp.json`: project-scoped MCP server config for Claude Code
-- `.kirograph/claude.md`: KiroGraph tool guidance
-- `CLAUDE.md`: an import of `.kirograph/claude.md`
+| Tool | Target | MCP Config | Instructions | Hooks | Pattern |
+|------|--------|-----------|--------------|-------|---------|
+| 🎯 **Kiro** *(primary)* | `kiro` | `.kiro/settings/mcp.json` | Steering + CLI agent | ✅ sync + hint + memory | Full |
+| Cursor | `cursor` | `.cursor/mcp.json` | `.cursor/rules/kirograph.mdc` | ✅ sync on stop | A |
+| GitHub Copilot | `copilot` | `.github/copilot-mcp.json` | `.github/copilot-instructions.md` | ✅ sync on session-end | A |
+| Roo Code | `roo` | `.roo/mcp.json` | `.roo/rules/kirograph.md` | — | A |
+| JetBrains Junie | `junie` | `.junie/mcp/mcp.json` | `.junie/AGENTS.md` | — | A |
+| Continue | `continue` | `.continue/mcpServers/kirograph.json` | `.continue/rules/kirograph.md` | — | A |
+| Warp | `warp` | `.warp/.mcp.json` | `AGENTS.md` | — | A |
+| Trae | `trae` | `.trae/mcp.json` | `.trae/rules/kirograph.md` | — | A |
+| Augment Code | `augment` | `.augment/mcp.json` | `augment-guidelines.md` | — | A |
+| Sourcegraph Amp | `amp` | `.amp/config.json` | `.amp/instructions.md` | — | A |
+| Tabnine | `tabnine` | `.tabnine/mcp.json` | `.tabnine/instructions.md` | — | A |
+| Claude Code | `claude` | `.mcp.json` | `CLAUDE.md` | ✅ sync on Stop | B |
+| Codex CLI | `codex` | `.codex/hooks.json` | `AGENTS.md` | ✅ sync on Stop | B |
+| Gemini CLI | `gemini-cli` | `.gemini/settings.json` | `GEMINI.md` | ✅ SessionEnd | C |
+| OpenCode | `opencode` | `.opencode.json` | `.opencode.json (instructions)` | ✅ plugin | C |
+| Kilo Code | `kilo` | `kilo.json` | `.kilo/rules/kirograph.md` | — | C |
+| Devin | `devin` | `.devin/config.json` | `AGENTS.md` | ✅ .devin/hooks.v1.json | C |
+| OpenHands | `openhands` | `.openhands/config.json` | `AGENTS.md` | — | C |
+| Windsurf | `windsurf` | Print command | `.windsurf/rules/kirograph.md` | ✅ sync on response | D |
+| Cline | `cline` | Print command | `.clinerules/kirograph.md` | ✅ sync script | D |
+| Antigravity | `antigravity` | Print command | `GEMINI.md` | ✅ .agents/hooks.json | D |
+| Aider | `aider` | Print CLI flag | `CONVENTIONS.md` | — | D |
+| Replit Agent | `replit` | Print command | `AGENTS.md` | — | D |
+| Block Goose | `goose` | Print command | `AGENTS.md` | — | D |
+| Mistral Vibe | `mistral-vibe` | Print command | `.kirograph/mistral-vibe.md` | — | D |
+| IBM Bob | `ibm-bob` | Print command | `.kirograph/ibm-bob.md` | — | D |
+| Crush | `crush` | Print command | `.kirograph/crush.md` | — | D |
+| Droid Factory | `droid-factory` | Print command | `.kirograph/droid-factory.md` | — | D |
+| ForgeCode | `forgecode` | Print command | `.kirograph/forgecode.md` | — | D |
+| iFlow CLI | `iflow` | Print command | `.kirograph/iflow.md` | — | D |
+| Qwen Code | `qwen` | Print command | `.kirograph/qwen.md` | — | D |
+| Atlassian Rovo Dev | `rovo` | Print command | `.kirograph/rovo.md` | — | D |
+| Qoder | `qoder` | Print command | `.kirograph/qoder.md` | — | D |
 
-Claude Code prompts for project MCP approval the first time it sees `.mcp.json`.
+### Integration Patterns
 
-### Using with Codex
+**Pattern A — Project-level MCP config + rules file:** The installer writes a JSON config file the tool reads on startup, plus a rules/instructions file the agent loads into context. Restart the tool after installing.
+
+**Pattern B — Standard mcpServers + project memory file:** Writes a standard `mcpServers` config plus a generated block in the tool's project memory file (`CLAUDE.md`, `AGENTS.md`). The block is idempotent.
+
+**Pattern C — Custom config format:** The tool has its own config schema. The installer merges the kirograph entry without overwriting other settings.
+
+**Pattern D — Print-only:** The tool's MCP config is user-scoped or cloud-hosted. The installer writes instructions locally and prints the exact command to register the MCP server.
+
+### Auto-Sync Hooks
+
+For tools that support lifecycle hooks, the installer writes auto-sync hooks that run `kirograph sync` when the agent finishes:
+
+| Tool | Hook file | Event | Behavior |
+|------|-----------|-------|----------|
+| Kiro | `.kiro/hooks/*.kiro.hook` | agentStop + preToolUse | Sync + compression hint + memory capture |
+| Cursor | `.cursor/hooks.json` | stop | Sync on task completion |
+| Windsurf | `.windsurf/hooks.json` | post_cascade_response | Sync after each response |
+| Claude Code | `.claude/settings.json` | Stop | Sync on session stop |
+| GitHub Copilot | `.github/hooks.json` | session-end | Sync on session end |
+| Cline | `.clinerules/hooks/task_completed` | task_completed | Executable script that syncs |
+| Codex CLI | `.codex/hooks.json` | Stop | Sync on session stop |
+| Antigravity | `.agents/hooks.json` | Stop | Sync on execution stop |
+| Gemini CLI | `.gemini/settings.json` | SessionEnd | Sync on session end |
+| OpenCode | `.opencode/plugins/kirograph-sync.js` | session.idle | JS plugin that syncs |
+| Devin | `.devin/hooks.v1.json` | Stop | Sync on session stop |
+
+For tools **without** a hook system (22 targets), the generated instructions include a "Session Hygiene" section that tells the agent to manually run `kirograph sync` at the start and end of each session.
+
+### Multiple Targets
+
+You can install multiple targets in the same project. They all share the same `.kirograph/` graph data:
 
 ```bash
-kirograph install --target codex
+kirograph install                      # Kiro (primary)
+kirograph install --target cursor      # also Cursor
+kirograph install --target claude      # also Claude Code
+kirograph install --target copilot     # also GitHub Copilot
 ```
-
-This writes:
-
-- `.kirograph/codex.md`: KiroGraph tool guidance
-- `AGENTS.md`: a generated KiroGraph instruction block
-
-Codex MCP configuration is user-scoped, so the installer prints the exact `codex mcp add ...` command and equivalent `~/.codex/config.toml` snippet instead of editing files outside the project.

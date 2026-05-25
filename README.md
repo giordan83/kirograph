@@ -8,7 +8,7 @@ Semantic code knowledge graph for [Kiro](https://kiro.dev): fewer tool calls, in
 
 Inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [colbymchenry](https://github.com/colbymchenry) for Claude Code, rebuilt natively for Kiro's MCP and hooks system.
 
-> **Full support is for Kiro only.** Experimental integrations for other MCP-capable tools (Claude Code, Codex) are available but not fully tested. See [Integrations](docs/guide/integrations.md) for details.
+> **Full support is for Kiro only.** Experimental integrations for 32 other MCP-capable tools (Cursor, Copilot, Claude Code, Windsurf, Cline, and more) are available. See [Integrations](docs/guide/integrations.md) for the full list.
 
 ## Why KiroGraph?
 
@@ -236,7 +236,7 @@ npm uninstall -g .
 | 🪨 **Caveman Mode** 🪨 | Agent prose compression (lite → ultra) — fewer tokens on explanations without touching code |
 | 📈 **Token Analytics** | Track cumulative savings from graph tools and shell compression over time |
 | <h4>Integration</h4> | |
-| 🔌 **Multi-tool Support** | Native Kiro integration + experimental Claude Code and Codex targets |
+| 🔌 **Multi-tool Support** | Native Kiro + 32 experimental targets (Cursor, Copilot, Claude Code, Codex, Windsurf, Cline, and more) |
 >>>>>>> main
 
 ## Quick Start
