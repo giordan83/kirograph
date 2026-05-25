@@ -5,15 +5,15 @@ set -euo pipefail
 # KiroGraph Release Script
 #
 # Usage:
-#   ./scripts/release.sh [version]
+#   ./scripts/release.sh
 #
-# If no version is provided, reads it from package.json.
+# Reads version from package.json (single source of truth).
 #
 # What it does:
-#   1. Reads version from argument or package.json
+#   1. Reads version from package.json
 #   2. Extracts release notes from CHANGELOG.md for that version
 #   3. Runs the build
-#   4. Creates a git tag (v<version>)
+#   4. Creates a git tag (v<version>) if it doesn't exist
 #   5. Pushes the tag to origin
 #   6. Creates a GitHub release with the changelog notes (requires `gh` CLI)
 #   7. Publishes to npm (requires `npm` login)
@@ -42,11 +42,7 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
 # ── Get version ──────────────────────────────────────────────────────────────
-if [ -n "${1:-}" ]; then
-  VERSION="$1"
-else
-  VERSION=$(node -p "require('./package.json').version")
-fi
+VERSION=$(node -p "require('./package.json').version")
 
 TAG="v${VERSION}"
 
@@ -111,8 +107,8 @@ if [ -z "$NOTES" ]; then
   warn "No changelog entry found for version $VERSION"
   NOTES="Release $VERSION"
 else
-  # Trim leading/trailing blank lines
-  NOTES=$(echo "$NOTES" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba}')
+  # Trim leading blank lines, then trailing blank lines (POSIX-compatible)
+  NOTES=$(echo "$NOTES" | awk 'NF{found=1} found' | awk '{lines[NR]=$0} END{for(i=NR;i>=1;i--){if(lines[i]!=""){last=i;break}} for(i=1;i<=last;i++) print lines[i]}')
   LINES=$(echo "$NOTES" | wc -l | tr -d ' ')
   info "Found release notes ($LINES lines)"
 fi
