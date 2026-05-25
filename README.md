@@ -8,7 +8,7 @@ Semantic code knowledge graph for [Kiro](https://kiro.dev): fewer tool calls, in
 
 Inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [colbymchenry](https://github.com/colbymchenry) for Claude Code, rebuilt natively for Kiro's MCP and hooks system.
 
-> **Full support is for Kiro only.** Experimental integrations for 32 other MCP-capable tools are available — community-contributed, vibecoded, and unverified. PRs welcome for fixes. See [Other Tools (Experimental)](#other-tools-experimental) for the full list.
+> **Full support is for Kiro only.** Experimental integrations for other MCP-capable tools (Claude Code, Codex) are available but not fully tested. See [Integrations](docs/guide/integrations.md) for details.
 
 ## Why KiroGraph?
 
@@ -18,8 +18,9 @@ KiroGraph gives Kiro a semantic knowledge graph that's pre-indexed and always up
 
 The result is fewer tool calls, less context used, and faster responses on complex tasks.
 
-## What Gets Indexed?
+## Features
 
+<<<<<<< HEAD
 KiroGraph uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) to parse your source files into an AST and extract:
 
 - **Nodes**: functions, methods, classes, interfaces, types, enums, variables, constants, routes, components, and more (24 node kinds total)
@@ -207,21 +208,68 @@ If installed from source:
 cd kirograph
 npm uninstall -g .
 ```
+=======
+| Feature | Description |
+|---------|-------------|
+| <h4>Graph & Analysis</h4> | |
+| 🕸️ **Semantic Graph** | tree-sitter AST parsing across 24+ languages — functions, classes, call edges, type hierarchies, all in SQLite |
+| 🎯 **Context Building** | One tool call returns entry points, related symbols, and code snippets for any task description |
+| 💥 **Impact Analysis** | Blast-radius traversal before making changes — know what breaks at any depth |
+| 🧬 **Type Hierarchy** | Traverse inheritance chains — base types, derived types, implementations |
+| 🔄 **Circular Dependency Detection** | Find import cycles using Tarjan's SCC algorithm |
+| 💀 **Dead Code Detection** | Find unexported symbols with zero incoming references |
+| 🔥 **Hotspots & Surprises** | Identify most-connected symbols and unexpected cross-module coupling |
+| 🧪 **Affected Tests** | Find test files impacted by source changes — useful in CI and pre-commit hooks |
+| <h4>Architecture</h4> | |
+| 🏛️ **Architecture Analysis** | Package graph, layer detection, coupling metrics (Ca/Ce/instability) |
+| 📸 **Snapshots & Diff** | Save graph state before refactors, diff after to verify structural changes |
+| 🌐 **Graph Export** | Interactive browser dashboard with search, clustering, path finding, and analytics |
+| <h4>Semantic Search</h4> | |
+| ⚡ **7 Semantic Engines** | Cosine, sqlite-vec, Orama, PGlite, LanceDB, Qdrant, Typesense — pick the best fit for your project |
+| 🤖 **Custom Embedding Models** | Use any HuggingFace `feature-extraction` model — nomic, Gemma, MiniLM, BGE, or bring your own |
+| <h4>Knowledge & Data</h4> | |
+| 🧠 **Persistent Memory** | Cross-session observations — decisions, errors, patterns — auto-linked to code symbols |
+| 📖 **Documentation Indexing** | Section-level retrieval from Markdown, MDX, RST, AsciiDoc, OpenAPI — 92-97% token savings |
+| 📊 **Data Navigation** | Query CSV/JSON/Excel/Parquet with filters, aggregations, joins — all server-side in SQLite |
+| <h4>Token Optimization</h4> | |
+| 🗜️ **Shell Compression** | Token-optimized command output (git, tests, linters, docker, AWS) — 60-90% savings |
+| 🪨 **Caveman Mode** 🪨 | Agent prose compression (lite → ultra) — fewer tokens on explanations without touching code |
+| 📈 **Token Analytics** | Track cumulative savings from graph tools and shell compression over time |
+| <h4>Integration</h4> | |
+| 🔌 **Multi-tool Support** | Native Kiro integration + experimental Claude Code and Codex targets |
+>>>>>>> main
 
 ## Quick Start
 
 ```bash
-# In your project:
-kirograph install                  # wire up Kiro MCP + hooks + steering + CLI agent
+kirograph install        # wire up Kiro MCP + hooks + steering + CLI agent
 ```
-
-All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch to the `kirograph` agent in Kiro CLI. It will now use KiroGraph tools automatically.
 
 Or using the short alias:
 
 ```bash
 kg install
 ```
+
+All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch to the `kirograph` agent in Kiro CLI.
+
+## Documentation
+
+📖 **[Full documentation on GitHub Pages](https://davide-desio-eleva.github.io/kirograph/)**
+
+| Page | Description |
+|------|-------------|
+| [Installation](docs/guide/installation.md) | Install from npm or source, uninstall, verify |
+| [How It Works](docs/guide/how-it-works.md) | Indexing layers (structural, semantic, architecture, memory, docs, data) |
+| [Integrations](docs/guide/integrations.md) | Kiro setup, Claude Code, Codex (experimental) |
+| [MCP Tools](docs/guide/mcp-tools.md) | Full reference for all MCP tools |
+| [CLI Reference](docs/guide/cli.md) | All CLI commands with examples |
+| [Configuration](docs/guide/configuration.md) | Config fields, semantic engines, architecture analysis |
+| [Languages & Frameworks](docs/guide/languages.md) | Supported languages, frameworks, and detection |
+| [Changelog](CHANGELOG.md) | Release history |
+| [Contributing](CONTRIBUTING.md) | How to contribute |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Community guidelines |
+| [Security](SECURITY.md) | Security policy |
 
 ## How It Works
 
@@ -246,16 +294,18 @@ kg install
 └───────────────────────────────────────────┘
 ```
 
-A single Kiro hook triggers on `agentStop` and asks the agent to sync the index if any source files were changed during the session. No per-file hooks, no background watcher — zero overhead during active editing.
+## What Gets Indexed?
 
-## Using with Kiro
+KiroGraph uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) to parse your source files into an AST and extract:
 
-`kirograph install` or `kirograph install --target kiro` sets up four things in your Kiro workspace (all coexist, so you can switch between IDE and CLI freely):
+- **Nodes**: functions, methods, classes, interfaces, types, enums, variables, constants, routes, components, and more (24 node kinds total)
+- **Edges**: calls, imports, exports, extends, implements, contains, references, instantiates, overrides, decorates, type_of, returns
 
-### MCP Server (`.kiro/settings/mcp.json`)
+Everything is stored in a local SQLite database (`.kirograph/kirograph.db`). **Nothing leaves your machine.** No API keys. No external services.
 
-Registers the KiroGraph MCP server. Used by both the IDE and the CLI agent:
+## Requirements
 
+<<<<<<< HEAD
 ```json
 {
   "mcpServers": {
@@ -1945,10 +1995,15 @@ Kubernetes, Helm, Docker Compose
 Ansible
 
 Detected frameworks are stored in config and used to improve symbol extraction and resolution.
+=======
+- Node.js >= 18
+- Kiro IDE (fully supported)
+- Other MCP-capable tools (experimental — see [Integrations](docs/guide/integrations.md))
+>>>>>>> main
 
 ## Credits
 
-KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [Colby McHenry](https://www.linkedin.com/in/colby-mchenry/). the original concept of building a semantic code graph for AI coding agents comes from his work.
+KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [Colby McHenry](https://www.linkedin.com/in/colby-mchenry/). The original concept of building a semantic code graph for AI coding agents comes from his work.
 
 ### Inspirations
 
@@ -1958,15 +2013,21 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 
 ### Contributors
 
-- [Alessandro Franceschi](https://www.linkedin.com/in/alessandrofranceschi/). Claude Code and Codex integration, Elixir/Phoenix language and framework support.
-- [Mauro Argo](https://www.linkedin.com/in/argomauro/). original idea for the architecture layer analysis feature.
+- [Alessandro Franceschi](https://www.linkedin.com/in/alessandrofranceschi/) — Claude Code and Codex integration, Elixir/Phoenix language and framework support.
+- [Mauro Argo](https://www.linkedin.com/in/argomauro/) — original idea for the architecture layer analysis feature.
 
-## Requirements
+## Star History
 
-- Node.js >= 18
-- Kiro IDE (fully supported)
-- Other MCP-capable tools (experimental. see [Other Tools](#other-tools-experimental))
+<a href="https://www.star-history.com/?repos=davide-desio-eleva%2Fkirograph&type=date&legend=top-left"><picture><source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=davide-desio-eleva/kirograph&type=date&theme=dark&legend=top-left" /><source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=davide-desio-eleva/kirograph&type=date&legend=top-left" /><img alt="Star History Chart" src="https://api.star-history.com/chart?repos=davide-desio-eleva/kirograph&type=date&legend=top-left" /></picture></a>
 
 ## License
 
-MIT
+[MIT](LICENSE)
+
+| Document | Description |
+|----------|-------------|
+| [License](LICENSE) | MIT License — permissions, conditions, copyright |
+| [Disclaimer](DISCLAIMER.md) | Limitations of use, no professional advice, data handling |
+| [Warranty Disclaimer](WARRANTY.md) | Software provided "as is", no warranties of any kind |
+| [Limitation of Liability](LIABILITY.md) | Exclusion of liability for damages arising from use |
+| [Terms of Use](TERMS.md) | Permitted and prohibited use, user obligations, privacy |
