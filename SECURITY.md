@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.15.x  | ✅ Current release |
-| < 0.15  | ❌ No patches      |
+| 0.17.x  | ✅ Current release |
+| < 0.17  | ❌ No patches      |
 
 ## Reporting a Vulnerability
 
