@@ -14,9 +14,11 @@ import {
   buildInstructionOpts,
   readJson,
   writeJson,
-  printMcpSetup,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  KIROGRAPH_COMMAND,
+  KIROGRAPH_MCP_ARGS,
+  KIROGRAPH_SERVER_NAME,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -41,8 +43,22 @@ function buildAntigravityHooks(): object {
 }
 
 export function installAntigravityEarly(_projectRoot: string): void {
-  // Antigravity IDE MCP is user-scoped at ~/.gemini/antigravity/mcp_config.json.
-  // We print the setup instructions in printNextSteps instead of writing outside the project.
+  // Write MCP config to user-scoped ~/.gemini/antigravity/mcp_config.json
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.gemini', 'antigravity', 'mcp_config.json');
+  ensureDir(path.dirname(mcpPath));
+  const existing = readJson(mcpPath);
+  existing.mcpServers = existing.mcpServers ?? {};
+  if (existing.mcpServers[KIROGRAPH_SERVER_NAME]) {
+    console.log(`  ✓ Antigravity MCP already configured in ${mcpPath}`);
+    return;
+  }
+  existing.mcpServers[KIROGRAPH_SERVER_NAME] = {
+    command: KIROGRAPH_COMMAND,
+    args: KIROGRAPH_MCP_ARGS,
+  };
+  writeJson(mcpPath, existing);
+  console.log(`  ✓ Antigravity MCP server registered in ${mcpPath}`);
 }
 
 export function installAntigravityLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -75,6 +91,19 @@ export function installAntigravityLate(projectRoot: string, cavemanMode?: Cavema
 }
 
 export function uninitAntigravity(projectRoot: string): void {
+  // Remove user-scoped MCP config
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.gemini', 'antigravity', 'mcp_config.json');
+  if (fs.existsSync(mcpPath)) {
+    const config = readJson(mcpPath);
+    if (config.mcpServers?.[KIROGRAPH_SERVER_NAME]) {
+      delete config.mcpServers[KIROGRAPH_SERVER_NAME];
+      if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
+      writeJson(mcpPath, config);
+      console.log(`  ✓ Removed kirograph from ${mcpPath}`);
+    }
+  }
+
   const geminiPath = path.join(projectRoot, 'GEMINI.md');
   if (removeGeneratedBlock(geminiPath, ANTIGRAVITY_BLOCK_ID)) {
     console.log(`  ✓ Removed KiroGraph block from GEMINI.md`);
@@ -92,8 +121,11 @@ export function uninitAntigravity(projectRoot: string): void {
   }
 }
 
-export function printAntigravityNextSteps(projectRoot: string): void {
-  console.log('\n  Done! KiroGraph instructions are in GEMINI.md.');
-  console.log('  Auto-sync hook installed in .agents/hooks.json');
-  printMcpSetup('~/.gemini/antigravity/mcp_config.json', projectRoot);
+export function printAntigravityNextSteps(_projectRoot: string): void {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.gemini', 'antigravity', 'mcp_config.json');
+  console.log('\n  Done! Restart Antigravity for the MCP server to load.');
+  console.log(`  MCP registered in ${mcpPath}`);
+  console.log('  KiroGraph instructions are in GEMINI.md');
+  console.log('  Auto-sync hook installed in .agents/hooks.json\n');
 }

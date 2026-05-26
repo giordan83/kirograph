@@ -76,17 +76,7 @@ export const iflowCli = makeGenericInstaller({
   label: 'iFlow CLI',
 });
 
-export const qwenCode = makeGenericInstaller({
-  id: 'qwen',
-  label: 'Qwen Code',
-});
-
 export const rovoDev = makeGenericInstaller({
   id: 'rovo',
   label: 'Atlassian Rovo Dev',
-});
-
-export const qoder = makeGenericInstaller({
-  id: 'qoder',
-  label: 'Qoder',
 });

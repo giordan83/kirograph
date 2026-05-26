@@ -12,16 +12,34 @@ import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
-  printMcpSetup,
+  readJson,
+  writeJson,
+  KIROGRAPH_COMMAND,
+  KIROGRAPH_MCP_ARGS,
+  KIROGRAPH_SERVER_NAME,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
 const CLINE_RULES_FILE = 'kirograph.md';
 const CLINE_HOOK_SCRIPT = '#!/bin/sh\nkirograph sync --quiet 2>/dev/null || true\n';
 
-export function installClineEarly(_projectRoot: string): void {
-  // Cline MCP is user-scoped at ~/.cline/mcp.json.
-  // We print the setup instructions in printNextSteps.
+export function installClineEarly(projectRoot: string): void {
+  // Write MCP config to workspace-level .cline/mcp_settings.json
+  const mcpPath = path.join(projectRoot, '.cline', 'mcp_settings.json');
+  ensureDir(path.dirname(mcpPath));
+  const existing = readJson(mcpPath);
+  existing.mcpServers = existing.mcpServers ?? {};
+  if (existing.mcpServers[KIROGRAPH_SERVER_NAME]) {
+    console.log(`  ✓ Cline MCP already configured in ${mcpPath}`);
+    return;
+  }
+  existing.mcpServers[KIROGRAPH_SERVER_NAME] = {
+    command: KIROGRAPH_COMMAND,
+    args: KIROGRAPH_MCP_ARGS,
+    disabled: false,
+  };
+  writeJson(mcpPath, existing);
+  console.log(`  ✓ Cline MCP server registered in ${mcpPath}`);
 }
 
 export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -52,6 +70,18 @@ export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode 
 }
 
 export function uninitCline(projectRoot: string): void {
+  // Remove MCP entry
+  const mcpPath = path.join(projectRoot, '.cline', 'mcp_settings.json');
+  if (fs.existsSync(mcpPath)) {
+    const config = readJson(mcpPath);
+    if (config.mcpServers?.[KIROGRAPH_SERVER_NAME]) {
+      delete config.mcpServers[KIROGRAPH_SERVER_NAME];
+      if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
+      writeJson(mcpPath, config);
+      console.log(`  ✓ Removed kirograph from .cline/mcp_settings.json`);
+    }
+  }
+
   // Remove rule file
   const rulePath = path.join(projectRoot, '.clinerules', CLINE_RULES_FILE);
   if (fs.existsSync(rulePath)) {
@@ -70,7 +100,8 @@ export function uninitCline(projectRoot: string): void {
   }
 }
 
-export function printClineNextSteps(projectRoot: string): void {
-  console.log('\n  Done! KiroGraph rule and hook are in .clinerules/');
-  printMcpSetup('~/.cline/mcp.json', projectRoot);
+export function printClineNextSteps(_projectRoot: string): void {
+  console.log('\n  Done! Restart Cline for the MCP server to load.');
+  console.log('  MCP registered in .cline/mcp_settings.json');
+  console.log('  KiroGraph rule and hook are in .clinerules/\n');
 }

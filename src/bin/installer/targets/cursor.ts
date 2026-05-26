@@ -34,11 +34,13 @@ function buildCursorHooks(enableCompression?: boolean): object {
 
 export function installCursorEarly(projectRoot: string): void {
   const mcpPath = path.join(projectRoot, '.cursor', 'mcp.json');
-  writeMcpServersConfig(mcpPath, {
+  const written = writeMcpServersConfig(mcpPath, {
     command: KIROGRAPH_COMMAND,
     args: KIROGRAPH_MCP_ARGS,
   });
-  console.log(`  ✓ Cursor MCP server registered in ${mcpPath}`);
+  console.log(written
+    ? `  ✓ Cursor MCP server registered in ${mcpPath}`
+    : `  ✓ Cursor MCP already configured in ${mcpPath}`);
 }
 
 export function installCursorLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {

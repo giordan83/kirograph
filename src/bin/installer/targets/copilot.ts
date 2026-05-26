@@ -8,6 +8,7 @@ import {
   writeJson,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
+  KIROGRAPH_SERVER_NAME,
   removeMcpServersConfig,
   upsertGeneratedBlock,
   removeGeneratedBlock,
@@ -28,12 +29,32 @@ function buildCopilotHooks(): object {
 }
 
 export function installCopilotEarly(projectRoot: string): void {
-  const mcpPath = path.join(projectRoot, '.github', 'copilot-mcp.json');
-  writeMcpServersConfig(mcpPath, {
+  // VS Code Copilot Chat format: .vscode/mcp.json with "servers" key
+  const vscodeMcpPath = path.join(projectRoot, '.vscode', 'mcp.json');
+  ensureDir(path.dirname(vscodeMcpPath));
+  const vscodeConfig = readJson(vscodeMcpPath);
+  vscodeConfig.servers = vscodeConfig.servers ?? {};
+  if (!vscodeConfig.servers[KIROGRAPH_SERVER_NAME]) {
+    vscodeConfig.servers[KIROGRAPH_SERVER_NAME] = {
+      type: 'stdio',
+      command: KIROGRAPH_COMMAND,
+      args: KIROGRAPH_MCP_ARGS,
+    };
+    writeJson(vscodeMcpPath, vscodeConfig);
+    console.log(`  ✓ Copilot MCP registered in ${vscodeMcpPath}`);
+  } else {
+    console.log(`  ✓ Copilot MCP already configured in ${vscodeMcpPath}`);
+  }
+
+  // GitHub Copilot agent mode format: .github/copilot-mcp.json with "mcpServers" key
+  const ghMcpPath = path.join(projectRoot, '.github', 'copilot-mcp.json');
+  const ghWritten = writeMcpServersConfig(ghMcpPath, {
     command: KIROGRAPH_COMMAND,
     args: KIROGRAPH_MCP_ARGS,
   });
-  console.log(`  ✓ GitHub Copilot MCP server registered in ${mcpPath}`);
+  console.log(ghWritten
+    ? `  ✓ Copilot MCP registered in ${ghMcpPath}`
+    : `  ✓ Copilot MCP already configured in ${ghMcpPath}`);
 }
 
 export function installCopilotLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -69,6 +90,19 @@ export function installCopilotLate(projectRoot: string, cavemanMode?: CavemanMod
 }
 
 export function uninitCopilot(projectRoot: string): void {
+  // Remove from .vscode/mcp.json (servers key)
+  const vscodeMcpPath = path.join(projectRoot, '.vscode', 'mcp.json');
+  if (fs.existsSync(vscodeMcpPath)) {
+    const config = readJson(vscodeMcpPath);
+    if (config.servers?.[KIROGRAPH_SERVER_NAME]) {
+      delete config.servers[KIROGRAPH_SERVER_NAME];
+      if (Object.keys(config.servers).length === 0) delete config.servers;
+      writeJson(vscodeMcpPath, config);
+      console.log(`  ✓ Removed kirograph from .vscode/mcp.json`);
+    }
+  }
+
+  // Remove from .github/copilot-mcp.json
   const mcpPath = path.join(projectRoot, '.github', 'copilot-mcp.json');
   if (removeMcpServersConfig(mcpPath)) {
     console.log(`  ✓ Removed kirograph from .github/copilot-mcp.json`);
@@ -101,5 +135,6 @@ export function uninitCopilot(projectRoot: string): void {
 
 export function printCopilotNextSteps(): void {
   console.log('\n  Done! Restart your editor for the Copilot MCP server and hooks to load.');
+  console.log('  MCP registered in .vscode/mcp.json and .github/copilot-mcp.json');
   console.log('  Auto-sync hook runs on session end.\n');
 }

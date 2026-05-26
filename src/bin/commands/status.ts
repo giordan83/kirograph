@@ -6,9 +6,16 @@ export function register(program: Command): void {
   program
     .command('status [projectPath]')
     .description('Show index statistics')
-    .action(async (projectPath: string | undefined) => {
-      const KiroGraph = (await import('../../index')).default;
+    .option('--integrations', 'Show detected and configured platforms')
+    .action(async (projectPath: string | undefined, opts: { integrations?: boolean }) => {
       const target = path.resolve(projectPath ?? process.cwd());
+
+      if (opts.integrations) {
+        await showIntegrations(target);
+        return;
+      }
+
+      const KiroGraph = (await import('../../index')).default;
       const cg = await KiroGraph.open(target);
       const stats = await cg.getStats();
 
@@ -84,4 +91,82 @@ export function register(program: Command): void {
       console.log();
       cg.close();
     });
+}
+
+async function showIntegrations(projectRoot: string): Promise<void> {
+  const fs = await import('fs');
+  const { detectPlatforms } = await import('../installer/detect');
+  const { readJson, KIROGRAPH_SERVER_NAME } = await import('../installer/common');
+
+  const detected = detectPlatforms(projectRoot);
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+
+  // Map of target → config path to check if kirograph is configured
+  const configChecks: Record<string, { path: string; key: string }> = {
+    'kiro': { path: path.join(projectRoot, '.kiro', 'settings', 'mcp.json'), key: 'mcpServers' },
+    'claude': { path: path.join(projectRoot, '.mcp.json'), key: 'mcpServers' },
+    'cursor': { path: path.join(projectRoot, '.cursor', 'mcp.json'), key: 'mcpServers' },
+    'windsurf': { path: path.join(home, '.codeium', 'windsurf', 'mcp_config.json'), key: 'mcpServers' },
+    'codex': { path: path.join(projectRoot, '.codex', 'hooks.json'), key: 'hooks' },
+    'copilot': { path: path.join(projectRoot, '.vscode', 'mcp.json'), key: 'servers' },
+    'copilot-cli': { path: path.join(home, '.copilot', 'mcp-config.json'), key: 'servers' },
+    'gemini-cli': { path: path.join(projectRoot, '.gemini', 'settings.json'), key: 'mcpServers' },
+    'continue': { path: path.join(projectRoot, '.continue', 'mcpServers', 'kirograph.json'), key: 'mcpServers' },
+    'opencode': { path: path.join(projectRoot, '.opencode.json'), key: 'mcp' },
+    'antigravity': { path: path.join(home, '.gemini', 'antigravity', 'mcp_config.json'), key: 'mcpServers' },
+    'roo': { path: path.join(projectRoot, '.roo', 'mcp.json'), key: 'mcpServers' },
+    'warp': { path: path.join(projectRoot, '.warp', '.mcp.json'), key: 'mcpServers' },
+    'trae': { path: path.join(projectRoot, '.trae', 'mcp.json'), key: 'mcpServers' },
+    'amp': { path: path.join(projectRoot, '.amp', 'config.json'), key: 'mcpServers' },
+    'cline': { path: path.join(projectRoot, '.cline', 'mcp_settings.json'), key: 'mcpServers' },
+    'qoder': { path: path.join(projectRoot, '.qoder', 'mcp.json'), key: 'mcpServers' },
+    'qwen': { path: path.join(home, '.qwen', 'settings.json'), key: 'mcpServers' },
+  };
+
+  function isConfigured(target: string): boolean {
+    const check = configChecks[target];
+    if (!check) return false;
+    if (!fs.existsSync(check.path)) return false;
+    const config = readJson(check.path);
+    const container = config[check.key];
+    if (!container) return false;
+    if (typeof container === 'object' && !Array.isArray(container)) {
+      return KIROGRAPH_SERVER_NAME in container;
+    }
+    return false;
+  }
+
+  const configured = detected.filter(d => isConfigured(d.target));
+  const notConfigured = detected.filter(d => !isConfigured(d.target));
+
+  console.log();
+  console.log(section('  Integrations'));
+  console.log();
+
+  if (configured.length > 0) {
+    console.log(`  ${label('Configured:')}`);
+    for (const d of configured) {
+      const check = configChecks[d.target];
+      const configPath = check ? check.path.replace(projectRoot, '.').replace(home, '~') : '';
+      console.log(`    ${green}✓${reset} ${d.label.padEnd(20)} ${dim}${configPath}${reset}`);
+    }
+  }
+
+  if (notConfigured.length > 0) {
+    if (configured.length > 0) console.log();
+    console.log(`  ${label('Detected but not configured:')}`);
+    for (const d of notConfigured) {
+      const check = configChecks[d.target];
+      const configPath = check ? check.path.replace(projectRoot, '.').replace(home, '~') : '';
+      console.log(`    ${dim}○${reset} ${d.label.padEnd(20)} ${dim}${configPath}${reset}`);
+    }
+    console.log();
+    console.log(`  ${dim}Run \`kirograph install\` to configure detected platforms.${reset}`);
+  }
+
+  if (detected.length === 0) {
+    console.log(`  ${dim}No AI coding platforms detected.${reset}`);
+  }
+
+  console.log();
 }

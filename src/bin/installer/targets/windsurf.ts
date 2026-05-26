@@ -15,6 +15,9 @@ import {
   readJson,
   writeJson,
   printMcpSetup,
+  KIROGRAPH_COMMAND,
+  KIROGRAPH_MCP_ARGS,
+  KIROGRAPH_SERVER_NAME,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -41,8 +44,22 @@ function buildWindsurfRule(instructions: string): string {
 }
 
 export function installWindsurfEarly(_projectRoot: string): void {
-  // Windsurf MCP is user-scoped at ~/.codeium/windsurf/mcp_config.json.
-  // We print the setup instructions in printNextSteps.
+  // Write MCP config to user-scoped ~/.codeium/windsurf/mcp_config.json
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.codeium', 'windsurf', 'mcp_config.json');
+  ensureDir(path.dirname(mcpPath));
+  const existing = readJson(mcpPath);
+  existing.mcpServers = existing.mcpServers ?? {};
+  if (existing.mcpServers[KIROGRAPH_SERVER_NAME]) {
+    console.log(`  ✓ Windsurf MCP already configured in ${mcpPath}`);
+    return;
+  }
+  existing.mcpServers[KIROGRAPH_SERVER_NAME] = {
+    command: KIROGRAPH_COMMAND,
+    args: KIROGRAPH_MCP_ARGS,
+  };
+  writeJson(mcpPath, existing);
+  console.log(`  ✓ Windsurf MCP server registered in ${mcpPath}`);
 }
 
 export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
@@ -88,6 +105,19 @@ export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMo
 }
 
 export function uninitWindsurf(projectRoot: string): void {
+  // Remove user-scoped MCP config
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.codeium', 'windsurf', 'mcp_config.json');
+  if (fs.existsSync(mcpPath)) {
+    const config = readJson(mcpPath);
+    if (config.mcpServers?.[KIROGRAPH_SERVER_NAME]) {
+      delete config.mcpServers[KIROGRAPH_SERVER_NAME];
+      if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
+      writeJson(mcpPath, config);
+      console.log(`  ✓ Removed kirograph from ${mcpPath}`);
+    }
+  }
+
   // Remove rule file
   const rulePath = path.join(projectRoot, '.windsurf', 'rules', WINDSURF_RULES_FILE);
   if (fs.existsSync(rulePath)) {
@@ -126,8 +156,11 @@ export function uninitWindsurf(projectRoot: string): void {
   }
 }
 
-export function printWindsurfNextSteps(projectRoot: string): void {
-  console.log('\n  Done! KiroGraph rule is in .windsurf/rules/kirograph.md');
-  console.log('  Auto-sync hook is in .windsurf/hooks.json');
-  printMcpSetup('~/.codeium/windsurf/mcp_config.json', projectRoot);
+export function printWindsurfNextSteps(_projectRoot: string): void {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const mcpPath = path.join(home, '.codeium', 'windsurf', 'mcp_config.json');
+  console.log('\n  Done! Restart Windsurf for the MCP server and hooks to load.');
+  console.log(`  MCP registered in ${mcpPath}`);
+  console.log('  Rule is in .windsurf/rules/kirograph.md');
+  console.log('  Auto-sync hook is in .windsurf/hooks.json\n');
 }

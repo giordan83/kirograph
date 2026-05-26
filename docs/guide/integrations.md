@@ -83,13 +83,14 @@ KiroGraph can be installed for any MCP-capable coding agent. All targets share t
 kirograph install --target <name>
 ```
 
-### Supported Targets (33)
+### Supported Targets (34)
 
 | Tool | Target | MCP Config | Instructions | Hooks | Pattern |
 |------|--------|-----------|--------------|-------|---------|
 | 🎯 **Kiro** *(primary)* | `kiro` | `.kiro/settings/mcp.json` | Steering + CLI agent | ✅ sync + hint + memory | Full |
 | Cursor | `cursor` | `.cursor/mcp.json` | `.cursor/rules/kirograph.mdc` | ✅ sync on stop | A |
 | GitHub Copilot | `copilot` | `.github/copilot-mcp.json` | `.github/copilot-instructions.md` | ✅ sync on session-end | A |
+| GitHub Copilot CLI | `copilot-cli` | `~/.copilot/mcp-config.json` | `AGENTS.md` | — | D |
 | Roo Code | `roo` | `.roo/mcp.json` | `.roo/rules/kirograph.md` | — | A |
 | JetBrains Junie | `junie` | `.junie/mcp/mcp.json` | `.junie/AGENTS.md` | — | A |
 | Continue | `continue` | `.continue/mcpServers/kirograph.json` | `.continue/rules/kirograph.md` | — | A |
@@ -156,8 +157,22 @@ For tools **without** a hook system (22 targets), the generated instructions inc
 You can install multiple targets in the same project. They all share the same `.kirograph/` graph data:
 
 ```bash
-kirograph install                      # Kiro (primary)
-kirograph install --target cursor      # also Cursor
-kirograph install --target claude      # also Claude Code
-kirograph install --target copilot     # also GitHub Copilot
+kirograph install                      # Auto-detect all platforms and configure them
+kirograph install --all                # Same, but skip the confirmation prompt
+kirograph install --target cursor      # Install for a specific platform only
+kirograph install --target copilot     # Install for another specific platform
+```
+
+When run without `--target`, KiroGraph auto-detects which AI coding tools are installed by checking for known config directories and CLI binaries, then offers to configure them all:
+
+```
+$ kirograph install
+
+  Detected platforms:
+
+    ✓ Kiro                 (.kiro/ found in project)
+    ✓ Claude Code          (claude binary on PATH)
+    ✓ Cursor               (.cursor/ found in project)
+
+  Install KiroGraph for all 3 detected platform(s)? [Y/n]
 ```

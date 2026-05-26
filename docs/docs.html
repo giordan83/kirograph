@@ -104,7 +104,8 @@
     <p>This tight integration is why Kiro is the primary and fully supported target. The hooks, steering, and agent config are all Kiro-native concepts that make the experience seamless.</p>
 
     <h3>Scope and other tools</h3>
-    <p>The core of KiroGraph (the graph database, tree-sitter parsing, MCP server, and CLI) is tool-agnostic. Any MCP-capable client can query the same graph. Experimental integrations for 32 other tools are available via <code>kirograph install --target &lt;name&gt;</code>, but they lack the automatic sync hooks and steering that make the Kiro experience seamless. See <a href="#other-tools">Other Tools</a> for the full list.</p>
+    <p>The core of KiroGraph (the graph database, tree-sitter parsing, MCP server, and CLI) is tool-agnostic. Any MCP-capable client can query the same graph. Experimental integrations for 33 other tools are available via <code>kirograph install --target &lt;name&gt;</code>, but they lack the automatic sync hooks and steering that make the Kiro experience seamless. See <a href="#other-tools">Other Tools</a> for the full list.</p>
+    <p>When run without <code>--target</code>, <code>kirograph install</code> auto-detects which AI coding tools are installed on your system and offers to configure them all in one pass.</p>
     <p>Issues and PRs for non-Kiro targets are welcome, but there is no guarantee they will be supported or merged without active help from the contributor. The project's development focus remains on the Kiro integration.</p>
 
     <!-- ── Installation ── -->
@@ -140,9 +141,11 @@ cd kirograph && npm uninstall -g .</code></pre>
 
     <p>Run this inside any project you want to index:</p>
 
-    <pre><code>kirograph install    # interactive setup: wires MCP + hooks + steering + CLI agent</code></pre>
+    <pre><code>kirograph install              # auto-detects platforms, interactive setup
+kirograph install --all        # auto-detect + install all without prompting
+kirograph install --target kiro   # install for a specific platform only</code></pre>
 
-    <p>The installer prompts you for:</p>
+    <p>Without <code>--target</code>, the installer auto-detects which AI coding tools are installed (Kiro, Cursor, Claude Code, Windsurf, etc.) and offers to configure them all. Then it prompts you for:</p>
     <ul>
       <li>Whether to enable embeddings (semantic search)</li>
       <li>Embedding model and semantic engine</li>
@@ -528,9 +531,9 @@ cd kirograph && npm uninstall -g .</code></pre>
 
     <h3 id="multiple-targets">Multiple Targets</h3>
     <p>You can install multiple targets in the same project. They all share the same <code>.kirograph/</code> graph data. Multiple targets can write to <code>AGENTS.md</code> simultaneously using unique block IDs.</p>
-    <pre><code>kirograph install                      # Kiro (primary)
-kirograph install --target cursor      # also Cursor
-kirograph install --target claude      # also Claude Code</code></pre>
+    <pre><code>kirograph install                      # Auto-detect all platforms
+kirograph install --all                # Same, skip confirmation prompt
+kirograph install --target cursor      # Install for a specific platform only</code></pre>
 
     <!-- ── Configuration ── -->
     <h2 id="configuration">Configuration</h2>

@@ -13,11 +13,13 @@ import { buildInstructionOpts } from '../common';
 
 export function installTraeEarly(projectRoot: string): void {
   const mcpPath = path.join(projectRoot, '.trae', 'mcp.json');
-  writeMcpServersConfig(mcpPath, {
+  const written = writeMcpServersConfig(mcpPath, {
     command: KIROGRAPH_COMMAND,
     args: KIROGRAPH_MCP_ARGS,
   });
-  console.log(`  ✓ Trae MCP server registered in ${mcpPath}`);
+  console.log(written
+    ? `  ✓ Trae MCP server registered in ${mcpPath}`
+    : `  ✓ Trae MCP already configured in ${mcpPath}`);
 }
 
 export function installTraeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {

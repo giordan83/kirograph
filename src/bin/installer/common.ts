@@ -4,7 +4,7 @@ import { KIROGRAPH_TOOL_NAMES } from '../../mcp/tool-names';
 import type { InstructionOptions } from './instructions';
 import type { CavemanMode } from './caveman';
 
-export type InstallTarget = 'kiro' | 'claude' | 'codex' | 'cursor' | 'antigravity' | 'opencode' | 'windsurf' | 'cline' | 'copilot' | 'junie' | 'gemini-cli' | 'continue' | 'roo' | 'warp' | 'aider' | 'trae' | 'augment' | 'kilo' | 'amp' | 'devin' | 'replit' | 'goose' | 'openhands' | 'tabnine' | 'mistral-vibe' | 'ibm-bob' | 'crush' | 'droid-factory' | 'forgecode' | 'iflow' | 'qwen' | 'rovo' | 'qoder';
+export type InstallTarget = 'kiro' | 'claude' | 'codex' | 'cursor' | 'antigravity' | 'opencode' | 'windsurf' | 'cline' | 'copilot' | 'copilot-cli' | 'junie' | 'gemini-cli' | 'continue' | 'roo' | 'warp' | 'aider' | 'trae' | 'augment' | 'kilo' | 'amp' | 'devin' | 'replit' | 'goose' | 'openhands' | 'tabnine' | 'mistral-vibe' | 'ibm-bob' | 'crush' | 'droid-factory' | 'forgecode' | 'iflow' | 'qwen' | 'rovo' | 'qoder';
 
 export const KIROGRAPH_SERVER_NAME = 'kirograph';
 export const KIROGRAPH_COMMAND = 'kirograph';
@@ -25,12 +25,20 @@ export function writeJson(p: string, data: unknown): void {
   fs.writeFileSync(p, JSON.stringify(data, null, 2) + '\n');
 }
 
-export function writeMcpServersConfig(configPath: string, serverConfig: object): void {
+/**
+ * Write MCP server config to a JSON file under the mcpServers key.
+ * Returns true if the config was written, false if already configured (idempotent).
+ */
+export function writeMcpServersConfig(configPath: string, serverConfig: object): boolean {
   ensureDir(path.dirname(configPath));
   const existing = readJson(configPath);
   existing.mcpServers = existing.mcpServers ?? {};
+  if (existing.mcpServers[KIROGRAPH_SERVER_NAME]) {
+    return false; // Already configured
+  }
   existing.mcpServers[KIROGRAPH_SERVER_NAME] = serverConfig;
   writeJson(configPath, existing);
+  return true;
 }
 
 export function removeMcpServersConfig(configPath: string): boolean {

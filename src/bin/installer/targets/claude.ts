@@ -29,11 +29,13 @@ function buildClaudeHooks(): object {
 
 export function installClaudeEarly(projectRoot: string): void {
   const mcpPath = path.join(projectRoot, '.mcp.json');
-  writeMcpServersConfig(mcpPath, {
+  const written = writeMcpServersConfig(mcpPath, {
     command: KIROGRAPH_COMMAND,
     args: KIROGRAPH_MCP_ARGS,
   });
-  console.log(`  ✓ Claude MCP server registered in ${mcpPath}`);
+  console.log(written
+    ? `  ✓ Claude MCP server registered in ${mcpPath}`
+    : `  ✓ Claude MCP already configured in ${mcpPath}`);
 }
 
 export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {

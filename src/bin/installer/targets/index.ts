@@ -9,6 +9,7 @@ import { installOpenCodeEarly, installOpenCodeLate, printOpenCodeNextSteps, unin
 import { installWindsurfEarly, installWindsurfLate, printWindsurfNextSteps, uninitWindsurf } from './windsurf';
 import { installClineEarly, installClineLate, printClineNextSteps, uninitCline } from './cline';
 import { installCopilotEarly, installCopilotLate, printCopilotNextSteps, uninitCopilot } from './copilot';
+import { installCopilotCliEarly, installCopilotCliLate, printCopilotCliNextSteps, uninitCopilotCli } from './copilot-cli';
 import { installJunieEarly, installJunieLate, printJunieNextSteps, uninitJunie } from './junie';
 import { installGeminiCliEarly, installGeminiCliLate, printGeminiCliNextSteps, uninitGeminiCli } from './gemini-cli';
 import { installContinueEarly, installContinueLate, printContinueNextSteps, uninitContinue } from './continue';
@@ -24,7 +25,9 @@ import { installReplitEarly, installReplitLate, printReplitNextSteps, uninitRepl
 import { installGooseEarly, installGooseLate, printGooseNextSteps, uninitGoose } from './goose';
 import { installOpenHandsEarly, installOpenHandsLate, printOpenHandsNextSteps, uninitOpenHands } from './openhands';
 import { installTabnineEarly, installTabnineLate, printTabnineNextSteps, uninitTabnine } from './tabnine';
-import { mistralVibe, ibmBob, crush, droidFactory, forgeCode, iflowCli, qwenCode, rovoDev, qoder } from './generic';
+import { mistralVibe, ibmBob, crush, droidFactory, forgeCode, iflowCli, rovoDev } from './generic';
+import { installQoderEarly, installQoderLate, printQoderNextSteps, uninitQoder } from './qoder';
+import { installQwenEarly, installQwenLate, printQwenNextSteps, uninitQwen } from './qwen';
 
 export interface TargetInstaller {
   label: string;
@@ -112,6 +115,16 @@ export function getTargetInstaller(target: InstallTarget): TargetInstaller {
       installLate: installCopilotLate,
       printNextSteps: printCopilotNextSteps,
       uninit: uninitCopilot,
+    };
+  }
+
+  if (target === 'copilot-cli') {
+    return {
+      label: 'GitHub Copilot CLI',
+      installEarly: installCopilotCliEarly,
+      installLate: installCopilotCliLate,
+      printNextSteps: printCopilotCliNextSteps,
+      uninit: uninitCopilotCli,
     };
   }
 
@@ -284,13 +297,13 @@ export function getTargetInstaller(target: InstallTarget): TargetInstaller {
     return { label: 'iFlow CLI', installEarly: iflowCli.installEarly, installLate: iflowCli.installLate, printNextSteps: iflowCli.printNextSteps, uninit: iflowCli.uninit };
   }
   if (target === 'qwen') {
-    return { label: 'Qwen Code', installEarly: qwenCode.installEarly, installLate: qwenCode.installLate, printNextSteps: qwenCode.printNextSteps, uninit: qwenCode.uninit };
+    return { label: 'Qwen Code', installEarly: installQwenEarly, installLate: installQwenLate, printNextSteps: printQwenNextSteps, uninit: uninitQwen };
   }
   if (target === 'rovo') {
     return { label: 'Atlassian Rovo Dev', installEarly: rovoDev.installEarly, installLate: rovoDev.installLate, printNextSteps: rovoDev.printNextSteps, uninit: rovoDev.uninit };
   }
   if (target === 'qoder') {
-    return { label: 'Qoder', installEarly: qoder.installEarly, installLate: qoder.installLate, printNextSteps: qoder.printNextSteps, uninit: qoder.uninit };
+    return { label: 'Qoder', installEarly: installQoderEarly, installLate: installQoderLate, printNextSteps: printQoderNextSteps, uninit: uninitQoder };
   }
 
   return {
