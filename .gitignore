@@ -21,3 +21,6 @@ package-lock.json
 
 # qdrant
 .qdrant-initialized
+
+# benchmark
+benchmark

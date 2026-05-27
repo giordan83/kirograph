@@ -8,7 +8,7 @@ Semantic code knowledge graph for [Kiro](https://kiro.dev): fewer tool calls, in
 
 Inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) by [colbymchenry](https://github.com/colbymchenry) for Claude Code, rebuilt natively for Kiro's MCP and hooks system.
 
-> **Full support is for Kiro only.** Experimental integrations for other MCP-capable tools (Claude Code, Codex) are available but not fully tested. See [Integrations](docs/guide/integrations.md) for details.
+> **Full support is for Kiro only.** Experimental integrations for 34 other MCP-capable tools (Cursor, Copilot, Claude Code, Windsurf, Cline, and more) are available with auto-detection. See [Integrations](docs/guide/integrations.md) for the full list.
 
 ## Why KiroGraph?
 
@@ -71,7 +71,8 @@ All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch 
 |------|-------------|
 | [Installation](docs/guide/installation.md) | Install from npm or source, uninstall, verify |
 | [How It Works](docs/guide/how-it-works.md) | Indexing layers (structural, semantic, architecture, memory, docs, data) |
-| [Integrations](docs/guide/integrations.md) | Kiro setup, Claude Code, Codex (experimental) |
+| [Integrations](docs/guide/integrations.md) | Kiro setup, 34 other tools, auto-detection |
+| [Comparison](docs/guide/comparison.md) | Feature comparison vs CodeGraph, code-review-graph, and others |
 | [MCP Tools](docs/guide/mcp-tools.md) | Full reference for all MCP tools |
 | [CLI Reference](docs/guide/cli.md) | All CLI commands with examples |
 | [Configuration](docs/guide/configuration.md) | Config fields, semantic engines, architecture analysis |
@@ -133,6 +134,21 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 
 - [Alessandro Franceschi](https://www.linkedin.com/in/alessandrofranceschi/) — Claude Code and Codex integration, Elixir/Phoenix language and framework support.
 - [Mauro Argo](https://www.linkedin.com/in/argomauro/) — original idea for the architecture layer analysis feature.
+
+## How It Compares
+
+KiroGraph combines capabilities from 6 separate tools into one integrated MCP server:
+
+| Capability | Inspired by | What KiroGraph adds |
+|-----------|-------------|---------------------|
+| Code graph | [CodeGraph](https://github.com/colbymchenry/codegraph) | Architecture metrics, community detection, execution flows |
+| Memory | [cavemem](https://github.com/JuliusBrussee/cavemem) | Symbol-linked observations, 7 semantic engines |
+| Docs | [jDocMunch-MCP](https://github.com/jgravelle/jdocmunch-mcp) | Code ↔ docs cross-references |
+| Data | [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) | Unified with code graph in one server |
+| Shell compression | [rtk](https://github.com/rtk-ai/rtk) | Integrated as MCP tool, no separate binary |
+| Prose compression | [caveman](https://github.com/JuliusBrussee/caveman) | Multi-level (lite/full/ultra) via steering |
+
+See the [full comparison](docs/guide/comparison.md) for a detailed feature matrix against CodeGraph, code-review-graph, jCodeMunch, and others.
 
 ## Star History
 
