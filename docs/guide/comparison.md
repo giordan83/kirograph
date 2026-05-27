@@ -152,7 +152,7 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-KiroGraph combines the capabilities of 6 separate tools into a single integrated package:
+KiroGraph combines the capabilities of 7 separate tools into a single integrated package:
 
 - **Code graph** layer inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) — tree-sitter parsing, symbol extraction, call graphs, impact analysis
 - **Memory** layer inspired by [cavemem](https://github.com/JuliusBrussee/cavemem) — persistent observations, compressed storage, hook-based capture
@@ -160,10 +160,13 @@ KiroGraph combines the capabilities of 6 separate tools into a single integrated
 - **Data** layer inspired by [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) — tabular data querying, column profiling, server-side computation
 - **Shell compression** inspired by [rtk](https://github.com/rtk-ai/rtk) — token-optimized command output with family-specific filters
 - **Prose compression** inspired by [caveman](https://github.com/JuliusBrussee/caveman) — agent communication compression (lite/full/ultra)
+- **Context layer** inspired by [lean-ctx](https://github.com/yvgude/lean-ctx) — file read caching, multiple read modes, context budget governance
 
 The [jCodeMunch-MCP](https://github.com/jgravelle/jcodemunch-mcp) family (jCodeMunch + jDocMunch + jDataMunch) represents the same "token-efficient retrieval" philosophy applied to three different data types: source code, documentation, and tabular data. KiroGraph unifies all three into a single MCP server with a shared graph database.
 
 [code-review-graph](https://github.com/tirth8205/code-review-graph) is the closest competitor in scope, with its own graph + community detection + refactoring tools + multi-platform support. The main differences are language (Python vs TypeScript), primary target (Claude Code vs Kiro), and KiroGraph's additional documentation/data/memory layers.
+
+[lean-ctx](https://github.com/yvgude/lean-ctx) focuses on the context transport layer (caching, compression, governance). KiroGraph integrates these concepts alongside deep code intelligence — users get both efficient delivery and structural understanding in one tool.
 
 ---
 

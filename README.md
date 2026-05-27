@@ -129,6 +129,8 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 - [cavemem](https://github.com/JuliusBrussee/cavemem) by [Julius Brussee](https://www.linkedin.com/in/julius-brussee/): the memory module's hook-based observation capture, deterministic compression, and SQLite storage pattern.
 - [jDocMunch-MCP](https://github.com/jgravelle/jdocmunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/): the documentation module's section-first retrieval approach, stable section IDs, and byte-offset addressing.
 - [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/): the data module's column profiling, streaming parsers, and server-side aggregation approach.
+- [code-review-graph](https://github.com/tirth8205/code-review-graph) by [Tirth Kanani](https://github.com/tirth8205): community detection, execution flow tracing, refactoring tools, and multi-platform auto-detection patterns.
+- [lean-ctx](https://github.com/yvgude/lean-ctx) by [Yves Gugger](https://github.com/yvgude): file read caching, multiple read modes, and context budget governance concepts.
 
 ### Contributors
 
@@ -137,7 +139,7 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 
 ## How It Compares
 
-KiroGraph combines capabilities from 6 separate tools into one integrated MCP server:
+KiroGraph combines capabilities from 7 separate tools into one integrated MCP server:
 
 | Capability | Inspired by | What KiroGraph adds |
 |-----------|-------------|---------------------|
@@ -147,6 +149,7 @@ KiroGraph combines capabilities from 6 separate tools into one integrated MCP se
 | Data | [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) | Unified with code graph in one server |
 | Shell compression | [rtk](https://github.com/rtk-ai/rtk) | Integrated as MCP tool, no separate binary |
 | Prose compression | [caveman](https://github.com/JuliusBrussee/caveman) | Multi-level (lite/full/ultra) via steering |
+| Context layer | [lean-ctx](https://github.com/yvgude/lean-ctx) | File caching, read modes, budget governance |
 
 See the [full comparison](docs/guide/comparison.md) for a detailed feature matrix against CodeGraph, code-review-graph, jCodeMunch, and others.
 

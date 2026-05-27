@@ -15,6 +15,10 @@
 - **Reproducible benchmarks**: `kirograph benchmark` CLI command clones repos at pinned SHAs, indexes them, runs predefined queries, and measures token efficiency. Results in `benchmarks/results/`.
 - **Copilot CLI target**: New `--target copilot-cli` writes MCP config to `~/.copilot/mcp-config.json` with `servers` key.
 - **`kirograph status --integrations`**: Shows which platforms are configured vs detected-but-not-configured.
+- **iOS/React Native/Expo cross-language bridging**: 7 bridge resolvers synthesize edges across language boundaries — Swift ↔ ObjC, RN Legacy Bridge, TurboModules, Expo Modules, Native Events, Fabric/Paper Views. Enables `kirograph_callers`, `kirograph_impact`, and `kirograph_flows` to trace calls across Swift/ObjC/Java/Kotlin/JS boundaries.
+- **`kirograph_read` MCP tool + CLI**: File read with session caching (re-reads of unchanged files cost ~13 tokens) and 7 read modes: `full`, `map`, `signatures`, `diff`, `lines`, `imports`, `exports`. Map and signatures modes use graph data — no file read needed.
+- **`kirograph_budget` MCP tool + CLI**: Context budget governance — tracks cumulative token consumption per session with configurable limits (`contextBudget` in config). Warns at threshold, throttles at limit.
+- **Temporal facts in memory**: Observations now support `valid_from`, `valid_until`, `superseded_by`, and `fact_type` fields. `kirograph_mem_search` gains `asOf` parameter for temporal queries. Expired/superseded facts are filtered automatically.
 
 ### Fixed
 
