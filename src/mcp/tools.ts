@@ -362,6 +362,38 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'kirograph_read',
+    description: 'Read a file with caching and multiple modes. First read returns full content; subsequent reads of unchanged files return a compact "cached" marker (~13 tokens). Supports modes: full, map, signatures, diff, lines, imports, exports.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path to read (absolute or relative to project root)' },
+        mode: {
+          type: 'string',
+          description: 'Read mode: "full" (default), "map" (structure overview), "signatures" (function signatures), "diff" (changes since last read), "lines" (line range), "imports", "exports"',
+          enum: ['full', 'map', 'signatures', 'diff', 'lines', 'imports', 'exports'],
+          default: 'full',
+        },
+        start: { type: 'number', description: 'Start line (for lines mode)' },
+        end: { type: 'number', description: 'End line (for lines mode)' },
+        noCache: { type: 'boolean', description: 'Force fresh read, bypass cache (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'kirograph_budget',
+    description: 'Show current session context budget usage. Returns tokens consumed, remaining budget, and utilization percentage.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        reset: { type: 'boolean', description: 'Reset session budget counters (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
     name: 'kirograph_flows',
     description: 'Trace execution flows from entry points (routes, handlers, main functions) through the call graph. Returns ordered call chains sorted by criticality.',
     inputSchema: {
@@ -415,6 +447,7 @@ export const tools: ToolDefinition[] = [
         },
         limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
         sessionId: { type: 'string', description: 'Filter to specific session' },
+        asOf: { type: 'number', description: 'Query facts valid at this timestamp (epoch ms). Filters out expired/superseded observations.' },
         projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['query'],
@@ -840,6 +873,87 @@ export class ToolHandler {
           const tag = cmd.source === 'graph' ? '📊' : '⚡';
           lines.push(`  ${tag} ${cmd.command.slice(0, 40)} → ${cmd.savings}% saved`);
         }
+      }
+
+      return lines.join('\n');
+    }
+
+    if (toolName === 'kirograph_read') {
+      const filePath = args.path as string;
+      if (!filePath) return 'Error: path is required.';
+
+      const projectRoot = (args.projectPath as string) || process.cwd();
+      const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(projectRoot, filePath);
+      const mode = (args.mode as string) ?? 'full';
+      const noCache = (args.noCache as boolean) ?? false;
+
+      if (!fs.existsSync(resolvedPath)) {
+        return `Error: File not found: ${resolvedPath}`;
+      }
+
+      const { getFileReadCache } = await import('./cache');
+      const { executeReadMode } = await import('./read-modes');
+      const cache = getFileReadCache();
+
+      // For non-full modes, skip caching logic and use read-modes directly
+      if (mode !== 'full') {
+        // Get graph connection for map/signatures/imports/exports modes
+        let cg: KiroGraph | null = null;
+        try {
+          cg = await this.getConnection(args.projectPath as string | undefined);
+        } catch { /* no graph available */ }
+
+        const result = executeReadMode({
+          mode: mode as any,
+          filePath: resolvedPath,
+          start: args.start as number | undefined,
+          end: args.end as number | undefined,
+          cg,
+        });
+
+        // Update cache with current content for future diff mode
+        cache.read(resolvedPath, true);
+
+        return result.content;
+      }
+
+      // Full mode with caching
+      const result = cache.read(resolvedPath, noCache);
+
+      if (result.cached) {
+        return result.content;
+      }
+
+      if (result.changed) {
+        return `[file changed since last read]\n\n${result.content}`;
+      }
+
+      return result.content;
+    }
+
+    if (toolName === 'kirograph_budget') {
+      const projectRoot = (args.projectPath as string) || process.cwd();
+      const reset = (args.reset as boolean) ?? false;
+
+      const { BudgetTracker } = await import('../compression/tracker');
+      const budget = BudgetTracker.getInstance(projectRoot);
+
+      if (reset) {
+        budget.reset();
+        return 'Context budget counters reset.';
+      }
+
+      const status = budget.getStatus();
+      const lines = [
+        'Context Budget:',
+        `  Tokens consumed: ${status.consumed.toLocaleString()}`,
+        `  Budget limit:    ${status.limit > 0 ? status.limit.toLocaleString() : 'unlimited'}`,
+        `  Remaining:       ${status.limit > 0 ? status.remaining.toLocaleString() : '∞'}`,
+        `  Utilization:     ${status.utilization}%`,
+      ];
+
+      if (status.warning) {
+        lines.push(`\n  ⚠ ${status.warning}`);
       }
 
       return lines.join('\n');
@@ -1734,6 +1848,7 @@ export class ToolHandler {
           limit: (args.limit as number) ?? 10,
           kind: args.kind as any,
           sessionId: args.sessionId as string | undefined,
+          asOf: args.asOf as number | undefined,
         });
 
         if (results.length === 0) return `No memory observations found for "${args.query}".`;

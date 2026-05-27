@@ -41,6 +41,8 @@ import { register as registerBenchmark } from './commands/benchmark';
 import { register as registerFlows } from './commands/flows';
 import { register as registerCommunities } from './commands/communities';
 import { register as registerRefactor } from './commands/refactor';
+import { register as registerRead } from './commands/read';
+import { register as registerBudget } from './commands/budget';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -127,6 +129,8 @@ registerBenchmark(program);
 registerFlows(program);
 registerCommunities(program);
 registerRefactor(program);
+registerRead(program);
+registerBudget(program);
 
 // Show banner + help when called with no arguments, otherwise parse normally
 if (process.argv.length === 2) {

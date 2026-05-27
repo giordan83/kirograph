@@ -19,6 +19,8 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_type_hierarchy',
   'kirograph_exec',
   'kirograph_gain',
+  'kirograph_read',
+  'kirograph_budget',
   'kirograph_flows',
   'kirograph_communities',
   'kirograph_refactor',
