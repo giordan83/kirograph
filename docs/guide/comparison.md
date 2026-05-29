@@ -150,7 +150,7 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 
 | Feature | KiroGraph | CodeGraph | code-review-graph | jCodeMunch | jDocMunch | jDataMunch | caveman | cavemem | rtk | lean-ctx |
 |---------|:---------:|:---------:|:-----------------:|:----------:|:---------:|:----------:|:-------:|:-------:|:---:|:--------:|
-| Languages supported | 24+ | 22 | 30+ | 20+ | N/A | N/A | N/A | N/A | N/A | N/A |
+| Languages supported | 33+ | 22 | 30+ | 20+ | N/A | N/A | N/A | N/A | N/A | N/A |
 | Framework detection | ✅ (26 frameworks) | ✅ (14 frameworks) | — | — | — | — | — | — | — | — |
 | Framework-aware route extraction | ✅ (14+ frameworks) | ✅ (14 frameworks) | — | — | — | — | — | — | — | — |
 | Jupyter notebook support | ✅ | — | ✅ | — | — | — | — | — | — | — |

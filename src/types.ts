@@ -21,6 +21,7 @@ export type Language =
   | 'scala' | 'lua' | 'zig' | 'bash' | 'ocaml' | 'elm' | 'solidity' | 'vue' | 'objc'
   | 'yaml' | 'hcl' | 'css' | 'scss' | 'html'
   | 'jupyter'
+  | 'rescript' | 'sql' | 'r' | 'julia' | 'powershell' | 'perl' | 'astro' | 'gdscript' | 'nix' | 'verilog'
   | 'unknown';
 
 export interface Node {

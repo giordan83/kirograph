@@ -66,6 +66,33 @@ export const EXTENSION_MAP: Record<string, Language> = {
   '.html': 'html',
   '.htm': 'html',
   '.ipynb': 'jupyter',
+  // ReScript
+  '.res': 'rescript',
+  '.resi': 'rescript',
+  // SQL
+  '.sql': 'sql',
+  // R
+  '.r': 'r',
+  '.R': 'r',
+  // Julia
+  '.jl': 'julia',
+  // PowerShell
+  '.ps1': 'powershell',
+  '.psm1': 'powershell',
+  '.psd1': 'powershell',
+  // Perl
+  '.pl': 'perl',
+  '.pm': 'perl',
+  // Astro
+  '.astro': 'astro',
+  // GDScript (Godot)
+  '.gd': 'gdscript',
+  // Nix
+  '.nix': 'nix',
+  // Verilog / SystemVerilog (.v is Verilog, not Vim script)
+  '.v': 'verilog',
+  '.sv': 'verilog',
+  '.svh': 'verilog',
 };
 
 export const GRAMMAR_MAP: Record<Language, string> = {
@@ -106,6 +133,18 @@ export const GRAMMAR_MAP: Record<Language, string> = {
   liquid: '',
   // Jupyter notebooks are parsed via the notebook extractor (Python grammar on extracted code cells)
   jupyter: '',
+  // ReScript: WASM available in tree-sitter-wasms
+  rescript: 'tree-sitter-rescript',
+  // Languages with WASMs TBD — files tracked, symbol extraction pending WASM compilation
+  sql: 'tree-sitter-sql',
+  r: 'tree-sitter-r',
+  julia: 'tree-sitter-julia',
+  powershell: 'tree-sitter-powershell',
+  perl: 'tree-sitter-perl',
+  astro: 'tree-sitter-astro',
+  gdscript: 'tree-sitter-gdscript',
+  nix: 'tree-sitter-nix',
+  verilog: 'tree-sitter-verilog',
   unknown: '',
 };
 

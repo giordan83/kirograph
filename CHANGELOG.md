@@ -57,6 +57,7 @@
   - **Flutter framework resolver** (`src/frameworks/flutter.ts`): route extraction from `MaterialApp(routes: {...})`, `GoRouter`, and `@RoutePage()` AutoRoute annotations.
   - **Flutter Method Channel bridge** (`src/resolution/bridges/flutter-channel.ts`): Dart `invokeMethod('name')` → Kotlin/Java/Swift `setMethodCallHandler`. Channel name string is the linking key. `MethodChannel` call→handler: `calls` at 0.7; `EventChannel` stream→handler: `references` at 0.65.
 - **Android/Kotlin React Native bridge** (`src/resolution/bridges/android-rn.ts`): `@ReactMethod` → JS `NativeModules.Module.method()` call edges, `NativeEventEmitter` binding edges, `@ReactProp` setter → JSX attribute usage edges.
+- **10 new languages**: ReScript (full — WASM in tree-sitter-wasms), SQL, R, Julia, PowerShell, Perl, Astro, GDScript, Nix, Verilog/SystemVerilog (file tracking + node kind handlers ready; WASMs compiled via `scripts/compile-grammars.sh`). KiroGraph now covers 33+ languages, matching or exceeding all compared tools.
 
 ### Fixed
 

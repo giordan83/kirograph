@@ -62,6 +62,12 @@ export const GRAMMAR_FILE_MAP: Record<Language, string> = {
   liquid: '',
   // Jupyter notebooks are parsed via the notebook extractor (Python grammar on extracted code cells)
   jupyter: '',
+  // ReScript: WASM available in tree-sitter-wasms
+  rescript: 'tree-sitter-rescript',
+  // Bundled WASMs — compiled from grammar sources, stored in src/extraction/wasm/
+  // resolveWasmPath handles these via BUNDLED_WASM_LANGS set (no entry needed here)
+  sql: '', r: '', julia: '', powershell: '', perl: '',
+  astro: '', gdscript: '', nix: '', verilog: '',
   unknown: '',
 };
 
@@ -85,21 +91,22 @@ export async function initGrammars(): Promise<void> {
 
 // ── resolveWasmPath ───────────────────────────────────────────────────────────
 
+/** Languages whose WASM is bundled in src/extraction/wasm/ (not from tree-sitter-wasms). */
+const BUNDLED_WASM_LANGS = new Set<Language>([
+  'pascal', 'hcl', 'scss',
+  // Compiled and bundled locally — no npm package with pre-built WASM available
+  'sql', 'r', 'julia', 'powershell', 'perl', 'gdscript', 'nix', 'verilog', 'astro',
+]);
+
 /**
  * Resolves the filesystem path to the WASM file for a given language.
- * Pascal and HCL use bundled wasm files in src/extraction/wasm/.
+ * Languages in BUNDLED_WASM_LANGS use bundled wasm files in src/extraction/wasm/.
  * All others are resolved from the tree-sitter-wasms npm package.
  * Returns null if the file cannot be located.
  */
 function resolveWasmPath(lang: Language): string | null {
-  if (lang === 'pascal') {
-    return path.join(__dirname, 'wasm', 'tree-sitter-pascal.wasm');
-  }
-  if (lang === 'hcl') {
-    return path.join(__dirname, 'wasm', 'tree-sitter-hcl.wasm');
-  }
-  if (lang === 'scss') {
-    return path.join(__dirname, 'wasm', 'tree-sitter-scss.wasm');
+  if (BUNDLED_WASM_LANGS.has(lang)) {
+    return path.join(__dirname, 'wasm', `tree-sitter-${lang}.wasm`);
   }
   const grammarFile = GRAMMAR_FILE_MAP[lang];
   if (!grammarFile) return null;

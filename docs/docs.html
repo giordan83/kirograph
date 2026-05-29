@@ -345,7 +345,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
     <table class="config-table cmp-filterable">
       <thead><tr><th>Feature</th><th>KiroGraph</th><th>CodeGraph</th><th>CRG</th><th>jMunch</th></tr></thead>
       <tbody>
-        <tr><td>Languages supported</td><td>24+</td><td>22</td><td>30+</td><td>20+</td></tr>
+        <tr><td>Languages supported</td><td>33+</td><td>22</td><td>30+</td><td>20+</td></tr>
         <tr><td>Framework detection</td><td>✅ (26)</td><td>✅ (14)</td><td>—</td><td>—</td></tr>
         <tr><td>Route extraction</td><td>✅ (14+)</td><td>✅ (14)</td><td>—</td><td>—</td></tr>
       </tbody>
@@ -404,7 +404,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
     <h3 id="structural-layer">Structural layer</h3>
     <p>tree-sitter parses every source file into an AST. Nodes and edges are extracted and written to <code>.kirograph/kirograph.db</code>. This powers all graph traversal tools and exact/FTS symbol search. No extra dependencies. Runs on every <code>kirograph index</code> or <code>kirograph sync</code>.</p>
 
-    <p>Extracts <strong>24 node kinds</strong>: <code>function</code>, <code>method</code>, <code>class</code>, <code>interface</code>, <code>struct</code>, <code>trait</code>, <code>protocol</code>, <code>enum</code>, <code>type_alias</code>, <code>property</code>, <code>field</code>, <code>variable</code>, <code>constant</code>, <code>enum_member</code>, <code>parameter</code>, <code>import</code>, <code>export</code>, <code>route</code>, <code>component</code>, <code>file</code>, <code>module</code>, <code>namespace</code>, and more.</p>
+    <p>Extracts <strong>26 node kinds</strong>: <code>function</code>, <code>method</code>, <code>class</code>, <code>interface</code>, <code>struct</code>, <code>trait</code>, <code>protocol</code>, <code>enum</code>, <code>type_alias</code>, <code>property</code>, <code>field</code>, <code>variable</code>, <code>constant</code>, <code>enum_member</code>, <code>parameter</code>, <code>import</code>, <code>export</code>, <code>route</code>, <code>component</code>, <code>file</code>, <code>module</code>, <code>namespace</code>, <code>dependency</code>, <code>vulnerability</code>, and more.</p>
 
     <p><strong>13 edge types</strong>: <code>calls</code>, <code>imports</code>, <code>exports</code>, <code>extends</code>, <code>implements</code>, <code>contains</code>, <code>references</code>, <code>instantiates</code>, <code>overrides</code>, <code>decorates</code>, <code>type_of</code>, <code>returns</code>, <code>uses</code>.</p>
 
@@ -479,6 +479,15 @@ kirograph install --target kiro   # install for a specific platform only</code><
           <tr data-tags="ocaml ml functional"><td>OCaml</td><td><code>.ml</code>, <code>.mli</code></td></tr>
           <tr data-tags="elm functional frontend"><td>Elm</td><td><code>.elm</code></td></tr>
           <tr data-tags="objective-c objc ios macos"><td>Objective-C</td><td><code>.m</code></td></tr>
+          <tr data-tags="julia scientific computing"><td>Julia</td><td><code>.jl</code></td></tr>
+          <tr data-tags="r statistics data science"><td>R</td><td><code>.r</code></td></tr>
+          <tr data-tags="perl scripting legacy"><td>Perl</td><td><code>.pl</code>, <code>.pm</code></td></tr>
+          <tr data-tags="powershell ps1 windows devops scripting"><td>PowerShell</td><td><code>.ps1</code>, <code>.psm1</code>, <code>.psd1</code></td></tr>
+          <tr data-tags="sql database query"><td>SQL</td><td><code>.sql</code></td></tr>
+          <tr data-tags="gdscript godot game engine"><td>GDScript</td><td><code>.gd</code></td></tr>
+          <tr data-tags="nix nixos package manager"><td>Nix</td><td><code>.nix</code></td></tr>
+          <tr data-tags="verilog systemverilog hardware hdl"><td>Verilog / SystemVerilog</td><td><code>.v</code>, <code>.sv</code>, <code>.svh</code></td></tr>
+          <tr data-tags="jupyter notebook python data science"><td>Jupyter Notebook</td><td><code>.ipynb</code> (Python cells via tree-sitter)</td></tr>
         </tbody>
       </table>
     </div>
@@ -493,6 +502,8 @@ kirograph install --target kiro   # install for a specific platform only</code><
           <tr data-tags="angular typescript frontend spa"><td>Angular</td><td><code>.ts</code>, <code>.html</code> (via TypeScript/HTML grammars)</td></tr>
           <tr data-tags="svelte sveltekit frontend"><td>Svelte</td><td><code>.svelte</code></td></tr>
           <tr data-tags="vue nuxt frontend"><td>Vue</td><td><code>.vue</code></td></tr>
+          <tr data-tags="astro web framework frontend"><td>Astro</td><td><code>.astro</code></td></tr>
+          <tr data-tags="rescript compile javascript frontend"><td>ReScript</td><td><code>.res</code>, <code>.resi</code></td></tr>
           <tr data-tags="html angular templates"><td>HTML</td><td><code>.html</code>, <code>.htm</code></td></tr>
           <tr data-tags="css styles"><td>CSS</td><td><code>.css</code></td></tr>
           <tr data-tags="scss sass styles css"><td>SCSS / Sass</td><td><code>.scss</code>, <code>.sass</code></td></tr>
@@ -541,6 +552,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
           <tr data-tags="rust"><td>Rust</td><td>Generic Rust resolver</td></tr>
           <tr data-tags="csharp dotnet aspnet"><td>C#</td><td>ASP.NET Core</td></tr>
           <tr data-tags="swift ios macos swiftui uikit vapor"><td>Swift</td><td>SwiftUI, UIKit, Vapor</td></tr>
+          <tr data-tags="dart flutter mobile cross-platform"><td>Dart</td><td>Flutter (layer detection, widget classification as <code>component</code>, route extraction from MaterialApp / GoRouter / AutoRoute, Method Channel bridge)</td></tr>
           <tr data-tags="php laravel"><td>PHP</td><td>Laravel</td></tr>
           <tr data-tags="elixir phoenix"><td>Elixir</td><td>Phoenix</td></tr>
           <tr data-tags="solidity hardhat foundry truffle ethereum web3"><td>Solidity</td><td>Hardhat, Foundry, Truffle (OpenZeppelin patterns)</td></tr>

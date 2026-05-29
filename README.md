@@ -23,7 +23,7 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | Feature | Description |
 |---------|-------------|
 | <h4>Graph & Analysis</h4> | |
-| 🕸️ **Semantic Graph** | tree-sitter AST parsing across 24+ languages — functions, classes, call edges, type hierarchies, all in SQLite |
+| 🕸️ **Semantic Graph** | tree-sitter AST parsing across 33+ languages — functions, classes, call edges, type hierarchies, all in SQLite |
 | 🎯 **Context Building** | One tool call returns entry points, related symbols, and code snippets for any task description |
 | 💥 **Impact Analysis** | Blast-radius traversal before making changes — know what breaks at any depth |
 | 🧬 **Type Hierarchy** | Traverse inheritance chains — base types, derived types, implementations |
@@ -122,7 +122,7 @@ All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch 
 
 KiroGraph uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) to parse your source files into an AST and extract:
 
-- **Nodes**: functions, methods, classes, interfaces, types, enums, variables, constants, routes, components, and more (24 node kinds total)
+- **Nodes**: functions, methods, classes, interfaces, types, enums, variables, constants, routes, components, dependencies, vulnerabilities, and more (26 node kinds total)
 - **Edges**: calls, imports, exports, extends, implements, contains, references, instantiates, overrides, decorates, type_of, returns
 
 Everything is stored in a local SQLite database (`.kirograph/kirograph.db`). **Nothing leaves your machine.** No API keys. No external services.

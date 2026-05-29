@@ -551,6 +551,53 @@ function getLanguageSpecificKind(type: string, lang: Language): NodeKind | null 
       if (type === 'rule_set') return 'class';
       if (type === 'declaration') return 'variable';
       break;
+    case 'rescript':
+      if (type === 'let_binding') return 'function';
+      if (type === 'type_definition') return 'type_alias';
+      if (type === 'module_declaration') return 'module';
+      break;
+    case 'sql':
+      if (type === 'create_function_statement') return 'function';
+      if (type === 'create_table_statement') return 'class';
+      if (type === 'create_view_statement') return 'function';
+      if (type === 'create_procedure_statement') return 'function';
+      break;
+    case 'r':
+      if (type === 'function_definition') return 'function';
+      if (type === 'left_assignment') return 'variable';
+      break;
+    case 'julia':
+      if (type === 'function_definition') return 'function';
+      if (type === 'struct_definition') return 'struct';
+      if (type === 'module_definition') return 'module';
+      if (type === 'macro_definition') return 'function';
+      break;
+    case 'powershell':
+      if (type === 'function_statement') return 'function';
+      if (type === 'class_statement') return 'class';
+      break;
+    case 'perl':
+      if (type === 'subroutine_declaration_statement') return 'function';
+      if (type === 'package_statement') return 'module';
+      break;
+    case 'gdscript':
+      if (type === 'function_definition') return 'function';
+      if (type === 'class_definition') return 'class';
+      if (type === 'variable_statement') return 'variable';
+      break;
+    case 'astro':
+      if (type === 'function_declaration') return 'function';
+      if (type === 'function_definition') return 'function';
+      break;
+    case 'nix':
+      if (type === 'function') return 'function';
+      if (type === 'binding') return 'variable';
+      break;
+    case 'verilog':
+      if (type === 'module_declaration') return 'class';
+      if (type === 'task_declaration') return 'function';
+      if (type === 'function_declaration') return 'function';
+      break;
   }
   return null;
 }
