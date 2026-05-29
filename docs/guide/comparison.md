@@ -73,6 +73,10 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 | CycloneDX 1.5 SBOM export | ✅ | — | — | — | — | — | — | — | — | — |
 | CycloneDX 1.5 VEX export | ✅ | — | — | — | — | — | — | — | — | — |
 | Fix suggestions per ecosystem | ✅ | — | — | — | — | — | — | — | — | — |
+| EPSS exploitation probability score | ✅ | — | — | — | — | — | — | — | — | — |
+| License compliance (SPDX + policy) | ✅ | — | — | — | — | — | — | — | — | — |
+| Dependency staleness score | ✅ | — | — | — | — | — | — | — | — | — |
+| Dashboard security overlay | ✅ | — | — | — | — | — | — | — | — | — |
 | Manual CVE registration | ✅ | — | — | — | — | — | — | — | — | — |
 | Queryable via MCP by AI agents | ✅ | — | — | — | — | — | — | — | — | — |
 
@@ -157,15 +161,15 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 
 None of the MCP tools above include dependency vulnerability scanning. When evaluating KiroGraph's security module (`enableSecurity: true`), the relevant comparison is against dedicated Software Composition Analysis (SCA) tools.
 
-| Tool | Type | Reachability | SBOM/VEX | MCP / AI-queryable | Local / free | Ecosystems |
-|------|------|:------------:|:--------:|:------------------:|:------------:|:----------:|
-| **KiroGraph-Sec** | Graph-integrated SCA | ✅ call-graph BFS | ✅ CycloneDX 1.5 | ✅ | ✅ | 12 (npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex) |
-| [Trivy](https://github.com/aquasecurity/trivy) | Container + app SCA | — | ✅ CycloneDX | — | ✅ | 10+ (+ OS packages) |
-| [Grype](https://github.com/anchore/grype) | App + container SCA | — | ✅ via Syft | — | ✅ | 10+ |
-| [OWASP Dep-Check](https://github.com/jeremylong/DependencyCheck) | App SCA | — | ✅ CycloneDX | — | ✅ | 8+ |
-| [npm audit](https://docs.npmjs.com/cli/v9/commands/npm-audit) | Built-in (npm only) | — | — | — | ✅ | npm only |
-| [Snyk](https://snyk.io) | Commercial SCA | ✅ (paid, JS/Python) | ✅ | — | ✗ (paid) | 10+ |
-| [Dependabot](https://docs.github.com/en/code-security/dependabot) | GitHub-integrated | — | — | — | ✅ (GitHub) | 10+ |
+| Tool | Type | Reachability | SBOM/VEX | EPSS | License | Staleness | MCP / AI-queryable | Local / free | Ecosystems |
+|------|------|:------------:|:--------:|:----:|:-------:|:---------:|:------------------:|:------------:|:----------:|
+| **KiroGraph-Sec** | Graph-integrated SCA | ✅ call-graph BFS | ✅ CycloneDX 1.5 | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
+| [Trivy](https://github.com/aquasecurity/trivy) | Container + app SCA | — | ✅ CycloneDX | — | — | — | — | ✅ | 10+ (+ OS) |
+| [Grype](https://github.com/anchore/grype) | App + container SCA | — | ✅ via Syft | — | — | — | — | ✅ | 10+ |
+| [OWASP Dep-Check](https://github.com/jeremylong/DependencyCheck) | App SCA | — | ✅ CycloneDX | — | — | — | — | ✅ | 8+ |
+| [npm audit](https://docs.npmjs.com/cli/v9/commands/npm-audit) | Built-in (npm only) | — | — | — | — | — | — | ✅ | npm only |
+| [Snyk](https://snyk.io) | Commercial SCA | ✅ (paid) | ✅ | ✅ (paid) | — | — | — | ✗ paid | 10+ |
+| [Dependabot](https://docs.github.com/en/code-security/dependabot) | GitHub-integrated | — | — | — | — | — | — | ✅ | 10+ |
 
 ### The key differentiator: reachability analysis
 
@@ -184,7 +188,7 @@ This matters because the typical npm project has 500–1000 transitive dependenc
 - **No container or OS-level scanning** — application dependencies only (use Trivy for container images)
 - **No proprietary vulnerability databases** — OSV by default (which aggregates NVD, GitHub Advisory Database, and others); no Snyk Intel feed
 - **No CI/CD-native integration** — can be run as part of CI via `kirograph vulns --refresh`, but no native GitHub Actions/GitLab CI plugin
-- **12 ecosystems** — npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex. No container/OS-level scanning.
+- **14 ecosystems** — npm (+ pnpm), Maven, Gradle, Go, pip, pyproject.toml (Poetry/PDM/Hatch), Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex. No container/OS-level scanning.
 
 For container scanning or OS-level coverage, combine KiroGraph-Sec with Trivy. For AI-queryable call-graph reachability during active development, KiroGraph-Sec is the only option.
 

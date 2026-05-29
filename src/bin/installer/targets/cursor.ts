@@ -43,9 +43,9 @@ export function installCursorEarly(projectRoot: string): void {
     : `  ✓ Cursor MCP already configured in ${mcpPath}`);
 }
 
-export function installCursorLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
+export function installCursorLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
   const enableCompression = shellCompressionLevel !== undefined && shellCompressionLevel !== 'off';
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true);
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'cursor.md');
   ensureDir(path.dirname(instructionsPath));

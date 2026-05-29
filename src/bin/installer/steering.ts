@@ -45,6 +45,8 @@ KiroGraph builds a semantic knowledge graph of your codebase. Use its MCP tools 
 | Are there vulnerable dependencies? | \`kirograph_security\` |
 | Which CVEs affect my project? | \`kirograph_vulns\` |
 | Is this vulnerability reachable? | \`kirograph_reachability\` |
+| What licenses do my dependencies use? | \`kirograph_licenses\` |
+| Are dependencies outdated? | \`kirograph_staleness\` |
 | Generate SBOM/VEX | \`kirograph_sbom\` / \`kirograph_vex\` |
 | Add a private CVE | \`kirograph_vuln_add\` |
 
@@ -346,6 +348,8 @@ function buildSteeringContent(opts?: SteeringOptions): string {
     content = content.replace('| Are there vulnerable dependencies? | `kirograph_security` |\n', '');
     content = content.replace('| Which CVEs affect my project? | `kirograph_vulns` |\n', '');
     content = content.replace('| Is this vulnerability reachable? | `kirograph_reachability` |\n', '');
+    content = content.replace('| What licenses do my dependencies use? | `kirograph_licenses` |\n', '');
+    content = content.replace('| Are dependencies outdated? | `kirograph_staleness` |\n', '');
     content = content.replace('| Generate SBOM/VEX | `kirograph_sbom` / `kirograph_vex` |\n', '');
     content = content.replace('| Add a private CVE | `kirograph_vuln_add` |\n', '');
   }
@@ -435,27 +439,47 @@ kirograph_data_aggregate(dataset: "data-orders", groupBy: ["region"], metrics: [
     const securitySection = `
 ## Security
 
-KiroGraph scans dependency manifests for known vulnerabilities and performs reachability analysis
-to determine if vulnerable code paths are actually reachable from your entry points.
+KiroGraph scans dependency manifests across 14 ecosystems for known vulnerabilities, performs
+call-graph reachability analysis, tracks exploitation probability (EPSS), checks license
+compliance, and monitors dependency staleness.
 
 **Available tools:**
-- \`kirograph_security\` — security overview: vulnerability counts, verdicts, stale data warnings
-- \`kirograph_vulns\` — list vulnerabilities with severity, affected components, and reachability verdicts
-- \`kirograph_reachability\` — check if a specific CVE is reachable from entry points
-- \`kirograph_sbom\` — export CycloneDX 1.5 SBOM (Software Bill of Materials)
-- \`kirograph_vex\` — export CycloneDX 1.5 VEX (Vulnerability Exploitability eXchange)
-- \`kirograph_vuln_add\` — manually register a private/internal CVE against a dependency
+- \`kirograph_security\` — overview: dep count, CVE count, verdict breakdown, stale warnings
+- \`kirograph_vulns\` — list CVEs with severity, EPSS score, reachability verdict, fix suggestion
+- \`kirograph_reachability\` — deep-dive: call paths, entry points, affected layers for one CVE or package
+- \`kirograph_licenses\` — list dependency licenses; flag policy violations (deny/warn by SPDX pattern)
+- \`kirograph_staleness\` — identify outdated dependencies (staleness score 0.0–1.0)
+- \`kirograph_sbom\` — export CycloneDX 1.5 SBOM for compliance/auditing
+- \`kirograph_vex\` — export CycloneDX 1.5 VEX with reachability-derived analysis states
+- \`kirograph_vuln_add\` — manually register a private/internal CVE not in public databases
 
-**Security workflow:**
-1. \`kirograph_security\`: get overview of vulnerability status
-2. \`kirograph_vulns\`: list vulnerabilities sorted by severity
-3. \`kirograph_reachability\`: check if a specific CVE is reachable
-4. \`kirograph_vex\`: export VEX for compliance
+**Proactive triggers — run \`kirograph_security\` when:**
+- You or the user add/update/remove a dependency
+- Before a production deploy or release branch cut
+- The user asks about security, compliance, or "is it safe to upgrade X"
+- \`kirograph_context\` surfaces a ⚠ Security warning in its output
 
-**When to use:** Before deploying or during security reviews, use \`kirograph_security\` for a
-quick overview. Use \`kirograph_reachability\` to determine if a CVE actually affects your
-application (many vulnerabilities are in code paths that are never reached). Use \`kirograph_sbom\`
-and \`kirograph_vex\` for compliance reporting.
+**Interpreting verdicts:**
+- \`affected\` — a call path exists from an entry point to the vulnerable code. Act on this.
+- \`not_affected\` — no reachable path found, no unresolved imports. Strong signal: likely safe.
+- \`under_investigation\` — traversal hit unresolved symbols (dynamic dispatch, reflection). Treat with caution.
+
+**Interpreting EPSS scores** (shown by \`kirograph_vulns\`):
+- \`>= 0.5\` — actively exploited or very likely to be. Patch immediately regardless of CVSS.
+- \`0.1 – 0.5\` — elevated risk. Prioritize over low-EPSS vulns with higher CVSS.
+- \`< 0.1\` — low exploitation probability. Use CVSS + reachability for triage.
+
+**Recommended workflow:**
+1. \`kirograph_security\` — get the big picture before diving in
+2. \`kirograph_vulns --verdict affected\` — focus only on confirmed reachable CVEs
+3. For each high-EPSS or high-CVSS result: \`kirograph_reachability <cve>\` to see exact call paths
+4. \`kirograph_licenses --policy\` — check for license violations before shipping
+5. \`kirograph_staleness --threshold 0.5\` — flag severely outdated dependencies
+6. Fix, then \`kirograph_vulns --refresh\` to re-query OSV and confirm resolution
+7. \`kirograph_vex\` / \`kirograph_sbom\` for compliance artifacts
+
+**Staleness score guide:** 0.0 = current; 0.3+ = worth reviewing; 0.7+ = significantly behind.
+A high staleness score alone is not a security issue, but old dependencies accumulate CVEs over time.
 `;
     content = content.trimEnd() + '\n\n' + securitySection.trim() + '\n';
   }
@@ -477,10 +501,10 @@ export function writeSteering(kiroDir: string, opts?: SteeringOptions | CavemanM
   console.log(`  ✓ Steering file written to ${steeringPath}`);
 
   // Write workflow-specific steering files
-  writeWorkflowSteering(steeringDir);
+  writeWorkflowSteering(steeringDir, resolvedOpts);
 }
 
-function writeWorkflowSteering(steeringDir: string): void {
+function writeWorkflowSteering(steeringDir: string, opts?: SteeringOptions): void {
   const workflows: Record<string, string> = {
     'kirograph-review.md': `---
 inclusion: manual
@@ -706,5 +730,96 @@ Follow these steps to plan and execute safe refactoring.
   for (const [filename, content] of Object.entries(workflows)) {
     fs.writeFileSync(path.join(steeringDir, filename), content);
   }
-  console.log(`  ✓ Workflow steering files written (review, debug, architecture, onboard, refactor)`);
+
+  // Security workflow — only when enableSecurity is true
+  if (opts?.enableSecurity) {
+    fs.writeFileSync(path.join(steeringDir, 'kirograph-security.md'), `---
+inclusion: manual
+---
+
+# KiroGraph: Security Audit Workflow
+
+Follow these steps for a structured security audit using the knowledge graph.
+Activate this workflow before a release, after adding dependencies, or when asked to review security posture.
+
+## Steps
+
+### 1. Overview
+\`\`\`
+kirograph_security()
+\`\`\`
+Note: total dependencies, vulnerability count, verdict breakdown, stale warning count.
+
+### 2. Triage reachable vulnerabilities
+\`\`\`
+kirograph_vulns(verdict: "affected")
+\`\`\`
+Focus only on confirmed reachable CVEs. Sort output by EPSS score (exploitation probability) first, then CVSS severity.
+
+**Act immediately on:** EPSS >= 0.5 (actively exploited). Patch regardless of CVSS.
+**Prioritize:** EPSS 0.1–0.5 over low-EPSS high-CVSS entries.
+**Low urgency:** EPSS < 0.1 — use CVSS + reachability for triage.
+
+### 3. Deep-dive reachability for critical CVEs
+For each high-priority CVE from step 2:
+\`\`\`
+kirograph_reachability(target: "<CVE-ID or package name>")
+\`\`\`
+This shows: exact call paths from entry points, affected architectural layers, distinct path count.
+
+- \`affected\` verdict with known entry points → fix this dependency
+- \`not_affected\` → no reachable path, document and move on
+- \`under_investigation\` → unresolved symbols, treat conservatively
+
+### 4. Check for under-investigation CVEs
+\`\`\`
+kirograph_vulns(verdict: "under_investigation")
+\`\`\`
+For each: run \`kirograph_reachability\` to see what symbols are unresolved. If you can determine
+the symbol is not called, you can downgrade to not_affected manually.
+
+### 5. License compliance
+\`\`\`
+kirograph_licenses(policy: true)
+\`\`\`
+Review any DENY violations — these must be resolved before shipping.
+WARN violations should be documented and approved by the team.
+
+### 6. Dependency staleness
+\`\`\`
+kirograph_staleness(threshold: 0.5)
+\`\`\`
+Score guide: 0.3+ = worth reviewing, 0.7+ = significantly behind.
+Cross-reference with step 2 results: stale + vulnerable = highest priority.
+
+### 7. Refresh data if needed
+If vulnerability data looks stale (flagged in step 1) or dependencies changed recently:
+\`\`\`
+kirograph_vulns(refresh: true)
+\`\`\`
+
+### 8. Export compliance artifacts
+\`\`\`
+kirograph_sbom()   // Software Bill of Materials
+kirograph_vex()    // Vulnerability Exploitability eXchange
+\`\`\`
+
+## Interpretation Reference
+
+| Signal | Meaning | Action |
+|--------|---------|--------|
+| \`affected\` + EPSS >= 0.5 | Actively exploited, reachable | Patch immediately |
+| \`affected\` + CVSS >= 9.0 | Critical, reachable | Patch this sprint |
+| \`affected\` + CVSS 7.0–8.9 | High, reachable | Plan fix within 2 weeks |
+| \`not_affected\` | No reachable path found | Document, no action needed |
+| \`under_investigation\` | Reachability unclear | Manual review required |
+| Stale >= 0.7 | Very outdated | Review for accumulated CVEs |
+| License DENY | Policy violation | Must resolve before release |
+`);
+    console.log(`  ✓ Security workflow steering file written`);
+  }
+
+  const written = ['review', 'debug', 'architecture', 'onboard', 'refactor'];
+  if (opts?.enableSecurity) written.push('security');
+  console.log(`  ✓ Workflow steering files written (${written.join(', ')})`);
 }

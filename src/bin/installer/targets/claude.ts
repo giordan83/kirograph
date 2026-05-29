@@ -38,8 +38,8 @@ export function installClaudeEarly(projectRoot: string): void {
     : `  ✓ Claude MCP already configured in ${mcpPath}`);
 }
 
-export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true);
+export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'claude.md');
   ensureDir(path.dirname(instructionsPath));

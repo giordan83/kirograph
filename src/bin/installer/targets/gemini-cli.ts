@@ -44,8 +44,8 @@ export function installGeminiCliEarly(projectRoot: string): void {
   console.log(`  ✓ Gemini CLI MCP server registered in ${settingsPath}`);
 }
 
-export function installGeminiCliLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true);
+export function installGeminiCliLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'gemini-cli.md');
   ensureDir(path.dirname(instructionsPath));

@@ -57,6 +57,9 @@ export async function parseCargoManifest(
   // Attempt to load resolved versions from Cargo.lock
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Extract the package-level license from [package] section
+  const license = extractCargoLicense(content);
+
   // Extract dependencies from each section
   const dependencies: ParsedDependency[] = [];
 
@@ -71,6 +74,7 @@ export async function parseCargoManifest(
         scope,
         ecosystem: 'cargo',
         sourceManifest: relativeManifest,
+        ...(license !== undefined ? { license } : {}),
       });
     }
   }
@@ -336,4 +340,26 @@ function isValidCrateName(name: string): boolean {
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Extract the license field from the [package] section of a Cargo.toml.
+ * Handles: license = "MIT" or license = "MIT OR Apache-2.0"
+ */
+function extractCargoLicense(content: string): string | undefined {
+  // Find the [package] section
+  const packageSectionMatch = /^\[package\]\s*$/m.exec(content);
+  if (!packageSectionMatch) return undefined;
+
+  const startIdx = packageSectionMatch.index + packageSectionMatch[0].length;
+  const remaining = content.slice(startIdx);
+  // Grab content up to the next section header
+  const nextSection = remaining.match(/^\[/m);
+  const sectionContent = nextSection ? remaining.slice(0, nextSection.index) : remaining;
+
+  const licenseMatch = sectionContent.match(/^license\s*=\s*"([^"]+)"/m);
+  if (licenseMatch && licenseMatch[1].trim() !== '') {
+    return licenseMatch[1].trim();
+  }
+  return undefined;
 }

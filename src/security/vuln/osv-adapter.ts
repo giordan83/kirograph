@@ -6,21 +6,11 @@
  */
 
 import { CVERecord, VersionRange } from '../types';
+import type { VulnDatabaseAdapter, BatchQuery } from './types';
 import { VulnDatabaseError } from '../errors';
 import { logWarn, logError } from '../../errors';
 
-// ── Interface ─────────────────────────────────────────────────────────────────
-
-export interface VulnDatabaseAdapter {
-  name: string;
-  /** Query for vulnerabilities affecting a specific package version */
-  query(
-    ecosystem: string,
-    packageName: string,
-    version: string,
-    signal?: AbortSignal,
-  ): Promise<CVERecord[]>;
-}
+export type { VulnDatabaseAdapter, BatchQuery };
 
 // ── Ecosystem Mapping ─────────────────────────────────────────────────────────
 
@@ -30,6 +20,7 @@ const ECOSYSTEM_MAP: Record<string, string> = {
   go: 'Go',
   pypi: 'PyPI',
   cargo: 'crates.io',
+  pyproject: 'PyPI',  // pyproject.toml (Poetry/Hatch/PDM/PEP 621)
   nuget: 'NuGet',
   gradle: 'Maven',    // Gradle projects use Maven Central
   rubygems: 'RubyGems',
@@ -39,7 +30,7 @@ const ECOSYSTEM_MAP: Record<string, string> = {
   hex: 'Hex',
 };
 
-// ── OSV Response Types ────────────────────────────────────────────────────────
+// ── OSV Request/Response Types ───────────────────────────────────────────────
 
 interface OsvSeverity {
   type: string;
@@ -70,10 +61,21 @@ interface OsvQueryResponse {
   vulns?: OsvVulnerability[];
 }
 
+interface OsvBatchQueryItem {
+  package: { name: string; ecosystem: string };
+  version: string;
+}
+
+interface OsvBatchResponse {
+  results: Array<{ vulns?: OsvVulnerability[] }>;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const OSV_API_URL = 'https://api.osv.dev/v1/query';
+const OSV_BATCH_API_URL = 'https://api.osv.dev/v1/querybatch';
 const DEFAULT_TIMEOUT_MS = 30_000;
+const OSV_BATCH_MAX_QUERIES = 1000;
 const MAX_SUMMARY_LENGTH = 500;
 
 // ── OsvAdapter Implementation ─────────────────────────────────────────────────
@@ -82,11 +84,98 @@ export class OsvAdapter implements VulnDatabaseAdapter {
   public readonly name = 'OSV';
 
   private readonly apiUrl: string;
+  private readonly batchApiUrl: string;
   private readonly timeoutMs: number;
 
-  constructor(options?: { apiUrl?: string; timeoutMs?: number }) {
+  constructor(options?: { apiUrl?: string; batchApiUrl?: string; timeoutMs?: number }) {
     this.apiUrl = options?.apiUrl ?? OSV_API_URL;
+    this.batchApiUrl = options?.batchApiUrl ?? OSV_BATCH_API_URL;
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
+
+  /**
+   * Batch query up to OSV_BATCH_MAX_QUERIES packages in a single HTTP request.
+   * Results are returned in the same order as the input queries.
+   * Queries for unsupported ecosystems produce empty results without an HTTP call.
+   */
+  async queryBatch(
+    queries: BatchQuery[],
+    signal?: AbortSignal,
+  ): Promise<Array<CVERecord[]>> {
+    if (queries.length === 0) return [];
+
+    // Map each query to its OSV ecosystem — track indices of unsupported ones
+    const osvQueries: OsvBatchQueryItem[] = [];
+    const indexMap: Array<number | null> = []; // index into osvQueries, or null if unsupported
+
+    for (const q of queries) {
+      const osvEcosystem = ECOSYSTEM_MAP[q.ecosystem.toLowerCase()];
+      if (!osvEcosystem) {
+        logWarn(`OSV adapter: unsupported ecosystem "${q.ecosystem}", skipping batch entry`);
+        indexMap.push(null);
+      } else {
+        indexMap.push(osvQueries.length);
+        osvQueries.push({
+          package: { name: q.packageName, ecosystem: osvEcosystem },
+          version: q.version,
+        });
+      }
+    }
+
+    if (osvQueries.length === 0) {
+      return queries.map(() => []);
+    }
+
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), this.timeoutMs);
+    const combinedSignal = signal
+      ? combineAbortSignals(signal, timeoutController.signal)
+      : timeoutController.signal;
+
+    let batchResults: Array<{ vulns?: OsvVulnerability[] }>;
+
+    try {
+      const response = await fetch(this.batchApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queries: osvQueries }),
+        signal: combinedSignal,
+      });
+
+      if (!response.ok) {
+        throw new VulnDatabaseError(
+          `OSV batch API returned HTTP ${response.status}: ${response.statusText}`,
+          'OSV',
+          response.status,
+        );
+      }
+
+      const data = (await response.json()) as OsvBatchResponse;
+      batchResults = data.results ?? [];
+    } catch (error: unknown) {
+      if (error instanceof VulnDatabaseError) throw error;
+      if (isAbortError(error)) {
+        const msg = timeoutController.signal.aborted
+          ? `OSV batch query timed out after ${this.timeoutMs}ms (${osvQueries.length} packages)`
+          : `OSV batch query aborted`;
+        logError(msg);
+        throw new VulnDatabaseError(msg, 'OSV');
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logError(`OSV batch query failed: ${msg}`);
+      throw new VulnDatabaseError(`Network error in OSV batch query: ${msg}`, 'OSV');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // Rebuild full results array aligned with input queries
+    return queries.map((_, i) => {
+      const osvIdx = indexMap[i];
+      if (osvIdx === null) return [];
+      const resultEntry = batchResults[osvIdx];
+      if (!resultEntry) return [];
+      return this.parseResponse({ vulns: resultEntry.vulns });
+    });
   }
 
   async query(

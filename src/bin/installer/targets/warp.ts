@@ -37,8 +37,8 @@ export function installWarpEarly(projectRoot: string): void {
   console.log(`  ✓ Warp MCP server registered in ${mcpPath}`);
 }
 
-export function installWarpLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory);
+export function installWarpLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'warp.md');
   ensureDir(path.dirname(instructionsPath));

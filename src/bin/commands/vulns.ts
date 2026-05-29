@@ -11,6 +11,8 @@ export function register(program: Command): void {
     .option('--severity <level>', 'Filter by severity: critical, high, medium, low')
     .option('--verdict <verdict>', 'Filter by verdict: affected, not_affected, under_investigation')
     .option('--refresh', 'Trigger fresh vulnerability enrichment before listing')
+    .option('--epss <threshold>', 'Filter by EPSS score (e.g. 0.5 shows only vulns with EPSS >= 0.5)')
+    .option('--stale', 'Show staleness score of the affected dependency alongside each CVE')
     .option('--add <cveId>', 'Manually register a CVE')
     .option('--package <name>', 'Package name for --add')
     .option('--version <ver>', 'Package version for --add')
@@ -18,6 +20,8 @@ export function register(program: Command): void {
       severity?: string;
       verdict?: string;
       refresh?: boolean;
+      epss?: string;
+      stale?: boolean;
       add?: string;
       package?: string;
       version?: string;
@@ -124,7 +128,9 @@ export function register(program: Command): void {
       let query = `
         SELECT
           v.node_id, v.cve_id, v.severity_score, v.fixed_version, v.summary, v.source_database,
+          v.epss_score, v.epss_percentile,
           d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
+          d.staleness_score,
           r.verdict
         FROM sec_vulnerabilities v
         LEFT JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
@@ -162,6 +168,17 @@ export function register(program: Command): void {
         params.push(opts.verdict);
       }
 
+      // Apply EPSS threshold filter
+      if (opts.epss !== undefined) {
+        const epssThreshold = parseFloat(opts.epss);
+        if (isNaN(epssThreshold) || epssThreshold < 0 || epssThreshold > 1) {
+          console.error(`  ✖ Invalid EPSS threshold: ${opts.epss}. Use a number between 0 and 1 (e.g. 0.5)`);
+          cg.close(); process.exit(1);
+        }
+        query += ` AND v.epss_score >= ?`;
+        params.push(epssThreshold);
+      }
+
       query += ` ORDER BY v.severity_score DESC NULLS LAST`;
 
       const rows: Array<{
@@ -171,10 +188,13 @@ export function register(program: Command): void {
         fixed_version: string | null;
         summary: string | null;
         source_database: string;
+        epss_score: number | null;
+        epss_percentile: number | null;
         package_name: string | null;
         ecosystem: string | null;
         resolved_version: string | null;
         declared_constraint: string | null;
+        staleness_score: number | null;
         verdict: string | null;
       }> = rawDb.all(query, params);
 
@@ -232,11 +252,27 @@ export function register(program: Command): void {
           ? `${row.package_name}@${row.resolved_version || row.declared_constraint || '?'}`
           : 'unknown package';
 
-        console.log(`  ${severityColor}${severityLabel}${reset}  ${violet}${bold}${row.cve_id}${reset}  ${dim}${pkg}${reset}  [${verdictColor}${verdictLabel}${reset}]`);
+        // EPSS badge
+        let epssBadge = '';
+        if (row.epss_score != null && row.epss_percentile != null) {
+          const epssColor = row.epss_score >= 0.3 ? '\x1b[33m' : dim;
+          const scoreStr = row.epss_score.toFixed(2);
+          const pctStr = `${Math.round(row.epss_percentile * 100)}th%`;
+          epssBadge = `  ${epssColor}${dim}[EPSS: ${scoreStr} / ${pctStr}]${reset}`;
+        }
+
+        console.log(`  ${severityColor}${severityLabel}${reset}  ${violet}${bold}${row.cve_id}${reset}  ${dim}${pkg}${reset}  [${verdictColor}${verdictLabel}${reset}]${epssBadge}`);
 
         if (row.summary && row.summary !== 'Manually registered') {
           const truncated = row.summary.length > 100 ? row.summary.slice(0, 100) + '…' : row.summary;
           console.log(`    ${dim}${truncated}${reset}`);
+        }
+
+        // Staleness badge (when --stale flag is set)
+        if (opts.stale && row.staleness_score != null) {
+          const s = row.staleness_score;
+          const staleColor = s >= 0.7 ? '\x1b[31m' : s >= 0.4 ? '\x1b[33m' : dim;
+          console.log(`    ${staleColor}${dim}[staleness: ${s.toFixed(2)}]${reset}`);
         }
 
         // Fix suggestion

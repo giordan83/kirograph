@@ -69,7 +69,26 @@ Or swap inside an active session:
 
 ### Steering File (`.kiro/steering/kirograph.md`)
 
-Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists.
+Always-active. Teaches the Kiro IDE to prefer graph tools over file scanning when `.kirograph/` exists. Includes a quick decision guide, tool selection rules, and — when enabled — sections for memory, docs, data, and security.
+
+### Workflow Steering Files (`inclusion: manual`)
+
+KiroGraph installs 5 task-specific steering files alongside the main one. These are **not** always active — they are loaded on demand by the agent when you mention the workflow, or by typing `/kirograph-<name>` in a Kiro session.
+
+| File | Activate with | When to use |
+|------|--------------|-------------|
+| `kirograph-review.md` | `/kirograph-review` | Structured code review — blast radius, test coverage, coupling |
+| `kirograph-debug.md` | `/kirograph-debug` | Systematic debugging — trace calls, check recent changes, find root cause |
+| `kirograph-architecture.md` | `/kirograph-architecture` | Architecture exploration — packages, layers, coupling metrics, cycles |
+| `kirograph-onboard.md` | `/kirograph-onboard` | Onboarding a new codebase — structure, entry points, key symbols |
+| `kirograph-refactor.md` | `/kirograph-refactor` | Safe refactoring — blast radius, rename preview, verify after changes |
+| `kirograph-security.md` | `/kirograph-security` | Security audit — vulnerability triage, EPSS prioritization, license compliance, staleness *(written only when `enableSecurity: true`)* |
+
+**How to activate in Kiro IDE:** mention the workflow by name in your prompt (e.g. "do a security audit" or "review this PR") and Kiro will auto-load the relevant steering file. You can also explicitly type `/kirograph-security` to force-load it.
+
+**How to activate in other agents (Claude Code, Cursor, etc.):** paste the file content as context, or reference `.kiro/steering/kirograph-security.md` directly in your prompt.
+
+All workflow files follow the same structure: numbered steps with exact tool calls, an interpretation reference, and tips.
 
 ---
 

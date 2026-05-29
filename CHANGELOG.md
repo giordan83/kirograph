@@ -20,7 +20,17 @@
     - `kirograph_reachability`: Analyze reachability for a CVE ID or package name — verdict, paths, impact summary.
     - `kirograph_vuln_add`: Manually register a CVE against a dependency (private advisories).
   - **`🔒 Security` section** in `kirograph --help`: lists all 5 security commands with options and examples.
-  - **12 ecosystem parsers**: npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex — each with lock file resolution for resolved versions.
+  - **14 ecosystem parsers**: npm (+ pnpm-lock.yaml support), Maven, Gradle, Go, pip, pyproject.toml (Poetry/Hatch/PDM/PEP 621), Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex — each with lock file resolution for resolved versions.
+  - **Batch OSV queries**: `VulnerabilityDatabaseClient.enrichAll()` now uses `/v1/querybatch` (up to 1000 packages per HTTP request) instead of sequential single queries, with automatic fallback to sequential on batch failure. For a project with 200 dependencies, enrichment drops from 200 HTTP requests to 1.
+  - **EPSS integration**: After CVE enrichment, `EpssClient` fetches exploitation probability scores from `api.first.org/data/v1/epss` in batches of 500. Scores stored as `epss_score` (0.0–1.0) and `epss_percentile` on each vulnerability. Shown in `kirograph vulns` output; filterable via `--epss <threshold>`.
+  - **License compliance**: All manifest plugins (npm, Maven, Cargo, pyproject, NuGet, RubyGems, Composer, pubspec) now extract SPDX license identifiers. New `securityLicensePolicy` config field (`deny`/`warn` arrays with wildcard support). New `kirograph licenses` CLI command and `kirograph_licenses` MCP tool.
+  - **Dependency staleness**: New `StalenessChecker` queries npm, PyPI, crates.io, RubyGems, and Packagist registries for latest published versions. Staleness score (0.0–1.0) based on major versions behind + time since latest. New `kirograph staleness` CLI command, `kirograph_staleness` MCP tool, `--stale` flag on `kirograph vulns`, `--refresh-staleness` on `kirograph security`.
+  - **Dashboard security overlay**: The interactive graph export (`kirograph export`) now color-codes `dependency` and `vulnerability` nodes by security status (red=affected, amber=investigating, green=not_affected, gray=no data). New `🔒 Security` toolbar button highlights security nodes and dims the rest. Includes legend panel.
+  - **`kirograph status` security section**: When `enableSecurity: true`, the status command and `kirograph_status` MCP tool now show a security summary (dep count, vuln count, verdict breakdown, stale warning).
+  - **pyproject.toml support** (PEP 621, Poetry, PDM, Hatch) with lock file support (poetry.lock, pdm.lock, uv.lock).
+  - **pnpm-lock.yaml support** added to the npm plugin (v5/v6/v9 format).
+  - **7 new ecosystems**: NuGet, Gradle, RubyGems, Composer (PHP), Swift PM, Dart/pub, Elixir/Hex — each with lock file resolution.
+  - **`securityLicensePolicy`** config field: `{ deny: string[], warn: string[] }` with SPDX wildcard matching (e.g. `GPL-*`).
   - **OSV integration**: Primary vulnerability database via /v1/query endpoint. 30-second timeout per dependency. Staleness tracking with `vulnDataStale` flag.
   - **Reachability analysis**: BFS traversal from entry points through call/import/reference edges. Three verdicts: `affected` (path exists), `not_affected` (no path, no unresolved imports), `under_investigation` (unresolved symbols encountered).
   - **Architecture-aware impact analysis**: Identifies affected layers, entry points, and distinct code paths (capped at 100). Reads `arch_file_layers` table populated by the architecture module.

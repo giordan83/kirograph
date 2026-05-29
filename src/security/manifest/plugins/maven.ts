@@ -79,6 +79,9 @@ export async function parseMavenManifest(
     return [];
   }
 
+  // Extract the project-level license
+  const license = extractMavenLicense(content);
+
   // Extract all <dependency> blocks from the <dependencies> sections
   const dependencies: ParsedDependency[] = [];
 
@@ -131,8 +134,24 @@ export async function parseMavenManifest(
       scope: mappedScope,
       ecosystem: 'maven',
       sourceManifest: relativeManifest,
+      ...(license !== undefined ? { license } : {}),
     });
   }
 
   return dependencies;
+}
+
+/**
+ * Extract the first license name from a pom.xml <licenses> block.
+ * Looks for: <licenses><license><name>...</name></license></licenses>
+ */
+function extractMavenLicense(content: string): string | undefined {
+  const licensesMatch = content.match(/<licenses\b[^>]*>([\s\S]*?)<\/licenses>/i);
+  if (!licensesMatch) return undefined;
+  const licenseBlock = licensesMatch[1];
+  const nameMatch = licenseBlock.match(/<name>([^<]+)<\/name>/i);
+  if (nameMatch && nameMatch[1].trim() !== '') {
+    return nameMatch[1].trim();
+  }
+  return undefined;
 }

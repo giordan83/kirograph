@@ -4,6 +4,9 @@ export interface InstructionOptions {
   cavemanMode?: CavemanMode | 'off';
   shellCompressionLevel?: 'off' | 'normal' | 'aggressive' | 'ultra';
   enableMemory?: boolean;
+  enableDocs?: boolean;
+  enableData?: boolean;
+  enableSecurity?: boolean;
   hasHooks?: boolean;
 }
 
@@ -44,6 +47,9 @@ export function buildAgentInstructions(cavemanModeOrOpts?: CavemanMode | 'off' |
   const enableCompression = opts.shellCompressionLevel && opts.shellCompressionLevel !== 'off';
   const shellCompressionLevel = opts.shellCompressionLevel ?? 'normal';
   const enableMemory = opts.enableMemory ?? false;
+  const enableDocs = opts.enableDocs ?? false;
+  const enableData = opts.enableData ?? false;
+  const enableSecurity = opts.enableSecurity ?? false;
 
   let content = `# KiroGraph
 
@@ -71,7 +77,7 @@ KiroGraph builds a local semantic knowledge graph of this codebase. When the \`k
 | What packages/layers exist? | \`kirograph_architecture\` |
 | How coupled is package X? | \`kirograph_coupling\` |
 | What does package X depend on? | \`kirograph_package\` |
-${enableCompression ? '| Run a command with token savings | `kirograph_exec` |\n| Check token savings stats | `kirograph_gain` |\n' : ''}${enableMemory ? '| Search past decisions/patterns | `kirograph_mem_search` |\n| Store an observation | `kirograph_mem_store` |\n' : ''}
+${enableCompression ? '| Run a command with token savings | `kirograph_exec` |\n| Check token savings stats | `kirograph_gain` |\n' : ''}${enableMemory ? '| Search past decisions/patterns | `kirograph_mem_search` |\n| Store an observation | `kirograph_mem_store` |\n' : ''}${enableDocs ? '| Find a doc section | `kirograph_docs_search` |\n| Get doc table of contents | `kirograph_docs_toc` |\n' : ''}${enableData ? '| What datasets are indexed? | `kirograph_data_list` |\n| Query rows with filters | `kirograph_data_query` |\n| Aggregate data server-side | `kirograph_data_aggregate` |\n' : ''}${enableSecurity ? '| Are there vulnerable dependencies? | `kirograph_security` |\n| Which CVEs affect my project? | `kirograph_vulns` |\n| Is this vulnerability reachable? | `kirograph_reachability` |\n| What licenses do my deps use? | `kirograph_licenses` |\n| Are dependencies outdated? | `kirograph_staleness` |\n' : ''}
 ## Tool selection
 
 - Start code tasks with \`kirograph_context\`.
@@ -145,6 +151,74 @@ linked to code symbols in the graph and surface in \`kirograph_context\` and
 **When to store:** After fixing a bug, making an architecture decision, discovering a pattern,
 encountering a non-obvious error, or learning something about the codebase that future sessions
 should know. Keep observations concise — one fact per store call.
+`;
+  }
+
+  // Documentation section
+  if (enableDocs) {
+    content += `
+## Documentation
+
+KiroGraph indexes project documentation by heading structure. Use \`kirograph_docs_search\`
+to find relevant sections instead of reading entire files.
+
+- \`kirograph_docs_toc\` — table of contents for a file or the whole project
+- \`kirograph_docs_search\` — search sections by query
+- \`kirograph_docs_section\` — retrieve full section content by ID
+- \`kirograph_docs_outline\` — heading hierarchy for a single file
+- \`kirograph_docs_refs\` — code ↔ doc cross-references
+
+Before reading a doc file directly, try \`kirograph_docs_search\` or \`kirograph_docs_outline\` first.
+`;
+  }
+
+  // Data section
+  if (enableData) {
+    content += `
+## Data
+
+KiroGraph indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet).
+
+- \`kirograph_data_list\` — list all indexed datasets
+- \`kirograph_data_describe\` — schema profile: column names, types, cardinality, samples
+- \`kirograph_data_query\` — filtered row retrieval (eq, gt, contains, in, between)
+- \`kirograph_data_aggregate\` — server-side GROUP BY: count, sum, avg, min, max
+
+Use \`kirograph_data_describe\` before reading a data file. Use \`kirograph_data_query\` with
+filters instead of loading all rows. Use \`kirograph_data_aggregate\` for statistics.
+This saves 95-99% of tokens compared to reading raw data files.
+`;
+  }
+
+  // Security section
+  if (enableSecurity) {
+    content += `
+## Security
+
+KiroGraph scans dependency manifests across 14 ecosystems for known vulnerabilities, performs
+call-graph reachability analysis, tracks EPSS exploitation probability, checks license
+compliance, and monitors dependency staleness.
+
+**Available tools:**
+- \`kirograph_security\` — overview: dep count, CVE count, verdict breakdown, stale warnings
+- \`kirograph_vulns\` — list CVEs with severity, EPSS score, reachability verdict, fix suggestion
+- \`kirograph_reachability\` — call paths, entry points, affected layers for one CVE or package
+- \`kirograph_licenses\` — list dependency licenses; flag policy violations
+- \`kirograph_staleness\` — identify outdated dependencies (staleness score 0.0–1.0)
+- \`kirograph_sbom\` / \`kirograph_vex\` — export CycloneDX 1.5 SBOM and VEX documents
+- \`kirograph_vuln_add\` — manually register a private/internal CVE
+
+**Proactive triggers:** Run \`kirograph_security\` when a dependency is added/updated, before a
+production deploy, or when the user asks about security/compliance.
+
+**Interpreting verdicts:**
+- \`affected\` — a call path exists from an entry point to the vulnerable code. Act on this.
+- \`not_affected\` — no reachable path found. Strong signal: likely safe.
+- \`under_investigation\` — unresolved symbols in traversal. Treat with caution.
+
+**EPSS scores:** >= 0.5 = patch immediately; 0.1–0.5 = elevated risk; < 0.1 = low probability.
+
+**Workflow:** \`kirograph_security\` → \`kirograph_vulns --verdict affected\` → \`kirograph_reachability <cve>\` → fix → \`kirograph_vulns --refresh\`
 `;
   }
 

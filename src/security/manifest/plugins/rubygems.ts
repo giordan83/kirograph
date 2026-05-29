@@ -48,6 +48,9 @@ export async function parseRubygemsManifest(
   // Attempt to load resolved versions from Gemfile.lock
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Attempt to extract license from a gemspec in the same directory
+  const license = loadGemspecLicense(manifestDir);
+
   // Extract dependencies from the Gemfile
   const dependencies: ParsedDependency[] = [];
   const lines = content.split('\n');
@@ -92,6 +95,7 @@ export async function parseRubygemsManifest(
         scope: currentScope,
         ecosystem: 'rubygems',
         sourceManifest: relativeManifest,
+        ...(license !== undefined ? { license } : {}),
       });
     }
   }
@@ -249,4 +253,24 @@ function extractFromGemfileLock(content: string, map: ResolvedVersionMap): void 
       }
     }
   }
+}
+
+/**
+ * Attempt to load the license from a .gemspec file in the given directory.
+ * Looks for: s.license = 'MIT' or spec.license = "MIT"
+ */
+function loadGemspecLicense(dir: string): string | undefined {
+  try {
+    const entries = fs.readdirSync(dir);
+    const gemspecFile = entries.find(f => f.endsWith('.gemspec'));
+    if (!gemspecFile) return undefined;
+    const content = fs.readFileSync(path.join(dir, gemspecFile), 'utf8');
+    const match = content.match(/\.license\s*=\s*['"]([^'"]+)['"]/);
+    if (match && match[1].trim() !== '') {
+      return match[1].trim();
+    }
+  } catch {
+    // best-effort — ignore errors
+  }
+  return undefined;
 }

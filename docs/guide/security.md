@@ -60,6 +60,7 @@ Show security overview: total dependencies, vulnerabilities found, verdict break
 
 ```bash
 kirograph security [path]
+kirograph security --refresh-staleness   # Re-query registries for latest versions first
 ```
 
 ### `kirograph sbom`
@@ -96,6 +97,8 @@ kirograph vulns --add CVE-2024-1234 --package lodash --version 4.17.20
 |------|-------------|
 | `--severity <level>` | Filter by severity: `critical`, `high`, `medium`, `low` |
 | `--verdict <verdict>` | Filter by verdict: `affected`, `not_affected`, `under_investigation` |
+| `--epss <threshold>` | Filter by EPSS exploitation probability (0.0–1.0, e.g. `--epss 0.5`) |
+| `--stale` | Show staleness score of the affected dependency alongside each CVE |
 | `--refresh` | Trigger fresh enrichment from configured databases before listing |
 | `--add <cveId>` | Manually register a CVE (requires `--package` and `--version`) |
 | `--package <name>` | Package name for manual CVE registration |
@@ -112,6 +115,31 @@ kirograph reachability lodash
 ```
 
 Accepts either a CVE ID or a package name. Shows: verdict, reaching entry point count, call paths (up to 5), unresolved symbols if any, and full impact summary (affected layers, entry points, distinct paths) when verdict is `affected`.
+
+### `kirograph licenses`
+
+List dependency licenses and check against configured policy.
+
+```bash
+kirograph licenses [path]
+kirograph licenses --policy                          # Show only violations
+kirograph licenses --deny "GPL-*,AGPL-3.0"          # Override deny list
+kirograph licenses --warn "LGPL-*"                  # Override warn list
+kirograph licenses --format json
+```
+
+### `kirograph staleness`
+
+Check dependency freshness against registries (npm, PyPI, crates.io, RubyGems, Packagist).
+
+```bash
+kirograph staleness [path]
+kirograph staleness --threshold 0.5    # Only show score >= 0.5
+kirograph staleness --refresh          # Re-query registries first
+kirograph staleness --format json
+```
+
+Staleness score 0.0–1.0: accounts for major versions behind (up to 0.6) and months since latest release (up to 0.4).
 
 ## MCP Tools
 
@@ -174,6 +202,25 @@ Manually register a CVE against a dependency. Useful for private/internal adviso
 | `fixedVersion` | string | - | Version that fixes the vulnerability |
 | `projectPath` | string | cwd | Project root path |
 
+### `kirograph_licenses`
+
+List dependency licenses and check against the configured `securityLicensePolicy`.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `policy` | boolean | false | Return only policy violations (deny/warn) |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_staleness`
+
+Check dependency freshness. Queries npm, PyPI, crates.io, RubyGems, and Packagist for latest versions.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | number | 0.3 | Minimum staleness score to include (0.0–1.0) |
+| `refresh` | boolean | false | Re-query registries before returning results |
+| `projectPath` | string | cwd | Project root path |
+
 ## CycloneDX Output Format
 
 ### SBOM
@@ -224,11 +271,12 @@ The traversal encountered at least one unresolved import or symbol whose outgoin
 
 | Ecosystem | Manifest | Lock File | OSV Ecosystem | Purl Prefix |
 |-----------|----------|-----------|---------------|-------------|
-| npm | `package.json` | `package-lock.json`, `yarn.lock` | `npm` | `pkg:npm/` |
+| npm | `package.json` | `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` | `npm` | `pkg:npm/` |
 | Maven | `pom.xml` | — | `Maven` | `pkg:maven/` |
 | Gradle | `build.gradle`, `build.gradle.kts` | `gradle.lockfile` | `Maven` | `pkg:maven/` |
 | Go | `go.mod` | `go.sum` | `Go` | `pkg:golang/` |
 | pip | `requirements.txt` | — | `PyPI` | `pkg:pypi/` |
+| Python (modern) | `pyproject.toml` | `poetry.lock`, `pdm.lock`, `uv.lock` | `PyPI` | `pkg:pypi/` |
 | Cargo | `Cargo.toml` | `Cargo.lock` | `crates.io` | `pkg:cargo/` |
 | NuGet | `*.csproj`, `packages.config` | `packages.lock.json` | `NuGet` | `pkg:nuget/` |
 | RubyGems | `Gemfile` | `Gemfile.lock` | `RubyGems` | `pkg:gem/` |
@@ -246,6 +294,7 @@ The traversal encountered at least one unresolved import or symbol whose outgoin
 | Gradle | `implementation`, `api`, etc. | `testImplementation`, `testApi` | — |
 | Go | `require` | — | — |
 | pip | default | — | — |
+| Python (pyproject) | `[project]`, `[tool.poetry.dependencies]` | `[project.optional-dependencies]`, Poetry groups | `require-dev`/dev groups |
 | Cargo | `[dependencies]` | `[dev-dependencies]`, `[build-dependencies]` | — |
 | NuGet | default | `PrivateAssets="all"` | — |
 | RubyGems | default | `group :development`, `group :test` | — |

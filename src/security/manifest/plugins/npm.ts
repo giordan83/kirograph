@@ -58,6 +58,9 @@ export async function parseNpmManifest(
   // Attempt to load resolved versions from lock file
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Extract the package-level license
+  const license = extractNpmLicense(pkg);
+
   // Extract dependencies from each scope field
   const dependencies: ParsedDependency[] = [];
   const warnings: Array<{ name: string; reason: string }> = [];
@@ -95,6 +98,7 @@ export async function parseNpmManifest(
         scope,
         ecosystem: 'npm',
         sourceManifest: relativeManifest,
+        ...(license !== undefined ? { license } : {}),
       });
     }
   }
@@ -127,6 +131,7 @@ export async function parseNpmManifest(
           scope: 'production',
           ecosystem: 'npm',
           sourceManifest: relativeManifest,
+          ...(license !== undefined ? { license } : {}),
         });
       }
     }
@@ -136,13 +141,13 @@ export async function parseNpmManifest(
 }
 
 /**
- * Attempt to load resolved versions from package-lock.json or yarn.lock
- * in the given directory. Returns an empty map if neither is available.
+ * Attempt to load resolved versions from package-lock.json, pnpm-lock.yaml,
+ * or yarn.lock in the given directory. Returns an empty map if none is available.
  */
 function loadResolvedVersions(manifestDir: string): ResolvedVersionMap {
   const map: ResolvedVersionMap = new Map();
 
-  // Try package-lock.json first (preferred)
+  // Try package-lock.json first (preferred — npm)
   const lockPath = path.join(manifestDir, 'package-lock.json');
   if (fs.existsSync(lockPath)) {
     try {
@@ -152,6 +157,18 @@ function loadResolvedVersions(manifestDir: string): ResolvedVersionMap {
       return map;
     } catch (err) {
       logWarn(`[sec:npm] Failed to parse package-lock.json: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // Try pnpm-lock.yaml (pnpm)
+  const pnpmLockPath = path.join(manifestDir, 'pnpm-lock.yaml');
+  if (fs.existsSync(pnpmLockPath)) {
+    try {
+      const pnpmContent = fs.readFileSync(pnpmLockPath, 'utf8');
+      extractFromPnpmLock(pnpmContent, map);
+      return map;
+    } catch (err) {
+      logWarn(`[sec:npm] Failed to parse pnpm-lock.yaml: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -168,6 +185,28 @@ function loadResolvedVersions(manifestDir: string): ResolvedVersionMap {
   }
 
   return map;
+}
+
+/**
+ * Extract resolved versions from pnpm-lock.yaml (v5, v6, v9 formats).
+ *
+ * v5/v6: packages section with keys like "/express/4.18.2" or "/express@4.18.2"
+ * v9:    snapshots section with keys like "express@4.18.2" and
+ *        packages section with "express@4.18.2: {version: ...}" (optional)
+ */
+function extractFromPnpmLock(content: string, map: ResolvedVersionMap): void {
+  // v9 format: package entries under `packages:` or `snapshots:`
+  // Key format: "name@version" or "@scope/name@version"
+  // We extract name@version pairs from both sections.
+
+  // Match lines like:  /express/4.18.2:  or  /express@4.18.2:  or  express@4.18.2:
+  for (const m of content.matchAll(/^[\s]*\/?(@?[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)?)[@/]([0-9][a-zA-Z0-9._-]*)(?:\(.*?\))?:/gm)) {
+    const name = m[1].replace(/^\//, ''); // strip leading slash for scoped packages
+    const version = m[2];
+    if (name && version && !map.has(name)) {
+      map.set(name, version);
+    }
+  }
 }
 
 /**
@@ -291,6 +330,38 @@ function extractPackageNameFromYarnHeader(header: string): string | null {
   }
 
   return cleaned.slice(0, lastAtIndex);
+}
+
+/**
+ * Extract the license field from a parsed package.json object.
+ * Handles both string format (`"MIT"`) and object format (`{"type":"MIT"}`).
+ */
+function extractNpmLicense(pkg: Record<string, unknown>): string | undefined {
+  const raw = pkg['license'];
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return raw.trim();
+  }
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const licObj = raw as Record<string, unknown>;
+    if (typeof licObj['type'] === 'string' && licObj['type'].trim() !== '') {
+      return licObj['type'].trim();
+    }
+  }
+  // Handle legacy "licenses" array
+  const licenses = pkg['licenses'];
+  if (Array.isArray(licenses) && licenses.length > 0) {
+    const first = licenses[0];
+    if (typeof first === 'object' && first !== null) {
+      const lic = first as Record<string, unknown>;
+      if (typeof lic['type'] === 'string' && lic['type'].trim() !== '') {
+        return lic['type'].trim();
+      }
+    }
+    if (typeof first === 'string' && first.trim() !== '') {
+      return first.trim();
+    }
+  }
+  return undefined;
 }
 
 /**

@@ -57,8 +57,8 @@ export function installCopilotEarly(projectRoot: string): void {
     : `  ✓ Copilot MCP already configured in ${ghMcpPath}`);
 }
 
-export function installCopilotLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true);
+export function installCopilotLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'copilot.md');
   ensureDir(path.dirname(instructionsPath));

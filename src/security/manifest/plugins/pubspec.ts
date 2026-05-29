@@ -50,6 +50,9 @@ export async function parsePubspecManifest(
   // Attempt to load resolved versions from pubspec.lock
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Extract the license field if present
+  const license = extractPubspecLicense(content);
+
   const dependencies: ParsedDependency[] = [];
 
   // Process `dependencies` (production) and `dev_dependencies` (development)
@@ -69,6 +72,7 @@ export async function parsePubspecManifest(
         scope,
         ecosystem: 'pub',
         sourceManifest: relativeManifest,
+        ...(license !== undefined ? { license } : {}),
       });
     }
   }
@@ -315,4 +319,22 @@ function extractFromPubspecLock(content: string, map: ResolvedVersionMap): void 
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Extract the `license:` field from pubspec.yaml content.
+ * Handles: `license: MIT` (top-level scalar field)
+ */
+function extractPubspecLicense(content: string): string | undefined {
+  const match = content.match(/^license:\s*(.+)$/m);
+  if (match && match[1].trim() !== '') {
+    // Strip surrounding quotes if present
+    let value = match[1].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1).trim();
+    }
+    return value || undefined;
+  }
+  return undefined;
 }

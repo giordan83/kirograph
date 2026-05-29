@@ -47,5 +47,7 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_vex',
   'kirograph_reachability',
   'kirograph_vuln_add',
+  'kirograph_staleness',
+  'kirograph_licenses',
 ];
 

@@ -252,9 +252,10 @@ kirograph coupling --format json           # JSON output
 
 ```bash
 kirograph security [path]                  # Vulnerability status overview
+kirograph security --refresh-staleness     # Re-query registries for latest versions first
 ```
 
-Shows: total dependencies, vulnerabilities found, verdict breakdown (affected/not_affected/under_investigation), stale data warnings.
+Shows: total dependencies, vulnerabilities found, verdict breakdown (affected/not_affected/under_investigation), stale data warnings, stale dependency count.
 
 ### SBOM Export
 
@@ -284,6 +285,8 @@ kirograph vulns --add CVE-2024-1234 --package lodash --version 4.17.20  # Regist
 |------|-------------|
 | `--severity <level>` | Filter: `critical`, `high`, `medium`, `low` |
 | `--verdict <verdict>` | Filter: `affected`, `not_affected`, `under_investigation` |
+| `--epss <threshold>` | Filter by EPSS exploitation probability >= threshold (0.0–1.0) |
+| `--stale` | Show staleness score of the dependency alongside each CVE |
 | `--refresh` | Trigger fresh enrichment from configured databases before listing |
 | `--add <cveId>` | Manually register a CVE (requires `--package` and `--version`) |
 | `--package <name>` | Package name for manual CVE registration |
@@ -298,6 +301,27 @@ kirograph reachability lodash              # By package name
 ```
 
 Shows: verdict (`affected` / `not affected` / `under investigation`), reaching entry point count, call paths (up to 5), unresolved symbols, and impact summary (affected layers, entry points, distinct paths) when verdict is `affected`.
+
+### License Compliance
+
+```bash
+kirograph licenses [path]                  # List all dependency licenses
+kirograph licenses --policy                # Show only policy violations
+kirograph licenses --deny "GPL-*,AGPL-3.0" # Override deny list (comma-separated SPDX patterns)
+kirograph licenses --warn "LGPL-*"         # Override warn list
+kirograph licenses --format json
+```
+
+### Dependency Staleness
+
+```bash
+kirograph staleness [path]                 # Check freshness against registries
+kirograph staleness --threshold 0.5        # Only show staleness_score >= 0.5
+kirograph staleness --refresh              # Re-query registries first
+kirograph staleness --format json
+```
+
+Staleness score 0.0–1.0: `0` = current, `1` = very stale. Supports npm, PyPI, crates.io, RubyGems, Packagist.
 
 ## Memory *(requires `enableMemory: true`)*
 

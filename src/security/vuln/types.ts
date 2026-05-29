@@ -4,6 +4,13 @@
 
 import type { CVERecord } from '../types';
 
+/** A single entry in a batch vulnerability query. */
+export interface BatchQuery {
+  ecosystem: string;
+  packageName: string;
+  version: string;
+}
+
 /**
  * Adapter interface for querying a vulnerability database.
  * Each supported database (OSV, NVD, etc.) implements this interface.
@@ -14,12 +21,6 @@ export interface VulnDatabaseAdapter {
 
   /**
    * Query for vulnerabilities affecting a specific package version.
-   *
-   * @param ecosystem - Package ecosystem (npm, maven, go, pypi, cargo)
-   * @param packageName - Package name
-   * @param version - Resolved version string
-   * @param signal - Optional AbortSignal for timeout/cancellation
-   * @returns Array of CVE records matching the query
    */
   query(
     ecosystem: string,
@@ -27,4 +28,14 @@ export interface VulnDatabaseAdapter {
     version: string,
     signal?: AbortSignal,
   ): Promise<CVERecord[]>;
+
+  /**
+   * Batch query — results[i] corresponds to queries[i].
+   * Implementing this is optional but strongly recommended for performance:
+   * a single HTTP request replaces N sequential requests.
+   */
+  queryBatch?(
+    queries: BatchQuery[],
+    signal?: AbortSignal,
+  ): Promise<Array<CVERecord[]>>;
 }

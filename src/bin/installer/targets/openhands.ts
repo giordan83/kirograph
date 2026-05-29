@@ -29,14 +29,14 @@ export function installOpenHandsEarly(projectRoot: string): void {
   console.log(`  ✓ OpenHands MCP server registered in ${configPath}`);
 }
 
-export function installOpenHandsLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
+export function installOpenHandsLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'openhands.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity)));
   console.log(`  ✓ OpenHands instructions written to ${instructionsPath}`);
 
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const changed = upsertGeneratedBlock(agentsPath, OPENHANDS_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory)));
+  const changed = upsertGeneratedBlock(agentsPath, OPENHANDS_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity)));
   console.log(changed
     ? `  ✓ AGENTS.md updated with KiroGraph instructions (OpenHands)`
     : `  ✓ AGENTS.md already up to date`);

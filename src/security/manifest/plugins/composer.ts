@@ -56,6 +56,9 @@ export async function parseComposerManifest(
   // Attempt to load resolved versions from composer.lock
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Extract the project-level license
+  const license = extractComposerLicense(manifest);
+
   const dependencies: ParsedDependency[] = [];
 
   // Process `require` (production) and `require-dev` (development) sections
@@ -90,6 +93,7 @@ export async function parseComposerManifest(
         scope,
         ecosystem: 'composer',
         sourceManifest: relativeManifest,
+        ...(license !== undefined ? { license } : {}),
       });
     }
   }
@@ -182,4 +186,19 @@ function extractFromComposerLock(content: string, map: ResolvedVersionMap): void
       }
     }
   }
+}
+
+/**
+ * Extract the license field from a parsed composer.json manifest.
+ * The "license" field can be a string or an array of strings (SPDX).
+ */
+function extractComposerLicense(manifest: Record<string, unknown>): string | undefined {
+  const raw = manifest['license'];
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return raw.trim();
+  }
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
+    return (raw as string[]).join(' OR ');
+  }
+  return undefined;
 }

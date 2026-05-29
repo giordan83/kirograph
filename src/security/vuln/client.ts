@@ -11,8 +11,11 @@
 import type { GraphDatabase } from '../../db/database';
 import type { Edge } from '../../types';
 import type { CVERecord, EnrichmentResult } from '../types';
-import type { VulnDatabaseAdapter } from './types';
+import type { VulnDatabaseAdapter, BatchQuery } from './types';
 import { logError, logWarn } from '../../errors';
+import { EpssClient } from './epss-client';
+
+const BATCH_CHUNK_SIZE = 1000;
 
 /**
  * Dependency row from sec_dependencies table.
@@ -43,9 +46,9 @@ export class VulnerabilityDatabaseClient {
   /**
    * Enrich all Dependency_Nodes with vulnerability data.
    *
-   * Iterates over all dependencies in sec_dependencies, queries each configured
-   * database adapter in order, merges results, deduplicates by CVE ID, creates
-   * Vulnerability_Nodes and has_vulnerability edges, and updates timestamps.
+   * Uses batch queries (up to 1000 per HTTP request) when the adapter supports
+   * `queryBatch`. Falls back to sequential single queries per dependency if batch
+   * is unavailable or fails. Results are deduplicated by CVE ID across adapters.
    */
   async enrichAll(): Promise<EnrichmentResult> {
     const rawDb = this.db.getRawDb();
@@ -56,44 +59,140 @@ export class VulnerabilityDatabaseClient {
       staleNodes: [],
     };
 
-    // Get all dependency nodes
     const depRows: DependencyRow[] = rawDb.all(
       `SELECT node_id, ecosystem, package_name, resolved_version, declared_constraint
        FROM sec_dependencies`,
     );
 
-    for (const dep of depRows) {
-      const version = dep.resolved_version || dep.declared_constraint;
-      if (!version) {
-        continue;
+    // Filter out deps with no usable version
+    const queryableDeps = depRows.filter(d => d.resolved_version || d.declared_constraint);
+
+    for (const adapter of this.adapters) {
+      if (adapter.queryBatch) {
+        await this.enrichAllBatch(adapter, queryableDeps, result);
+      } else {
+        await this.enrichAllSequential(adapter, queryableDeps, result);
       }
+    }
 
-      const cveRecords = await this.queryAdaptersForDependency(
-        dep,
-        version,
-        result,
-      );
-
-      // Deduplicate by CVE ID across all adapters
-      const uniqueCves = this.deduplicateByCveId(cveRecords);
-
-      // Create Vulnerability_Nodes and edges for each unique CVE
-      for (const cve of uniqueCves) {
-        this.upsertVulnerabilityNode(rawDb, cve, dep.node_id);
-        result.vulnerabilitiesFound++;
-      }
-
-      // Record lastVulnCheck timestamp (Requirement 3.4)
-      const now = Date.now();
+    // Record lastVulnCheck for all queried deps (do once, after all adapters)
+    const now = Date.now();
+    for (const dep of queryableDeps) {
       rawDb.run(
         `UPDATE sec_dependencies SET last_vuln_check = ? WHERE node_id = ?`,
         [now, dep.node_id],
       );
-
-      result.dependenciesChecked++;
     }
+    result.dependenciesChecked = queryableDeps.length;
+
+    // Enrich stored vulnerabilities with EPSS scores
+    await this.enrichEpss(rawDb);
 
     return result;
+  }
+
+  /**
+   * Fetch EPSS scores for all stored vulnerabilities and update the database.
+   */
+  private async enrichEpss(rawDb: any): Promise<void> {
+    try {
+      const cveRows: Array<{ cve_id: string }> = rawDb.all(
+        `SELECT cve_id FROM sec_vulnerabilities`,
+      );
+
+      if (cveRows.length === 0) {
+        return;
+      }
+
+      const cveIds = cveRows.map(r => r.cve_id);
+      const epssClient = new EpssClient();
+      const scores = await epssClient.fetchScores(cveIds);
+
+      if (scores.size === 0) {
+        return;
+      }
+
+      const fetchedAt = Date.now();
+      for (const [cveId, { score, percentile }] of scores) {
+        rawDb.run(
+          `UPDATE sec_vulnerabilities SET epss_score = ?, epss_percentile = ?, epss_fetched_at = ? WHERE cve_id = ?`,
+          [score, percentile, fetchedAt, cveId],
+        );
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logWarn(`[sec:epss] EPSS enrichment failed (non-critical): ${msg}`);
+    }
+  }
+
+  /**
+   * Batch enrichment path: groups deps into chunks of BATCH_CHUNK_SIZE and sends
+   * one HTTP request per chunk. Falls back to sequential on batch failure.
+   */
+  private async enrichAllBatch(
+    adapter: VulnDatabaseAdapter & Required<Pick<VulnDatabaseAdapter, 'queryBatch'>>,
+    deps: DependencyRow[],
+    result: EnrichmentResult,
+  ): Promise<void> {
+    const rawDb = this.db.getRawDb();
+
+    for (let i = 0; i < deps.length; i += BATCH_CHUNK_SIZE) {
+      const chunk = deps.slice(i, i + BATCH_CHUNK_SIZE);
+      const queries: BatchQuery[] = chunk.map(dep => ({
+        ecosystem: dep.ecosystem,
+        packageName: dep.package_name,
+        version: dep.resolved_version || dep.declared_constraint,
+      }));
+
+      let batchResults: Array<CVERecord[]>;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+        try {
+          batchResults = await adapter.queryBatch(queries, controller.signal);
+        } finally {
+          clearTimeout(timeout);
+        }
+      } catch (error: unknown) {
+        // Batch failed — fall back to sequential for this chunk
+        const msg = error instanceof Error ? error.message : String(error);
+        logWarn(`[sec:vuln] ${adapter.name} batch query failed (${msg}), falling back to sequential for chunk of ${chunk.length}`);
+        await this.enrichAllSequential(adapter, chunk, result);
+        continue;
+      }
+
+      for (let j = 0; j < chunk.length; j++) {
+        const dep = chunk[j]!;
+        const cveRecords = batchResults[j] ?? [];
+        const uniqueCves = this.deduplicateByCveId(cveRecords);
+        for (const cve of uniqueCves) {
+          this.upsertVulnerabilityNode(rawDb, cve, dep.node_id);
+          result.vulnerabilitiesFound++;
+        }
+      }
+    }
+  }
+
+  /**
+   * Sequential enrichment path: queries one dependency at a time.
+   * Used when the adapter does not support queryBatch, or as a fallback.
+   */
+  private async enrichAllSequential(
+    adapter: VulnDatabaseAdapter,
+    deps: DependencyRow[],
+    result: EnrichmentResult,
+  ): Promise<void> {
+    const rawDb = this.db.getRawDb();
+
+    for (const dep of deps) {
+      const version = dep.resolved_version || dep.declared_constraint;
+      const cveRecords = await this.queryAdaptersForDependency(dep, version, result, [adapter]);
+      const uniqueCves = this.deduplicateByCveId(cveRecords);
+      for (const cve of uniqueCves) {
+        this.upsertVulnerabilityNode(rawDb, cve, dep.node_id);
+        result.vulnerabilitiesFound++;
+      }
+    }
   }
 
   /**
@@ -152,17 +251,19 @@ export class VulnerabilityDatabaseClient {
   }
 
   /**
-   * Query all configured adapters for a single dependency.
+   * Query a set of adapters for a single dependency.
    * Handles timeouts and unreachable databases gracefully.
+   * Defaults to all configured adapters when adapterList is omitted.
    */
   private async queryAdaptersForDependency(
     dep: DependencyRow,
     version: string,
     result: EnrichmentResult,
+    adapterList: VulnDatabaseAdapter[] = this.adapters,
   ): Promise<CVERecord[]> {
     const allRecords: CVERecord[] = [];
 
-    for (const adapter of this.adapters) {
+    for (const adapter of adapterList) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);

@@ -37,8 +37,8 @@ export function installContinueEarly(projectRoot: string): void {
   console.log(`  ✓ Continue MCP server registered in ${mcpPath}`);
 }
 
-export function installContinueLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory);
+export function installContinueLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean): void {
+  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'continue.md');
   ensureDir(path.dirname(instructionsPath));

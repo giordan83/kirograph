@@ -225,7 +225,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
 
     <div class="cmp-panel" id="panel-security">
     <h3 id="cmp-security">🔒 Security <span style="font-size:0.8rem;font-weight:normal;color:var(--text-muted);">(opt-in: <code>enableSecurity: true</code>)</span></h3>
-    <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">None of the compared MCP tools include dependency vulnerability scanning. The relevant comparison for this module is against dedicated SCA tools — see the <a href="guide/security.html" style="color:var(--accent);">security documentation</a> for a full breakdown vs Trivy, Snyk, npm audit, and others.</p>
+    <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">None of the compared MCP tools include dependency vulnerability scanning. The relevant comparison for this module is against dedicated SCA tools — see the <a href="#security" style="color:var(--accent);">security section</a> for configuration and CLI reference, or the table below for a direct SCA comparison.</p>
     <div style="overflow-x:auto;">
     <table class="config-table cmp-filterable">
       <thead><tr><th>Feature</th><th>KiroGraph</th><th>CodeGraph</th><th>CRG</th><th>jMunch</th><th>cavemem</th><th>rtk</th></tr></thead>
@@ -237,6 +237,10 @@ kirograph install --target kiro   # install for a specific platform only</code><
         <tr><td>CycloneDX 1.5 SBOM export</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>CycloneDX 1.5 VEX export</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Fix suggestions per ecosystem</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>EPSS exploitation probability</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>License compliance (SPDX + policy)</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Dependency staleness score</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Dashboard security overlay</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Manual CVE registration</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Queryable via MCP by AI agents</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
       </tbody>
@@ -245,19 +249,19 @@ kirograph install --target kiro   # install for a specific platform only</code><
     <h4 style="margin-top:1.5rem;">KiroGraph-Sec vs dedicated SCA tools</h4>
     <div style="overflow-x:auto;">
     <table class="config-table">
-      <thead><tr><th>Tool</th><th>Reachability</th><th>SBOM/VEX</th><th>MCP / AI-queryable</th><th>Local / free</th><th>Ecosystems</th></tr></thead>
+      <thead><tr><th>Tool</th><th>Reachability</th><th>SBOM/VEX</th><th>EPSS</th><th>License</th><th>Staleness</th><th>MCP</th><th>Free</th><th>Ecosystems</th></tr></thead>
       <tbody>
-        <tr><td><strong>KiroGraph-Sec</strong></td><td>✅ call-graph BFS</td><td>✅ CycloneDX 1.5</td><td>✅</td><td>✅</td><td>5 (npm, Maven, Go, pip, Cargo)</td></tr>
-        <tr><td>Trivy</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>✅</td><td>10+ (+ OS packages)</td></tr>
-        <tr><td>Grype</td><td>—</td><td>✅ via Syft</td><td>—</td><td>✅</td><td>10+</td></tr>
-        <tr><td>OWASP Dep-Check</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>✅</td><td>8+</td></tr>
-        <tr><td>npm audit</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>npm only</td></tr>
-        <tr><td>Snyk</td><td>✅ (paid, JS/Python)</td><td>✅</td><td>—</td><td>✗ paid</td><td>10+</td></tr>
-        <tr><td>Dependabot</td><td>—</td><td>—</td><td>—</td><td>✅ (GitHub)</td><td>10+</td></tr>
+        <tr><td><strong>KiroGraph-Sec</strong></td><td>✅ call-graph</td><td>✅ CycloneDX 1.5</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>14</td></tr>
+        <tr><td>Trivy</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>10+ (+ OS)</td></tr>
+        <tr><td>Grype</td><td>—</td><td>✅ via Syft</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>10+</td></tr>
+        <tr><td>OWASP Dep-Check</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>8+</td></tr>
+        <tr><td>npm audit</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>npm only</td></tr>
+        <tr><td>Snyk</td><td>✅ (paid)</td><td>✅</td><td>✅ (paid)</td><td>—</td><td>—</td><td>—</td><td>✗</td><td>10+</td></tr>
+        <tr><td>Dependabot</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>10+</td></tr>
       </tbody>
     </table>
     </div>
-    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">The key differentiator: KiroGraph-Sec uses the call graph already built from code indexing to determine whether vulnerable code is <em>actually reachable</em> from entry points — not just present as a transitive dependency. Reachability analysis is free and works across all 5 ecosystems, whereas Snyk's equivalent is a paid feature limited to JS/Python.</p>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">KiroGraph-Sec uses the call graph already built from code indexing to determine whether vulnerable code is <em>actually reachable</em> from entry points — not just present as a transitive dependency. It is the only free SCA tool with EPSS scoring, license policy enforcement, and staleness tracking across 14 ecosystems.</p>
     </div>
 
     <div class="cmp-panel" id="panel-memory">
@@ -1167,9 +1171,11 @@ kirograph docs reembed                      # re-embed with current model</code>
       <table>
         <thead><tr><th>Command</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>kirograph security [path]</code></td><td>Overview: dep count, vulnerability count, verdict breakdown, stale data warnings</td></tr>
-          <tr><td><code>kirograph vulns [path]</code></td><td>List vulnerabilities — filter by <code>--severity</code>, <code>--verdict</code>, refresh with <code>--refresh</code>, register with <code>--add</code></td></tr>
+          <tr><td><code>kirograph security [path]</code></td><td>Overview: dep count, vulnerability count, verdict breakdown, stale warnings (<code>--refresh-staleness</code>)</td></tr>
+          <tr><td><code>kirograph vulns [path]</code></td><td>List vulnerabilities — <code>--severity</code>, <code>--verdict</code>, <code>--epss &lt;n&gt;</code>, <code>--stale</code>, <code>--refresh</code>, <code>--add</code></td></tr>
           <tr><td><code>kirograph reachability &lt;target&gt;</code></td><td>Check reachability for a CVE ID or package name — verdict, call paths, impact summary</td></tr>
+          <tr><td><code>kirograph licenses [path]</code></td><td>List dependency licenses, check policy (<code>--policy</code>, <code>--deny</code>, <code>--warn</code>)</td></tr>
+          <tr><td><code>kirograph staleness [path]</code></td><td>Check dependency freshness against registries (<code>--threshold</code>, <code>--refresh</code>)</td></tr>
           <tr><td><code>kirograph vex [--output file]</code></td><td>Export CycloneDX 1.5 VEX document</td></tr>
           <tr><td><code>kirograph sbom [--output file]</code></td><td>Export CycloneDX 1.5 SBOM document</td></tr>
         </tbody>
@@ -1183,7 +1189,7 @@ kirograph docs reembed                      # re-embed with current model</code>
       <li><strong>VEX</strong> — Vulnerability Exploitability eXchange with reachability-derived analysis states and justifications</li>
     </ul>
 
-    <p><a href="guide/security.html">Full security documentation →</a></p>
+    <p><a href="#comparison">Feature comparison →</a></p>
 
     <!-- ── Caveman Mode ── -->
     <h2 id="caveman-mode">Caveman Mode</h2>

@@ -494,3 +494,22 @@ Manually register a CVE against a dependency. Creates a Vulnerability_Node linke
 | `summary` | string | - | Human-readable description (truncated to 500 chars) |
 | `fixedVersion` | string | - | Version that fixes the vulnerability |
 | `projectPath` | string | cwd | Project root path |
+
+### `kirograph_licenses`
+
+List dependency licenses and check against the configured policy (`securityLicensePolicy`).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `policy` | boolean | false | Show only policy violations (deny/warn) |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_staleness`
+
+Check dependency freshness — identifies packages significantly behind their latest published version. Supports npm, PyPI, crates.io, RubyGems, and Packagist registries.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | number | 0.3 | Minimum staleness score (0.0–1.0) to include |
+| `refresh` | boolean | false | Re-query registries before listing |
+| `projectPath` | string | cwd | Project root path |

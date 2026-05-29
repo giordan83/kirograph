@@ -105,6 +105,17 @@ export interface KiroGraphConfig {
   securityDatabases: string[];
   /** Auto-run vulnerability enrichment after manifest parsing. Default: true. */
   securityAutoEnrich: boolean;
+  /**
+   * License policy for dependency compliance.
+   * deny: licenses to block (build fails / command exits non-zero).
+   * warn: licenses to flag as warnings.
+   * Patterns support wildcards: GPL-* matches GPL-2.0, GPL-3.0, etc.
+   * Default: { deny: [], warn: [] }.
+   */
+  securityLicensePolicy: {
+    deny: string[];
+    warn: string[];
+  };
   /** Context budget governance settings. */
   contextBudget?: {
     maxTokensPerSession: number;
@@ -130,7 +141,7 @@ const KNOWN_FIELDS = new Set<string>([
   'docsContextLimit', 'docsContextThreshold', 'docsMaxFileSize', 'docsSummarization',
   'enableData', 'dataInclude', 'dataExclude', 'dataLinkCode',
   'dataContextLimit', 'dataMaxFileSize', 'dataMaxRows', 'dataQueryLimit', 'dataMaxResponseTokens',
-  'enableSecurity', 'securityDatabases', 'securityAutoEnrich',
+  'enableSecurity', 'securityDatabases', 'securityAutoEnrich', 'securityLicensePolicy',
   'contextBudget',
   // Legacy aliases (still accepted, mapped during validation)
   'enableCompression', 'compressionLevel',
@@ -206,6 +217,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     enableSecurity: false,
     securityDatabases: ['OSV'],
     securityAutoEnrich: true,
+    securityLicensePolicy: { deny: [], warn: [] },
   };
 }
 
@@ -415,6 +427,23 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     securityDatabases = defaults.securityDatabases;
   }
 
+  let securityLicensePolicy: KiroGraphConfig['securityLicensePolicy'];
+  if (raw.securityLicensePolicy && typeof raw.securityLicensePolicy === 'object' && !Array.isArray(raw.securityLicensePolicy)) {
+    const rawPolicy = raw.securityLicensePolicy as Record<string, unknown>;
+    const deny = Array.isArray(rawPolicy.deny) && rawPolicy.deny.every((p: unknown) => typeof p === 'string')
+      ? (rawPolicy.deny as string[])
+      : defaults.securityLicensePolicy.deny;
+    const warn = Array.isArray(rawPolicy.warn) && rawPolicy.warn.every((p: unknown) => typeof p === 'string')
+      ? (rawPolicy.warn as string[])
+      : defaults.securityLicensePolicy.warn;
+    securityLicensePolicy = { deny, warn };
+  } else {
+    if (raw.securityLicensePolicy !== undefined) {
+      logWarn('Invalid config field securityLicensePolicy: expected object with deny/warn arrays, applying default');
+    }
+    securityLicensePolicy = defaults.securityLicensePolicy;
+  }
+
   // Dependency constraint: enableSecurity requires enableArchitecture
   let finalEnableArchitecture = enableArchitecture;
   if (enableSecurity && !enableArchitecture) {
@@ -490,6 +519,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     enableSecurity,
     securityDatabases,
     securityAutoEnrich,
+    securityLicensePolicy,
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
     ...(contextBudget !== undefined ? { contextBudget } : {}),
   };

@@ -7,7 +7,8 @@ export function register(program: Command): void {
   program
     .command('security [projectPath]')
     .description('Show security overview: vulnerabilities, reachability verdicts, stale data warnings')
-    .action(async (projectPath: string | undefined) => {
+    .option('--refresh-staleness', 'Fetch latest version info from registries and show stale dependency count')
+    .action(async (projectPath: string | undefined, opts: { refreshStaleness?: boolean }) => {
       const target = path.resolve(projectPath ?? process.cwd());
       const config = await loadConfig(target);
 
@@ -37,6 +38,19 @@ export function register(program: Command): void {
       const db = cg.getDatabase();
       db.applySecuritySchema();
       const rawDb = db.getRawDb();
+
+      // Optionally refresh staleness data from registries
+      if (opts.refreshStaleness) {
+        console.error(`  ${dim}Fetching latest version info from package registries...${reset}`);
+        const { StalenessChecker } = await import('../../security/staleness');
+        const checker = new StalenessChecker(db);
+        const result = await checker.checkAll();
+        console.error(`  ${green}✓${reset} Checked ${bold}${result.checked}${reset} packages, ${bold}${result.stale}${reset} stale`);
+        if (result.errors.length > 0) {
+          console.error(`  ${'\x1b[33m'}⚠${reset} ${result.errors.length} error(s) during registry fetch`);
+        }
+        console.error();
+      }
 
       // Query dependency counts
       const depCount: { count: number } = rawDb.get(
@@ -93,6 +107,24 @@ export function register(program: Command): void {
       if (staleCount.count > 0) {
         console.log(`  ${'\x1b[33m'}⚠${reset} ${bold}${staleCount.count}${reset} ${dim}dependenc${staleCount.count === 1 ? 'y has' : 'ies have'} stale vulnerability data.${reset}`);
         console.log(`  ${dim}Run${reset} ${violet}${bold}kirograph vulns --refresh${reset} ${dim}to update.${reset}\n`);
+      }
+
+      // Show stale dependency count (version staleness) if data exists
+      const stalenessDataCount: { count: number } = rawDb.get(
+        `SELECT COUNT(*) as count FROM sec_dependencies WHERE staleness_score IS NOT NULL`,
+      ) ?? { count: 0 };
+
+      if (stalenessDataCount.count > 0) {
+        const staleDepCount: { count: number } = rawDb.get(
+          `SELECT COUNT(*) as count FROM sec_dependencies WHERE staleness_score >= 0.3`,
+        ) ?? { count: 0 };
+        console.log(`  ${dim}Stale dependencies:${reset}    ${staleDepCount.count > 0 ? `${'\x1b[33m'}${bold}${staleDepCount.count}${reset}` : `${green}${bold}0${reset}`} ${dim}of ${stalenessDataCount.count} scored${reset}`);
+        if (staleDepCount.count > 0) {
+          console.log(`  ${dim}Run${reset} ${violet}${bold}kirograph staleness${reset} ${dim}for details.${reset}`);
+        }
+        console.log();
+      } else if (!opts.refreshStaleness) {
+        console.log(`  ${dim}No staleness data.${reset} ${dim}Run${reset} ${violet}${bold}kirograph security --refresh-staleness${reset} ${dim}to score dependencies.${reset}\n`);
       }
 
       cg.close();

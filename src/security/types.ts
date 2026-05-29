@@ -14,6 +14,7 @@ export interface ParsedDependency {
   scope: 'production' | 'development' | 'optional';
   ecosystem: string;
   sourceManifest: string; // relative path to declaring manifest
+  license?: string; // SPDX expression or license name, if available in the manifest
 }
 
 export interface ManifestParseResult {

@@ -52,6 +52,9 @@ export async function parseNugetManifest(
   // Attempt to load resolved versions from packages.lock.json
   const resolvedVersions = loadResolvedVersions(manifestDir);
 
+  // Extract project-level license from .csproj
+  const license = extractNugetLicense(content);
+
   const dependencies: ParsedDependency[] = [];
 
   // Extract from .csproj PackageReference elements
@@ -65,6 +68,7 @@ export async function parseNugetManifest(
       scope: dep.scope,
       ecosystem: 'nuget',
       sourceManifest: relativeManifest,
+      ...(license !== undefined ? { license } : {}),
     });
   }
 
@@ -84,6 +88,7 @@ export async function parseNugetManifest(
           scope: dep.scope,
           ecosystem: 'nuget',
           sourceManifest: relativePackagesConfig,
+          ...(license !== undefined ? { license } : {}),
         });
       }
     } catch (err) {
@@ -270,4 +275,16 @@ function extractFromPackagesLock(
       }
     }
   }
+}
+
+/**
+ * Extract the PackageLicenseExpression from a .csproj file.
+ * Handles: <PackageLicenseExpression>MIT</PackageLicenseExpression>
+ */
+function extractNugetLicense(content: string): string | undefined {
+  const match = content.match(/<PackageLicenseExpression\s*>\s*([^<]+)\s*<\/PackageLicenseExpression>/i);
+  if (match && match[1].trim() !== '') {
+    return match[1].trim();
+  }
+  return undefined;
 }

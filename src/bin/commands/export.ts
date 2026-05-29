@@ -11,6 +11,15 @@ function openBrowser(filePath: string): void {
   spawn(cmd, [filePath], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' }).unref();
 }
 
+type SecurityStatus = 'affected' | 'under_investigation' | 'not_affected' | 'none';
+
+interface SecurityOverlayData {
+  /** Maps dependency node_id → worst verdict */
+  depVerdicts: Map<string, SecurityStatus>;
+  /** Maps vulnerability node_id → verdict */
+  vulnVerdicts: Map<string, SecurityStatus>;
+}
+
 async function generateExport(
   projectPath: string | undefined,
   opts: { output?: string; includeContains: boolean },
@@ -21,6 +30,64 @@ async function generateExport(
 
   const nodes = cg.getAllNodes();
   const edges = cg.getAllEdges();
+
+  // ── Security overlay data (only when enableSecurity is configured) ────────
+  let securityOverlay: SecurityOverlayData | undefined;
+  try {
+    const db = cg.getDatabase();
+    db.applySecuritySchema();
+
+    // Query worst verdict per dependency node
+    const depRows: Array<{ node_id: string; verdict: string | null }> = (db as any).getRawDb().all(
+      `SELECT d.node_id, r.verdict
+       FROM sec_dependencies d
+       LEFT JOIN edges e ON e.source = d.node_id AND e.kind = 'has_vulnerability'
+       LEFT JOIN sec_reachability r ON r.vulnerability_node_id = e.target
+       ORDER BY
+         CASE r.verdict
+           WHEN 'affected'            THEN 0
+           WHEN 'under_investigation' THEN 1
+           WHEN 'not_affected'        THEN 2
+           ELSE 3
+         END`,
+    );
+
+    const depVerdicts = new Map<string, SecurityStatus>();
+    for (const row of depRows) {
+      // Only keep the first (worst) verdict per node_id due to ORDER BY above
+      if (!depVerdicts.has(row.node_id)) {
+        const status: SecurityStatus = (
+          row.verdict === 'affected'            ? 'affected' :
+          row.verdict === 'under_investigation' ? 'under_investigation' :
+          row.verdict === 'not_affected'        ? 'not_affected' :
+          'none'
+        );
+        depVerdicts.set(row.node_id, status);
+      }
+    }
+
+    // Query vulnerability node verdicts
+    const vulnRows: Array<{ node_id: string; verdict: string }> = (db as any).getRawDb().all(
+      `SELECT node_id, verdict FROM sec_reachability`,
+    );
+    const vulnVerdicts = new Map<string, SecurityStatus>();
+    for (const row of vulnRows) {
+      const status: SecurityStatus = (
+        row.verdict === 'affected'            ? 'affected' :
+        row.verdict === 'under_investigation' ? 'under_investigation' :
+        row.verdict === 'not_affected'        ? 'not_affected' :
+        'none'
+      );
+      vulnVerdicts.set(row.node_id, status);
+    }
+
+    if (depVerdicts.size > 0 || vulnVerdicts.size > 0) {
+      securityOverlay = { depVerdicts, vulnVerdicts };
+    }
+  } catch {
+    // Security schema not present or tables empty — overlay disabled silently
+  }
+
   cg.close();
 
   const projectName = path.basename(target);
@@ -55,7 +122,7 @@ async function generateExport(
 
   fs.mkdirSync(outDir, { recursive: true });
 
-  const { html, css, js } = buildFiles(nodes, edges, projectName, opts.includeContains, logoBase64, fileModified);
+  const { html, css, js } = buildFiles(nodes, edges, projectName, opts.includeContains, logoBase64, fileModified, securityOverlay);
 
   fs.writeFileSync(path.join(outDir, 'index.html'), html, 'utf8');
   fs.writeFileSync(path.join(outDir, 'app.css'),    css,  'utf8');
@@ -137,9 +204,22 @@ function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Security status → node color ─────────────────────────────────────────────
+const SEC_DEP_COLOR: Record<string, string> = {
+  affected:            '#ef4444',
+  under_investigation: '#f59e0b',
+  not_affected:        '#22c55e',
+  none:                '#64748b',
+};
+const SEC_VULN_COLOR: Record<string, string> = {
+  affected:            '#dc2626',
+  under_investigation: '#d97706',
+  not_affected:        '#16a34a',
+};
+
 function buildFiles(
   nodes: any[], edges: any[], projectName: string, includeContains: boolean, logoBase64?: string,
-  fileModified?: Record<string, number>,
+  fileModified?: Record<string, number>, securityOverlay?: SecurityOverlayData,
 ): { html: string; css: string; js: string } {
   const filteredEdges = includeContains ? edges : edges.filter(e => e.kind !== 'contains');
 
@@ -154,14 +234,32 @@ function buildFiles(
     const fp: string = n.filePath ?? '';
     const parts = fp.split('/').filter(Boolean);
     const dir = parts.length >= 2 ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
+
+    // Determine security status and override color when overlay data is present
+    let securityStatus: SecurityStatus = 'none';
+    let baseColor = KIND_COLOR[n.kind] ?? '#424242';
+
+    if (securityOverlay) {
+      if (n.kind === 'dependency') {
+        securityStatus = securityOverlay.depVerdicts.get(n.id) ?? 'none';
+        baseColor = SEC_DEP_COLOR[securityStatus];
+      } else if (n.kind === 'vulnerability') {
+        const verdict = securityOverlay.vulnVerdicts.get(n.id);
+        if (verdict) {
+          securityStatus = verdict;
+          baseColor = SEC_VULN_COLOR[verdict] ?? baseColor;
+        }
+      }
+    }
+
     return {
       id:           n.id,
       label:        n.name,
       color: {
-        background: KIND_COLOR[n.kind] ?? '#424242',
-        border:     lighten(KIND_COLOR[n.kind] ?? '#424242'),
+        background: baseColor,
+        border:     lighten(baseColor),
         highlight:  { background: '#e040fb', border: '#ea80fc' },
-        hover:      { background: lighten(KIND_COLOR[n.kind] ?? '#424242'), border: '#ea80fc' },
+        hover:      { background: lighten(baseColor), border: '#ea80fc' },
       },
       size:         Math.max(8, Math.min(40, 8 + (degree.get(n.id) ?? 0) * 1.5)),
       font:         { size: 11, color: '#e0e0e0', face: 'monospace' },
@@ -176,6 +274,7 @@ function buildFiles(
       borderWidth:  n.isExported ? 2 : 1,
       borderWidthSelected: 3,
       lastModified: fileModified ? (fileModified[fp] ?? 0) : 0,
+      securityStatus,
     };
   });
 
@@ -195,6 +294,9 @@ function buildFiles(
 
   const allNodeKinds = [...new Set(nodes.map((n: any) => n.kind))].sort();
   const allEdgeKinds = [...new Set(filteredEdges.map((e: any) => e.kind))].sort();
+
+  // Detect whether any security nodes are present in this graph
+  const hasSecurityNodes = visNodes.some(n => n.kind === 'dependency' || n.kind === 'vulnerability');
 
   const logoTag = logoBase64
     ? `<img src="data:image/png;base64,${logoBase64}" alt="KiroGraph">`
@@ -270,7 +372,8 @@ function buildFiles(
       <button class="fbtn" id="btn-focus"   title="Focus on node and neighbors">◎ <span class="fbtn-label">Focus</span></button>
       <button class="fbtn" id="btn-path"    title="Find path between two nodes">⟶ <span class="fbtn-label">Path</span></button>
       <button class="fbtn" id="btn-cluster" title="Cluster by directory">⬡ <span class="fbtn-label">Cluster</span></button>
-      <button class="fbtn" id="btn-heat"    title="Heat map by file recency">🌡 <span class="fbtn-label">Heat</span></button>
+      <button class="fbtn" id="btn-heat"    title="Heat map by file recency">🌡 <span class="fbtn-label">Heat</span></button>${hasSecurityNodes ? `
+      <button class="fbtn" id="btn-security" title="Security overlay — highlight dependency/vulnerability nodes">🔒 <span class="fbtn-label">Security</span></button>` : ''}
       <button class="fbtn" id="btn-charts"  title="Analytics charts">📊 <span class="fbtn-label">Charts</span></button>
     </div>
 
@@ -285,7 +388,20 @@ function buildFiles(
         <div class="heat-stop" data-tip="Modified more than 6 months ago"><span class="heat-stop-dot" style="background:#2980b9"></span>Older</div>
       </div>
       <div id="heat-tip"></div>
-    </div>
+    </div>${hasSecurityNodes ? `
+
+    <div id="security-legend">
+      <div class="security-legend-title">🔒 Security status</div>
+      <div class="security-stops">
+        <div class="security-stop"><span class="security-stop-dot" style="background:#ef4444"></span>Affected</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#f59e0b"></span>Under investigation</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#22c55e"></span>Not affected</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#64748b"></span>No vuln data</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#dc2626;border:2px solid #fff"></span>Vuln: affected</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#d97706;border:2px solid #fff"></span>Vuln: investigating</div>
+        <div class="security-stop"><span class="security-stop-dot" style="background:#16a34a;border:2px solid #fff"></span>Vuln: not affected</div>
+      </div>
+    </div>` : ''}
   </div>
   </div><!-- /float-sidebar -->
 
@@ -432,7 +548,7 @@ function buildFiles(
 </html>`;
 
   const css = buildCss();
-  const js  = buildJs(visNodes, visEdges, KIND_COLOR, EDGE_COLOR);
+  const js  = buildJs(visNodes, visEdges, KIND_COLOR, EDGE_COLOR, hasSecurityNodes);
 
   return { html, css, js };
 }
@@ -960,12 +1076,51 @@ input[type=range] {
   min-height: 14px;
   font-style: italic;
 }
+
+/* ── Security legend (inside sidebar) ── */
+#security-legend {
+  display: none;
+  background: rgba(8, 8, 18, 0.97);
+  border: 1px solid #3a3a5e;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.75);
+  width: 200px;
+}
+.security-legend-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9da8cc;
+  margin-bottom: 10px;
+}
+.security-stops {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.security-stop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #7a86aa;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.security-stop-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 `;
 }
 
 function buildJs(
   visNodes: any[], visEdges: any[],
   kindColors: Record<string, string>, edgeColors: Record<string, string>,
+  hasSecurityNodes: boolean,
 ): string {
   return `// ── Data ─────────────────────────────────────────────────────────────────────
 const NODES_DATA  = ${JSON.stringify(visNodes)};
@@ -1574,6 +1729,7 @@ document.getElementById('btn-cluster').addEventListener('click', () => {
       document.getElementById('heat-legend').style.display = 'none';
       nodesDS.update(NODES_DATA.map(n => ({ id: n.id, color: originalColors[n.id] })));
     }
+    ${hasSecurityNodes ? `if (securityActive) { exitSecurityOverlay(); }` : ''}
     if (focusActive) exitFocus();
     if (pathMode) exitPath(true);
     network.unselectAll();
@@ -1792,6 +1948,55 @@ document.querySelectorAll('.heat-stop').forEach(function(el) {
   el.addEventListener('mouseleave', function() { if (tip) tip.textContent = ''; });
 });
 
+${hasSecurityNodes ? `// ── Security overlay ─────────────────────────────────────────────────────────
+let securityActive = false;
+
+// Colours embedded from build-time palette
+const SEC_DEP_COLORS = { affected: '#ef4444', under_investigation: '#f59e0b', not_affected: '#22c55e', none: '#64748b' };
+const SEC_VULN_COLORS = { affected: '#dc2626', under_investigation: '#d97706', not_affected: '#16a34a' };
+
+function enterSecurityOverlay() {
+  securityActive = true;
+  document.getElementById('btn-security').classList.add('active');
+  document.getElementById('security-legend').style.display = 'block';
+
+  const DIM = { background: '#111118', border: '#1a1a2a', highlight: { background: '#111118', border: '#1a1a2a' }, hover: { background: '#111118', border: '#1a1a2a' } };
+  const secNodeIds = new Set(
+    NODES_DATA
+      .filter(n => n.kind === 'dependency' || n.kind === 'vulnerability')
+      .map(n => n.id)
+  );
+
+  // Dim edges that don't connect to any security node
+  const secEdgeIds = new Set(
+    EDGES_DATA
+      .filter(e => secNodeIds.has(e.from) || secNodeIds.has(e.to))
+      .map(e => e.id)
+  );
+
+  nodesDS.update(NODES_DATA.map(n => ({
+    id: n.id,
+    color: secNodeIds.has(n.id) ? originalColors[n.id] : DIM,
+  })));
+  edgesDS.update(EDGES_DATA.map(e => ({
+    id: e.id,
+    color: secEdgeIds.has(e.id) ? originalEdgeColors[e.id] : { color: '#111118', opacity: 0.08 },
+  })));
+}
+
+function exitSecurityOverlay() {
+  securityActive = false;
+  document.getElementById('btn-security').classList.remove('active');
+  document.getElementById('security-legend').style.display = 'none';
+  nodesDS.update(NODES_DATA.map(n => ({ id: n.id, color: originalColors[n.id] })));
+  edgesDS.update(EDGES_DATA.map(e => ({ id: e.id, color: originalEdgeColors[e.id] })));
+}
+
+document.getElementById('btn-security').addEventListener('click', () => {
+  if (securityActive) { exitSecurityOverlay(); } else { enterSecurityOverlay(); }
+});
+` : '// Security overlay: no security nodes in this graph'}
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
@@ -1843,6 +2048,9 @@ function resetToEmpty() {
     document.getElementById('btn-heat').classList.remove('active');
     document.getElementById('heat-legend').style.display = 'none';
   }
+
+  // Reset security overlay
+  ${hasSecurityNodes ? `if (securityActive) { exitSecurityOverlay(); }` : ''}
 
   // Reset context menu
   document.getElementById('ctx-menu').style.display = 'none';

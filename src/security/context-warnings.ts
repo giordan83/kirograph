@@ -11,6 +11,8 @@ import { formatFixSuggestion } from './export/fix-suggestions';
 export interface SecurityWarning {
   cveId: string;
   severityScore: number | null;
+  epssScore: number | null;      // exploitation probability 0.0–1.0
+  epssPercentile: number | null; // percentile rank among all CVEs
   packageName: string;
   ecosystem: string;
   fixedVersion: string | null;
@@ -42,6 +44,8 @@ export function getSecurityWarningsForNodes(rawDb: any, nodeIds: string[]): Secu
       SELECT DISTINCT
         v.cve_id,
         v.severity_score,
+        v.epss_score,
+        v.epss_percentile,
         v.fixed_version,
         d.package_name,
         d.ecosystem,
@@ -51,10 +55,12 @@ export function getSecurityWarningsForNodes(rawDb: any, nodeIds: string[]): Secu
       JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
       JOIN sec_dependencies d ON d.node_id = e.source
       WHERE r.verdict = 'affected'
-      ORDER BY v.severity_score DESC NULLS LAST
+      ORDER BY v.epss_score DESC NULLS LAST, v.severity_score DESC NULLS LAST
     `) as Array<{
       cve_id: string;
       severity_score: number | null;
+      epss_score: number | null;
+      epss_percentile: number | null;
       fixed_version: string | null;
       package_name: string;
       ecosystem: string;
@@ -95,16 +101,23 @@ export function getSecurityWarningsForNodes(rawDb: any, nodeIds: string[]): Secu
         warnings.push({
           cveId: row.cve_id,
           severityScore: row.severity_score,
+          epssScore: row.epss_score,
+          epssPercentile: row.epss_percentile,
           packageName: row.package_name,
           ecosystem: row.ecosystem,
           fixedVersion: row.fixed_version,
-          entryPoints: [...new Set(matchingEntryPoints)], // deduplicate
+          entryPoints: [...new Set(matchingEntryPoints)],
         });
       }
     }
 
-    // Sort by severity (highest first)
-    warnings.sort((a, b) => (b.severityScore ?? 0) - (a.severityScore ?? 0));
+    // Sort by risk: EPSS first (actual exploitation probability), then CVSS severity
+    warnings.sort((a, b) => {
+      const epssA = a.epssScore ?? 0;
+      const epssB = b.epssScore ?? 0;
+      if (epssA !== epssB) return epssB - epssA;
+      return (b.severityScore ?? 0) - (a.severityScore ?? 0);
+    });
 
     return warnings;
   } catch {
@@ -129,7 +142,14 @@ export function formatSecurityWarnings(warnings: SecurityWarning[], nodeNames: M
 
   const shown = warnings.slice(0, MAX_SHOWN);
   for (const w of shown) {
-    const severity = w.severityScore !== null ? ` (CVSS ${w.severityScore.toFixed(1)})` : '';
+    const scoreParts: string[] = [];
+    if (w.severityScore !== null) scoreParts.push(`CVSS ${w.severityScore.toFixed(1)}`);
+    if (w.epssScore !== null) {
+      const pct = w.epssPercentile !== null ? ` / ${Math.round(w.epssPercentile * 100)}th%` : '';
+      scoreParts.push(`EPSS ${w.epssScore.toFixed(2)}${pct}`);
+    }
+    const scores = scoreParts.length > 0 ? ` (${scoreParts.join(', ')})` : '';
+
     const entryPointNames = w.entryPoints
       .map(id => nodeNames.get(id) ?? id)
       .slice(0, 3);
@@ -137,13 +157,10 @@ export function formatSecurityWarnings(warnings: SecurityWarning[], nodeNames: M
       ? ` — reaches via: ${entryPointNames.join(', ')}`
       : '';
 
-    lines.push(`- **${w.cveId}**${severity}: ${w.packageName} (${w.ecosystem})${entryPointStr}`);
+    lines.push(`- **${w.cveId}**${scores}: ${w.packageName} (${w.ecosystem})${entryPointStr}`);
 
-    // Add fix suggestion if available
     const fix = formatFixSuggestion(w.ecosystem, w.packageName, w.fixedVersion);
-    if (fix) {
-      lines.push(`  ${fix}`);
-    }
+    if (fix) lines.push(`  ${fix}`);
   }
 
   if (warnings.length > MAX_SHOWN) {

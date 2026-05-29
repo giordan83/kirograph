@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import * as path from 'path';
 import { dim, reset, violet, bold, green, label, value, section, renderTable } from '../ui';
+import { loadConfig } from '../../config';
 
 export function register(program: Command): void {
   program
@@ -87,6 +88,41 @@ export function register(program: Command): void {
       } else {
         console.log(`  ${label('Status')}     ${dim}disabled${reset}`);
       }
+
+      // Security stats (conditional on enableSecurity)
+      try {
+        const config = await loadConfig(target);
+        if (config.enableSecurity) {
+          const db = cg.getDatabase();
+          db.applySecuritySchema();
+          const rawDb = db.getRawDb();
+
+          const depCount: number = rawDb.get('SELECT COUNT(*) as cnt FROM sec_dependencies')?.cnt ?? 0;
+          const vulnCount: number = rawDb.get('SELECT COUNT(*) as cnt FROM sec_vulnerabilities')?.cnt ?? 0;
+          const affectedCount: number = rawDb.get("SELECT COUNT(*) as cnt FROM sec_reachability WHERE verdict = 'affected'")?.cnt ?? 0;
+          const notAffectedCount: number = rawDb.get("SELECT COUNT(*) as cnt FROM sec_reachability WHERE verdict = 'not_affected'")?.cnt ?? 0;
+          const investigatingCount: number = rawDb.get("SELECT COUNT(*) as cnt FROM sec_reachability WHERE verdict = 'under_investigation'")?.cnt ?? 0;
+          const staleCount: number = rawDb.get('SELECT COUNT(*) as cnt FROM sec_dependencies WHERE vuln_data_stale = 1')?.cnt ?? 0;
+
+          console.log();
+          console.log(section('  🔒 Security'));
+          console.log(`  ${label('Dependencies')}  ${value(String(depCount))}`);
+          console.log(`  ${label('Vulnerabilities')} ${value(String(vulnCount))}`);
+
+          if (vulnCount > 0) {
+            const affectedLabel = affectedCount > 0
+              ? `${'\x1b[31m'}${affectedCount} affected${reset}`
+              : `${dim}0 affected${reset}`;
+            console.log(`  ${label('Affected')}     ${affectedLabel}`);
+            console.log(`  ${label('Not Affected')} ${dim}${notAffectedCount}${reset}`);
+            console.log(`  ${label('Investigating')} ${dim}${investigatingCount}${reset}`);
+          }
+
+          if (staleCount > 0) {
+            console.log(`  ${'\x1b[33m'}⚠ ${staleCount} dependenc${staleCount === 1 ? 'y has' : 'ies have'} stale vulnerability data. Run \`kirograph vulns --refresh\` to update.${reset}`);
+          }
+        }
+      } catch { /* non-critical */ }
 
       console.log();
       cg.close();

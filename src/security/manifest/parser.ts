@@ -22,6 +22,7 @@ import { parseComposerManifest } from './plugins/composer';
 import { parseSwiftManifest } from './plugins/swift';
 import { parsePubspecManifest } from './plugins/pubspec';
 import { parseHexManifest } from './plugins/hex';
+import { parsePyprojectManifest } from './plugins/pyproject';
 import type { GraphDatabase } from '../../db/database';
 import type { ParsedDependency, ManifestParseResult } from '../types';
 import type { Node, Edge } from '../../types';
@@ -127,6 +128,17 @@ function createGradlePlugin(): VersionExtractionPlugin {
       return base === 'build.gradle' || base === 'build.gradle.kts';
     },
     extract: parseGradleManifest,
+  };
+}
+
+function createPyprojectPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'pyproject',
+    manifestFiles: ['pyproject.toml'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('pyproject.toml');
+    },
+    extract: parsePyprojectManifest,
   };
 }
 
@@ -265,6 +277,8 @@ interface DeduplicatedDependency {
   scope: ParsedDependency['scope'];
   /** All source manifests that declared this dependency */
   sourceManifests: string[];
+  /** License from manifest, if available */
+  license?: string;
 }
 
 /**
@@ -286,6 +300,7 @@ export function deduplicateDependencies(deps: ParsedDependency[]): DeduplicatedD
         resolvedVersion: dep.resolvedVersion,
         scope: dep.scope,
         sourceManifests: [dep.sourceManifest],
+        license: dep.license,
       });
     } else {
       // Add source manifest if not already present
@@ -301,6 +316,13 @@ export function deduplicateDependencies(deps: ParsedDependency[]): DeduplicatedD
         existing.declaredConstraint = dep.declaredConstraint;
         existing.resolvedVersion = dep.resolvedVersion;
         existing.scope = dep.scope;
+        // Update license if the winning version entry has one
+        if (dep.license !== undefined) {
+          existing.license = dep.license;
+        }
+      } else if (existing.license === undefined && dep.license !== undefined) {
+        // Even if version didn't win, adopt the license if we don't have one
+        existing.license = dep.license;
       }
     }
   }
@@ -334,6 +356,7 @@ export class ManifestParser {
     this.adapter.registerPlugin(createGradlePlugin());
 
     // Standalone plugins (no arch parser — own manifest discovery via manifestFiles)
+    this.adapter.registerStandalonePlugin(createPyprojectPlugin());
     this.adapter.registerStandalonePlugin(createRubygemsPlugin());
     this.adapter.registerStandalonePlugin(createComposerPlugin());
     this.adapter.registerStandalonePlugin(createSwiftPlugin());
@@ -430,8 +453,8 @@ export class ManifestParser {
         // Insert/update the sec_dependencies row
         rawDb.run(
           `INSERT OR REPLACE INTO sec_dependencies
-            (node_id, ecosystem, package_name, declared_constraint, resolved_version, scope, source_manifests)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            (node_id, ecosystem, package_name, declared_constraint, resolved_version, scope, source_manifests, license)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             nodeId,
             dep.ecosystem,
@@ -440,6 +463,7 @@ export class ManifestParser {
             dep.resolvedVersion ?? null,
             dep.scope,
             JSON.stringify(dep.sourceManifests),
+            dep.license ?? null,
           ],
         );
 

@@ -48,6 +48,8 @@ import { register as registerSbom } from './commands/sbom';
 import { register as registerVex } from './commands/vex';
 import { register as registerVulns } from './commands/vulns';
 import { register as registerReachability } from './commands/reachability';
+import { register as registerStaleness } from './commands/staleness';
+import { register as registerLicenses } from './commands/licenses';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -141,6 +143,8 @@ registerSbom(program);
 registerVex(program);
 registerVulns(program);
 registerReachability(program);
+registerStaleness(program);
+registerLicenses(program);
 
 // Register the help command for `kirograph help`
 program

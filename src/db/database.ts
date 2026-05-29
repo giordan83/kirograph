@@ -102,6 +102,18 @@ export class GraphDatabase {
       const sql = fs.readFileSync(schemaPath, 'utf8');
       this.db.exec(sql);
     }
+    // Migrate existing DBs: add new columns introduced after initial release.
+    const tryAlter = (stmt: string) => { try { this.db.run(stmt); } catch { /* already exists */ } };
+    tryAlter('ALTER TABLE sec_dependencies ADD COLUMN license TEXT');
+    tryAlter('ALTER TABLE sec_dependencies ADD COLUMN latest_version TEXT');
+    tryAlter('ALTER TABLE sec_dependencies ADD COLUMN latest_published INTEGER');
+    tryAlter('ALTER TABLE sec_dependencies ADD COLUMN staleness_score REAL');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN epss_score REAL');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN epss_percentile REAL');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN epss_fetched_at INTEGER');
+    tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_deps_license ON sec_dependencies(license)');
+    tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_deps_staleness ON sec_dependencies(staleness_score)');
+    tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_vulns_epss ON sec_vulnerabilities(epss_score)');
   }
 
   /**

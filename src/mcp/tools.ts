@@ -736,6 +736,29 @@ export const tools: ToolDefinition[] = [
       required: ['target'],
     },
   },
+  {
+    name: 'kirograph_staleness',
+    description: 'Check dependency freshness — identifies packages significantly behind their latest published version.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        threshold: { type: 'number', description: 'Only return packages with staleness_score >= threshold (default: 0.3)', default: 0.3 },
+        refresh: { type: 'boolean', description: 'Fetch latest version info from registries before listing (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_licenses',
+    description: 'Show dependency licenses and check against the configured license policy (deny/warn lists). Supports wildcard patterns (e.g. GPL-* matches GPL-2.0, GPL-3.0-only).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        policy: { type: 'boolean', description: 'Return only policy violations (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
 ];
 
 export class ToolHandler {
@@ -1406,6 +1429,24 @@ export class ToolHandler {
           }
         } catch { /* non-critical */ }
 
+        // Security stats
+        let securityLine = '  Security: disabled';
+        try {
+          const { loadConfig: loadCfgSec } = await import('../config');
+          const cfgSec = await loadCfgSec(cg.getProjectRoot());
+          if (cfgSec.enableSecurity) {
+            const db = cg.getDatabase();
+            db.applySecuritySchema();
+            const rawDb = db.getRawDb();
+            const depCount = rawDb.get('SELECT COUNT(*) as cnt FROM sec_dependencies')?.cnt ?? 0;
+            const vulnCount = rawDb.get('SELECT COUNT(*) as cnt FROM sec_vulnerabilities')?.cnt ?? 0;
+            const affectedCount = rawDb.get("SELECT COUNT(*) as cnt FROM sec_reachability WHERE verdict = 'affected'")?.cnt ?? 0;
+            const staleCount = rawDb.get('SELECT COUNT(*) as cnt FROM sec_dependencies WHERE vuln_data_stale = 1')?.cnt ?? 0;
+            const staleNote = staleCount > 0 ? ` ⚠ ${staleCount} stale` : '';
+            securityLine = `  Security: enabled — ${depCount} deps, ${vulnCount} vulns (${affectedCount} affected)${staleNote}`;
+          }
+        } catch { /* non-critical */ }
+
         // Sync state warning
         const threshold = stats.syncWarningThreshold ?? 10;
         const pendingFiles: number = stats.pendingFiles ?? 0;
@@ -1442,6 +1483,7 @@ export class ToolHandler {
           archLine,
           docsLine,
           dataLine,
+          securityLine,
           `  DB size: ${dbMb} MB`,
           ...semanticLines,
           ...syncLines,
@@ -2560,6 +2602,7 @@ export class ToolHandler {
         let query = `
           SELECT
             v.node_id, v.cve_id, v.severity_score, v.fixed_version, v.summary,
+            v.epss_score, v.epss_percentile,
             d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
             r.verdict
           FROM sec_vulnerabilities v
@@ -2604,6 +2647,8 @@ export class ToolHandler {
           severity_score: number | null;
           fixed_version: string | null;
           summary: string | null;
+          epss_score: number | null;
+          epss_percentile: number | null;
           package_name: string | null;
           ecosystem: string | null;
           resolved_version: string | null;
@@ -2638,7 +2683,10 @@ export class ToolHandler {
             ? `${row.package_name}@${row.resolved_version || row.declared_constraint || '?'}`
             : 'unknown package';
 
-          lines.push(`${severityLabel}  ${row.cve_id}  ${pkg}  [${verdictLabel}]`);
+          const epssNote = row.epss_score != null
+            ? ` [EPSS: ${row.epss_score.toFixed(2)}]`
+            : '';
+          lines.push(`${severityLabel}  ${row.cve_id}  ${pkg}  [${verdictLabel}]${epssNote}`);
 
           if (row.summary && row.summary !== 'Manually registered') {
             const truncSummary = row.summary.length > 120 ? row.summary.slice(0, 120) + '…' : row.summary;
@@ -2837,6 +2885,152 @@ export class ToolHandler {
             lines.push(`Distinct paths: ${impact.distinctPathCount}`);
           }
         }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_staleness': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        const threshold = typeof args.threshold === 'number' ? args.threshold : 0.3;
+
+        // Optionally refresh staleness data from registries
+        if (args.refresh === true) {
+          const { StalenessChecker } = await import('../security/staleness');
+          const checker = new StalenessChecker(db);
+          await checker.checkAll();
+        }
+
+        const rows: Array<{
+          package_name: string;
+          ecosystem: string;
+          resolved_version: string | null;
+          declared_constraint: string;
+          latest_version: string | null;
+          latest_published: number | null;
+          staleness_score: number | null;
+        }> = rawDb.all(
+          `SELECT package_name, ecosystem, resolved_version, declared_constraint,
+                  latest_version, latest_published, staleness_score
+           FROM sec_dependencies
+           WHERE staleness_score >= ?
+           ORDER BY staleness_score DESC`,
+          [threshold],
+        );
+
+        if (rows.length === 0) {
+          return `No dependencies found with staleness_score >= ${threshold}.` +
+            (args.refresh ? '' : ' Use refresh=true to fetch latest version data from registries.');
+        }
+
+        const lines: string[] = [`Stale Dependencies (threshold: ${threshold}):\n`];
+        for (const row of rows) {
+          const resolved = row.resolved_version ?? row.declared_constraint ?? '?';
+          const latest = row.latest_version ?? '?';
+          const score = row.staleness_score ?? 0;
+          const months = row.latest_published
+            ? Math.round((Date.now() - row.latest_published) / (1000 * 60 * 60 * 24 * 30))
+            : null;
+          const bar = '█'.repeat(Math.round(score * 10)) + '░'.repeat(10 - Math.round(score * 10));
+          const monthsStr = months !== null ? `, ${months}mo since latest` : '';
+          lines.push(`${row.package_name} (${row.ecosystem}): ${resolved} → ${latest}${monthsStr}`);
+          lines.push(`  ${bar} ${score.toFixed(2)}`);
+        }
+
+        const totalCount: { count: number } = rawDb.get(`SELECT COUNT(*) as count FROM sec_dependencies`) ?? { count: 0 };
+        lines.push('', `${rows.length} of ${totalCount.count} dependencies are stale (score >= ${threshold})`);
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_licenses': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        const deps: Array<{
+          package_name: string;
+          ecosystem: string;
+          license: string | null;
+        }> = rawDb.all(
+          `SELECT package_name, ecosystem, license FROM sec_dependencies ORDER BY ecosystem, package_name`,
+        );
+
+        const { checkLicensePolicy } = await import('../security/license');
+        const policy = config.securityLicensePolicy;
+        const violations = checkLicensePolicy(deps, policy);
+
+        if (args.policy === true) {
+          // Return only violations
+          if (violations.length === 0) {
+            return 'No license policy violations found.';
+          }
+          const lines: string[] = ['# License Policy Violations\n'];
+          for (const v of violations) {
+            lines.push(`${v.severity.toUpperCase()}  ${v.packageName} [${v.ecosystem}]  ${v.license}`);
+          }
+          const denyCount = violations.filter(v => v.severity === 'deny').length;
+          const warnCount = violations.filter(v => v.severity === 'warn').length;
+          lines.push('');
+          if (denyCount > 0) lines.push(`${denyCount} denied license${denyCount !== 1 ? 's' : ''}`);
+          if (warnCount > 0) lines.push(`${warnCount} license warning${warnCount !== 1 ? 's' : ''}`);
+          return truncate(lines.join('\n'));
+        }
+
+        // Full listing
+        if (deps.length === 0) {
+          return 'No dependencies found. Run kirograph index first.';
+        }
+
+        const violationMap = new Map<string, 'deny' | 'warn'>();
+        for (const v of violations) {
+          violationMap.set(`${v.ecosystem}:${v.packageName}`, v.severity);
+        }
+
+        const lines: string[] = [`# License Report (${deps.length} dependencies)\n`];
+
+        // Violations first
+        if (violations.length > 0) {
+          lines.push('## Policy Violations\n');
+          for (const v of violations) {
+            lines.push(`${v.severity.toUpperCase()}  ${v.packageName} [${v.ecosystem}]  ${v.license}`);
+          }
+          lines.push('');
+        }
+
+        lines.push('## All Dependencies\n');
+        lines.push('package | ecosystem | license | status');
+        lines.push('------- | --------- | ------- | ------');
+
+        for (const dep of deps) {
+          const key = `${dep.ecosystem}:${dep.package_name}`;
+          const violation = violationMap.get(key);
+          const license = dep.license ?? '(unknown)';
+          const status = violation ?? (dep.license ? 'ok' : 'unknown');
+          lines.push(`${dep.package_name} | ${dep.ecosystem} | ${license} | ${status}`);
+        }
+
+        const denyCount = violations.filter(v => v.severity === 'deny').length;
+        const warnCount = violations.filter(v => v.severity === 'warn').length;
+        const unknownCount = deps.filter(d => !d.license).length;
+
+        lines.push('');
+        if (denyCount > 0) lines.push(`${denyCount} denied license${denyCount !== 1 ? 's' : ''}`);
+        if (warnCount > 0) lines.push(`${warnCount} license warning${warnCount !== 1 ? 's' : ''}`);
+        if (unknownCount > 0) lines.push(`${unknownCount} unknown license${unknownCount !== 1 ? 's' : ''}`);
+        if (denyCount === 0 && warnCount === 0) lines.push('No policy violations');
 
         return truncate(lines.join('\n'));
       }
