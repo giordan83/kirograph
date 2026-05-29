@@ -41,20 +41,37 @@
   - **Manual CVE registration**: `kirograph vulns --add <cveId> --package <name> --version <ver>` for private/internal advisories.
   - **On-demand refresh**: `kirograph vulns --refresh` triggers fresh enrichment from configured databases.
 - **Installer prompt**: "Security analysis?" added to the interactive installer after the Architecture section.
-- **Steering file security section**: Teaches the agent to use `kirograph_security`, `kirograph_vulns`, `kirograph_sbom`, `kirograph_vex`, `kirograph_reachability`, and `kirograph_vuln_add`.
-- **3 new config fields**: `enableSecurity`, `securityDatabases`, `securityAutoEnrich`.
+- **Steering file security section**: Full security guidance for agents — 8 tools, proactive triggers (run on dep changes and pre-deploy), EPSS interpretation guide (≥0.5 = patch immediately), 7-step workflow, staleness score reference.
+- **`kirograph-security.md` workflow steering file** (`inclusion: manual`): Step-by-step security audit — triage affected CVEs, EPSS-based prioritization, deep-dive reachability, license compliance, staleness check, SBOM/VEX export. Written only when `enableSecurity: true`.
+- **`kirograph-architecture.md` workflow steering file** now conditional on `enableArchitecture: true` (same pattern as security).
+- **Workflow steering files in CLI agent resources**: All `kirograph-*.md` files (review, debug, onboard, refactor, + architecture/security when enabled) are registered in `.kiro/agents/kirograph.json` so they're activatable via `/kirograph-<name>` slash commands in Kiro CLI.
+- **Agent instructions for all 34 non-Kiro targets**: `InstructionOptions` and `buildAgentInstructions` now support `enableArchitecture`, `enableDocs`, `enableData`, `enableSecurity` — each produces a conditional section with tool list and guidance. All 27 `installLate` implementations updated to propagate these flags through `buildInstructionOpts`.
+- **`context-warnings.ts` EPSS-aware**: Security warnings surfaced in `kirograph_context` now include EPSS score/percentile, are sorted by EPSS first (actual exploit probability), then CVSS.
+- **`kirograph install` UX**: Without `--target`, now prompts "Kiro only (recommended) vs Auto-detect all platforms" instead of immediately entering auto-detect flow.
+- **"Did you know?" tips**: Expanded from 8 to 37 tips covering all CLI commands — core graph, indexing, architecture, security (vulns/reachability/licenses/staleness/EPSS), memory, docs, data, export, shell compression, and workflow slash commands (`/kirograph-security`, `/kirograph-review`, etc.).
+- **3 new config fields**: `enableSecurity`, `securityDatabases`, `securityAutoEnrich`, `securityLicensePolicy`.
+
+### Fixed
+
+- **`security-schema.sql` not copied to dist**: Build script `copyAssets()` was missing the copy, causing `no such table: sec_dependencies` on all security commands after a clean install.
+- **`kirograph vex/sbom --output`**: Crashed with `EROFS` when output directory didn't exist. Both now call `mkdirSync(..., { recursive: true })` before writing.
+- **`kirograph uninit`**: Only removed `kirograph.md` from `.kiro/steering/`. Now removes all `kirograph-*.md` files (main + all workflow files).
+- **`kirograph_reachability` MCP parameter**: Documented as `cve` (CVE-only) in several places; corrected to `target` which accepts both CVE IDs and package names.
+- **`kirograph_vuln_add` MCP parameters**: Corrected `cve` → `cveId`, removed non-existent `version` param, added `fixedVersion`.
+- **`--severity` filter**: Docs incorrectly described as comma-separated; accepts a single value.
 
 ### Changed
 
-- MCP tool count: 37 → 43 (`kirograph_security`, `kirograph_vulns`, `kirograph_sbom`, `kirograph_vex`, `kirograph_reachability`, `kirograph_vuln_add`).
+- MCP tool count: 37 → 45 (`kirograph_security`, `kirograph_vulns`, `kirograph_sbom`, `kirograph_vex`, `kirograph_reachability`, `kirograph_vuln_add`, `kirograph_licenses`, `kirograph_staleness`).
 - `IndexProgress.phase` type extended with `'security'` phase.
 - `NodeKind` extended with `'dependency' | 'vulnerability'`.
 - `EdgeKind` extended with `'has_vulnerability' | 'depends_on' | 'declared_in'`.
-- `GraphDatabase` exposes `applySecuritySchema()` for security module access.
-- Installer `installLate` signature extended with `enableSecurity` parameter.
-- `ConfigPatch` type extended with `enableSecurity`.
-- Build script copies `security-schema.sql` to dist; `vex`/`sbom --output` create parent directories automatically.
-- `KIROGRAPH_TOOL_NAMES` updated with 6 new security tools.
+- `GraphDatabase` exposes `applySecuritySchema()` with automatic migration for new columns (`epss_score`, `epss_percentile`, `license`, `latest_version`, `staleness_score`, etc.) on existing databases.
+- Installer `installLate` signature extended with `enableSecurity` and `enableArchitecture` parameters across all 27 non-Kiro target implementations.
+- `ConfigPatch` type extended with `enableSecurity` and `securityLicensePolicy`.
+- `SteeringOptions` extended with `enableArchitecture`, `enableDocs`, `enableData`, `enableSecurity` — all are now properly conditional in both Kiro steering and non-Kiro agent instructions.
+- Build script copies `security-schema.sql` to dist.
+- `KIROGRAPH_TOOL_NAMES` updated with 8 new security tools.
 
 ---
 

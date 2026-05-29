@@ -11,7 +11,7 @@ const INSTALL_TARGETS = [
 export function register(program: Command): void {
   program
     .command('install')
-    .description('Configure KiroGraph for an agent workspace (auto-detects platforms if no --target)')
+    .description('Configure KiroGraph for an agent workspace')
     .option('--target <target>', `Integration target: ${INSTALL_TARGETS.join(', ')}`)
     .option('--all', 'Install for all auto-detected platforms without prompting')
     .option('--dry-run', 'Show what would be written without making changes')
@@ -37,9 +37,32 @@ export function register(program: Command): void {
         const { runAutoDetectInstaller } = await import('../installer/auto-detect');
         await runAutoDetectInstaller({ skipPrompt: true, dryRun: opts.dryRun });
       } else {
-        // No target specified: auto-detect and prompt
-        const { runAutoDetectInstaller } = await import('../installer/auto-detect');
-        await runAutoDetectInstaller({ skipPrompt: false, dryRun: opts.dryRun });
+        // No target specified: ask Kiro-only vs auto-detect
+        const readline = await import('readline');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const bold = '\x1b[1m';
+        const dim = '\x1b[2m';
+        const violet = '\x1b[38;5;99m';
+        const reset = '\x1b[0m';
+        const { printBanner } = await import('../banner');
+        printBanner();
+        console.log(`  ${bold}How do you want to install KiroGraph?${reset}\n`);
+        console.log(`  ${violet}1${reset}  Kiro only ${dim}(recommended — full support with IDE hooks, steering, CLI agent)${reset}`);
+        console.log(`  ${violet}2${reset}  Auto-detect ${dim}(configure all AI tools found in this environment)${reset}\n`);
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(`  Choose [1/2]: `, resolve);
+        });
+        rl.close();
+        console.log();
+        const choice = answer.trim();
+        if (choice === '2') {
+          const { runAutoDetectInstaller } = await import('../installer/auto-detect');
+          await runAutoDetectInstaller({ skipPrompt: false, skipBanner: true, dryRun: opts.dryRun });
+        } else {
+          // Default to Kiro (choice === '1' or Enter)
+          const { runInstaller } = await import('../installer/index');
+          await runInstaller('kiro');
+        }
       }
     });
 }

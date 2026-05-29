@@ -23,8 +23,8 @@ export interface AutoDetectOptions {
   dryRun?: boolean;
 }
 
-export async function runAutoDetectInstaller(opts: AutoDetectOptions = {}): Promise<void> {
-  printBanner();
+export async function runAutoDetectInstaller(opts: AutoDetectOptions & { skipBanner?: boolean } = {}): Promise<void> {
+  if (!opts.skipBanner) printBanner();
 
   const cwd = process.cwd();
   const detected = detectPlatforms(cwd);
