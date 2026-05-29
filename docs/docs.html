@@ -167,13 +167,14 @@ kirograph install --target kiro   # install for a specific platform only</code><
 
     <!-- ── Comparison ── -->
     <h2 id="comparison">Feature Comparison</h2>
-    <p>KiroGraph combines features from 7 separate open-source projects (160k+ combined ⭐) into a single integrated MCP server.</p>
+    <p>KiroGraph combines features from 8 separate open-source projects (160k+ combined ⭐) into a single integrated MCP server.</p>
 
     <input type="text" id="cmp-search" placeholder="🔍 Search features…" style="width:100%;padding:0.6rem 1rem;margin:1rem 0;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-family:inherit;font-size:0.9rem;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
 
     <div id="cmp-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1rem;overflow-x:auto;">
       <button class="cmp-tab active" data-tab="code-graph">Code Graph</button>
       <button class="cmp-tab" data-tab="architecture">Architecture</button>
+      <button class="cmp-tab" data-tab="security">🔒 Security</button>
       <button class="cmp-tab" data-tab="memory">Search & Memory</button>
       <button class="cmp-tab" data-tab="docs-data">Docs & Data</button>
       <button class="cmp-tab" data-tab="tokens">Tokens</button>
@@ -220,6 +221,43 @@ kirograph install --target kiro   # install for a specific platform only</code><
       </tbody>
     </table>
     </div>
+    </div>
+
+    <div class="cmp-panel" id="panel-security">
+    <h3 id="cmp-security">🔒 Security <span style="font-size:0.8rem;font-weight:normal;color:var(--text-muted);">(opt-in: <code>enableSecurity: true</code>)</span></h3>
+    <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1rem;">None of the compared MCP tools include dependency vulnerability scanning. The relevant comparison for this module is against dedicated SCA tools — see the <a href="guide/security.html" style="color:var(--accent);">security documentation</a> for a full breakdown vs Trivy, Snyk, npm audit, and others.</p>
+    <div style="overflow-x:auto;">
+    <table class="config-table cmp-filterable">
+      <thead><tr><th>Feature</th><th>KiroGraph</th><th>CodeGraph</th><th>CRG</th><th>jMunch</th><th>cavemem</th><th>rtk</th></tr></thead>
+      <tbody>
+        <tr><td>Dependency vulnerability scanning</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>OSV vulnerability database</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Call-graph reachability analysis</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Architecture-layer impact (affected layers)</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>CycloneDX 1.5 SBOM export</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>CycloneDX 1.5 VEX export</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Fix suggestions per ecosystem</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Manual CVE registration</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Queryable via MCP by AI agents</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h4 style="margin-top:1.5rem;">KiroGraph-Sec vs dedicated SCA tools</h4>
+    <div style="overflow-x:auto;">
+    <table class="config-table">
+      <thead><tr><th>Tool</th><th>Reachability</th><th>SBOM/VEX</th><th>MCP / AI-queryable</th><th>Local / free</th><th>Ecosystems</th></tr></thead>
+      <tbody>
+        <tr><td><strong>KiroGraph-Sec</strong></td><td>✅ call-graph BFS</td><td>✅ CycloneDX 1.5</td><td>✅</td><td>✅</td><td>5 (npm, Maven, Go, pip, Cargo)</td></tr>
+        <tr><td>Trivy</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>✅</td><td>10+ (+ OS packages)</td></tr>
+        <tr><td>Grype</td><td>—</td><td>✅ via Syft</td><td>—</td><td>✅</td><td>10+</td></tr>
+        <tr><td>OWASP Dep-Check</td><td>—</td><td>✅ CycloneDX</td><td>—</td><td>✅</td><td>8+</td></tr>
+        <tr><td>npm audit</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>npm only</td></tr>
+        <tr><td>Snyk</td><td>✅ (paid, JS/Python)</td><td>✅</td><td>—</td><td>✗ paid</td><td>10+</td></tr>
+        <tr><td>Dependabot</td><td>—</td><td>—</td><td>—</td><td>✅ (GitHub)</td><td>10+</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">The key differentiator: KiroGraph-Sec uses the call graph already built from code indexing to determine whether vulnerable code is <em>actually reachable</em> from entry points — not just present as a transitive dependency. Reachability analysis is free and works across all 5 ecosystems, whereas Snyk's equivalent is a paid feature limited to JS/Python.</p>
     </div>
 
     <div class="cmp-panel" id="panel-memory">
