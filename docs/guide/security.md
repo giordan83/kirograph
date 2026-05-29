@@ -222,13 +222,20 @@ The traversal encountered at least one unresolved import or symbol whose outgoin
 
 ## Supported Ecosystems
 
-| Ecosystem | Manifest | Lock File | Purl Prefix |
-|-----------|----------|-----------|-------------|
-| npm | `package.json` | `package-lock.json`, `yarn.lock` | `pkg:npm/` |
-| Maven | `pom.xml` | — | `pkg:maven/` |
-| Go | `go.mod` | `go.sum` | `pkg:golang/` |
-| pip | `requirements.txt` | — | `pkg:pypi/` |
-| Cargo | `Cargo.toml` | `Cargo.lock` | `pkg:cargo/` |
+| Ecosystem | Manifest | Lock File | OSV Ecosystem | Purl Prefix |
+|-----------|----------|-----------|---------------|-------------|
+| npm | `package.json` | `package-lock.json`, `yarn.lock` | `npm` | `pkg:npm/` |
+| Maven | `pom.xml` | — | `Maven` | `pkg:maven/` |
+| Gradle | `build.gradle`, `build.gradle.kts` | `gradle.lockfile` | `Maven` | `pkg:maven/` |
+| Go | `go.mod` | `go.sum` | `Go` | `pkg:golang/` |
+| pip | `requirements.txt` | — | `PyPI` | `pkg:pypi/` |
+| Cargo | `Cargo.toml` | `Cargo.lock` | `crates.io` | `pkg:cargo/` |
+| NuGet | `*.csproj`, `packages.config` | `packages.lock.json` | `NuGet` | `pkg:nuget/` |
+| RubyGems | `Gemfile` | `Gemfile.lock` | `RubyGems` | `pkg:gem/` |
+| Composer | `composer.json` | `composer.lock` | `Packagist` | `pkg:composer/` |
+| Swift PM | `Package.swift` | `Package.resolved` | `SwiftURL` | `pkg:swift/` |
+| Dart/Flutter | `pubspec.yaml` | `pubspec.lock` | `Pub` | `pkg:pub/` |
+| Elixir/Hex | `mix.exs` | `mix.lock` | `Hex` | `pkg:hex/` |
 
 ### Scope Mapping
 
@@ -236,9 +243,16 @@ The traversal encountered at least one unresolved import or symbol whose outgoin
 |-----------|-----------|-------------|----------|
 | npm | `dependencies` | `devDependencies` | `optionalDependencies` |
 | Maven | `compile`, `runtime` | `test` | `provided`, `system` |
+| Gradle | `implementation`, `api`, etc. | `testImplementation`, `testApi` | — |
 | Go | `require` | — | — |
 | pip | default | — | — |
-| Cargo | `[dependencies]` | `[dev-dependencies]` | `[build-dependencies]` |
+| Cargo | `[dependencies]` | `[dev-dependencies]`, `[build-dependencies]` | — |
+| NuGet | default | `PrivateAssets="all"` | — |
+| RubyGems | default | `group :development`, `group :test` | — |
+| Composer | `require` | `require-dev` | — |
+| Swift PM | all (no dev-dep concept) | — | — |
+| Dart/Flutter | `dependencies` | `dev_dependencies` | — |
+| Elixir/Hex | default | `only: :dev`, `only: :test` | — |
 
 ## Limitations
 

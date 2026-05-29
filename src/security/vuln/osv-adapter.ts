@@ -30,6 +30,13 @@ const ECOSYSTEM_MAP: Record<string, string> = {
   go: 'Go',
   pypi: 'PyPI',
   cargo: 'crates.io',
+  nuget: 'NuGet',
+  gradle: 'Maven',    // Gradle projects use Maven Central
+  rubygems: 'RubyGems',
+  composer: 'Packagist',
+  swift: 'SwiftURL',
+  pub: 'Pub',
+  hex: 'Hex',
 };
 
 // ── OSV Response Types ────────────────────────────────────────────────────────

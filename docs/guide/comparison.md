@@ -159,7 +159,7 @@ None of the MCP tools above include dependency vulnerability scanning. When eval
 
 | Tool | Type | Reachability | SBOM/VEX | MCP / AI-queryable | Local / free | Ecosystems |
 |------|------|:------------:|:--------:|:------------------:|:------------:|:----------:|
-| **KiroGraph-Sec** | Graph-integrated SCA | ✅ call-graph BFS | ✅ CycloneDX 1.5 | ✅ | ✅ | 5 (npm, Maven, Go, pip, Cargo) |
+| **KiroGraph-Sec** | Graph-integrated SCA | ✅ call-graph BFS | ✅ CycloneDX 1.5 | ✅ | ✅ | 12 (npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex) |
 | [Trivy](https://github.com/aquasecurity/trivy) | Container + app SCA | — | ✅ CycloneDX | — | ✅ | 10+ (+ OS packages) |
 | [Grype](https://github.com/anchore/grype) | App + container SCA | — | ✅ via Syft | — | ✅ | 10+ |
 | [OWASP Dep-Check](https://github.com/jeremylong/DependencyCheck) | App SCA | — | ✅ CycloneDX | — | ✅ | 8+ |
@@ -184,9 +184,9 @@ This matters because the typical npm project has 500–1000 transitive dependenc
 - **No container or OS-level scanning** — application dependencies only (use Trivy for container images)
 - **No proprietary vulnerability databases** — OSV by default (which aggregates NVD, GitHub Advisory Database, and others); no Snyk Intel feed
 - **No CI/CD-native integration** — can be run as part of CI via `kirograph vulns --refresh`, but no native GitHub Actions/GitLab CI plugin
-- **5 ecosystems only** — npm, Maven, Go, pip, Cargo; no Ruby gems, PHP Composer, .NET NuGet, etc.
+- **12 ecosystems** — npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex. No container/OS-level scanning.
 
-For comprehensive container scanning or broad ecosystem coverage, combine KiroGraph-Sec with Trivy. For AI-queryable reachability during active development, KiroGraph-Sec is the only option.
+For container scanning or OS-level coverage, combine KiroGraph-Sec with Trivy. For AI-queryable call-graph reachability during active development, KiroGraph-Sec is the only option.
 
 ---
 

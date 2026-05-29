@@ -53,6 +53,8 @@ const SKIP_DIRS = new Set([
 export class SecurityManifestAdapter {
   private readonly archParsers: ArchManifestParser[];
   private readonly plugins: Map<string, VersionExtractionPlugin> = new Map();
+  /** Standalone plugins have no corresponding architecture parser — they own their own discovery. */
+  private readonly standalonePlugins: Map<string, VersionExtractionPlugin> = new Map();
   private readonly projectRoot: string;
 
   constructor(projectRoot: string) {
@@ -61,18 +63,29 @@ export class SecurityManifestAdapter {
   }
 
   /**
-   * Register a version extraction plugin for a specific ecosystem.
-   * Plugins are matched to discovered manifests by ecosystem name.
+   * Register a version extraction plugin for an ecosystem that has a
+   * corresponding architecture parser. The plugin's `ecosystem` field
+   * must equal the architecture parser's `name` for the lookup to work.
    */
   registerPlugin(plugin: VersionExtractionPlugin): void {
     this.plugins.set(plugin.ecosystem, plugin);
   }
 
   /**
-   * Get all registered version extraction plugins.
+   * Register a standalone version extraction plugin for an ecosystem that
+   * has NO corresponding architecture parser. The plugin's `manifestFiles`
+   * list drives discovery — the adapter will scan for those filenames and
+   * invoke the plugin directly when found.
+   */
+  registerStandalonePlugin(plugin: VersionExtractionPlugin): void {
+    this.standalonePlugins.set(plugin.ecosystem, plugin);
+  }
+
+  /**
+   * Get all registered version extraction plugins (wrapped + standalone).
    */
   getPlugins(): VersionExtractionPlugin[] {
-    return [...this.plugins.values()];
+    return [...this.plugins.values(), ...this.standalonePlugins.values()];
   }
 
   /**
@@ -83,8 +96,9 @@ export class SecurityManifestAdapter {
   }
 
   /**
-   * Discover all manifest files in the project tree using the same logic
-   * as the architecture module (_findManifests). Returns absolute paths.
+   * Discover all manifest files in the project tree.
+   * Includes files known to architecture parsers AND files from standalone plugins.
+   * Returns absolute paths.
    */
   discoverManifests(): string[] {
     return this._findManifests(this.projectRoot);
@@ -154,12 +168,21 @@ export class SecurityManifestAdapter {
 
   /**
    * Extract dependencies for a single manifest file.
-   * Uses the registered plugin if available, otherwise falls back to
-   * architecture parser output.
+   * Tries standalone plugins first (when there is no arch parser), then
+   * wrapped plugins, then falls back to arch parser output.
    */
   async extractFromManifest(manifestPath: string): Promise<ParsedDependency[]> {
     const archParser = this.archParsers.find(p => p.canParse(manifestPath));
-    if (!archParser) return [];
+
+    if (!archParser) {
+      // No arch parser — try standalone plugins
+      const standalonePlugin = [...this.standalonePlugins.values()]
+        .find(p => p.canExtract(manifestPath));
+      if (standalonePlugin) {
+        return standalonePlugin.extract(manifestPath, this.projectRoot);
+      }
+      return [];
+    }
 
     const plugin = this.plugins.get(archParser.name);
 
@@ -212,11 +235,13 @@ export class SecurityManifestAdapter {
   /**
    * Walk the project directory tree looking for manifest files.
    * Mirrors the architecture module's _findManifests() logic, respecting SKIP_DIRS.
+   * Includes manifest filenames from standalone plugins in addition to arch parsers.
    */
   private _findManifests(dir: string, results: string[] = []): string[] {
-    const manifestFilenames = new Set(
-      this.archParsers.flatMap(p => p.manifestFiles),
-    );
+    const manifestFilenames = new Set([
+      ...this.archParsers.flatMap(p => p.manifestFiles),
+      ...Array.from(this.standalonePlugins.values()).flatMap(p => p.manifestFiles),
+    ]);
 
     return this._walkDir(dir, manifestFilenames, results);
   }

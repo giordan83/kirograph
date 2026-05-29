@@ -3,9 +3,9 @@
  *
  * Orchestrates manifest discovery, version extraction, deduplication, and
  * database persistence. Uses the SecurityManifestAdapter for discovery and
- * extraction, registers all 5 version extraction plugins (npm, maven, go, pip,
- * cargo), deduplicates dependencies by (name, ecosystem) keeping the highest
- * version, and creates Dependency_Nodes in the database.
+ * extraction, registers all 12 version extraction plugins:
+ *   Wrapped (arch parser exists): npm, maven, go, pip, cargo, nuget, gradle
+ *   Standalone (no arch parser):  rubygems, composer, swift, pubspec, hex
  *
  * Node ID format: `dep:<ecosystem>:<name>` (e.g. `dep:npm:express`)
  */
@@ -15,6 +15,13 @@ import { parseMavenManifest } from './plugins/maven';
 import { parseGoManifest } from './plugins/go';
 import { parsePipManifest } from './plugins/pip';
 import { parseCargoManifest } from './plugins/cargo';
+import { parseNugetManifest } from './plugins/nuget';
+import { parseGradleManifest } from './plugins/gradle';
+import { parseRubygemsManifest } from './plugins/rubygems';
+import { parseComposerManifest } from './plugins/composer';
+import { parseSwiftManifest } from './plugins/swift';
+import { parsePubspecManifest } from './plugins/pubspec';
+import { parseHexManifest } from './plugins/hex';
 import type { GraphDatabase } from '../../db/database';
 import type { ParsedDependency, ManifestParseResult } from '../types';
 import type { Node, Edge } from '../../types';
@@ -89,6 +96,94 @@ function createCargoPlugin(): VersionExtractionPlugin {
       return manifestPath.endsWith('Cargo.toml');
     },
     extract: parseCargoManifest,
+  };
+}
+
+/**
+ * Create the NuGet version extraction plugin wrapping parseNugetManifest.
+ * ecosystem = 'csproj' to match the architecture parser name for lookup;
+ * ParsedDependency.ecosystem is set to 'nuget' inside the plugin function.
+ */
+function createNugetPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'csproj',
+    manifestFiles: ['.csproj'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('.csproj');
+    },
+    extract: parseNugetManifest,
+  };
+}
+
+/**
+ * Create the Gradle version extraction plugin wrapping parseGradleManifest.
+ */
+function createGradlePlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'gradle',
+    manifestFiles: ['build.gradle', 'build.gradle.kts'],
+    canExtract(manifestPath: string): boolean {
+      const base = manifestPath.split('/').pop() ?? '';
+      return base === 'build.gradle' || base === 'build.gradle.kts';
+    },
+    extract: parseGradleManifest,
+  };
+}
+
+// ── Standalone Plugin Factories ───────────────────────────────────────────────
+
+function createRubygemsPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'rubygems',
+    manifestFiles: ['Gemfile'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('/Gemfile') || manifestPath === 'Gemfile';
+    },
+    extract: parseRubygemsManifest,
+  };
+}
+
+function createComposerPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'composer',
+    manifestFiles: ['composer.json'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('composer.json');
+    },
+    extract: parseComposerManifest,
+  };
+}
+
+function createSwiftPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'swift',
+    manifestFiles: ['Package.swift'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('Package.swift');
+    },
+    extract: parseSwiftManifest,
+  };
+}
+
+function createPubspecPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'pub',
+    manifestFiles: ['pubspec.yaml'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('pubspec.yaml');
+    },
+    extract: parsePubspecManifest,
+  };
+}
+
+function createHexPlugin(): VersionExtractionPlugin {
+  return {
+    ecosystem: 'hex',
+    manifestFiles: ['mix.exs'],
+    canExtract(manifestPath: string): boolean {
+      return manifestPath.endsWith('mix.exs');
+    },
+    extract: parseHexManifest,
   };
 }
 
@@ -229,12 +324,21 @@ export class ManifestParser {
     this.projectRoot = projectRoot;
     this.adapter = new SecurityManifestAdapter(projectRoot);
 
-    // Register all 5 version extraction plugins
+    // Wrapped plugins (arch parser exists — ecosystem must match archParser.name)
     this.adapter.registerPlugin(createNpmPlugin());
     this.adapter.registerPlugin(createMavenPlugin());
     this.adapter.registerPlugin(createGoPlugin());
     this.adapter.registerPlugin(createPipPlugin());
     this.adapter.registerPlugin(createCargoPlugin());
+    this.adapter.registerPlugin(createNugetPlugin());
+    this.adapter.registerPlugin(createGradlePlugin());
+
+    // Standalone plugins (no arch parser — own manifest discovery via manifestFiles)
+    this.adapter.registerStandalonePlugin(createRubygemsPlugin());
+    this.adapter.registerStandalonePlugin(createComposerPlugin());
+    this.adapter.registerStandalonePlugin(createSwiftPlugin());
+    this.adapter.registerStandalonePlugin(createPubspecPlugin());
+    this.adapter.registerStandalonePlugin(createHexPlugin());
   }
 
   /**

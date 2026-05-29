@@ -20,7 +20,7 @@
     - `kirograph_reachability`: Analyze reachability for a CVE ID or package name — verdict, paths, impact summary.
     - `kirograph_vuln_add`: Manually register a CVE against a dependency (private advisories).
   - **`🔒 Security` section** in `kirograph --help`: lists all 5 security commands with options and examples.
-  - **5 ecosystem parsers**: npm (package.json + lock), Maven (pom.xml), Go (go.mod + go.sum), pip (requirements.txt), Cargo (Cargo.toml + Cargo.lock).
+  - **12 ecosystem parsers**: npm, Maven, Gradle, Go, pip, Cargo, NuGet, RubyGems, Composer, Swift PM, Dart/pub, Elixir/Hex — each with lock file resolution for resolved versions.
   - **OSV integration**: Primary vulnerability database via /v1/query endpoint. 30-second timeout per dependency. Staleness tracking with `vulnDataStale` flag.
   - **Reachability analysis**: BFS traversal from entry points through call/import/reference edges. Three verdicts: `affected` (path exists), `not_affected` (no path, no unresolved imports), `under_investigation` (unresolved symbols encountered).
   - **Architecture-aware impact analysis**: Identifies affected layers, entry points, and distinct code paths (capped at 100). Reads `arch_file_layers` table populated by the architecture module.
