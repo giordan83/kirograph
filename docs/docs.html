@@ -72,6 +72,7 @@
       <a href="#memory" class="sidebar-link">Memory</a>
       <a href="#documentation" class="sidebar-link">Documentation</a>
       <a href="#data" class="sidebar-link">Data</a>
+      <a href="#security" class="sidebar-link">Security</a>
       <a href="#caveman-mode" class="sidebar-link">Caveman Mode</a>
       <a href="#shell-compression" class="sidebar-link">Shell Compression</a>
       <a href="#compression-caveman" class="sidebar-link" style="padding-left:2rem">Coexistence with Caveman</a>
@@ -355,7 +356,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
     <!-- ── How Indexing Works ── -->
     <h2 id="how-indexing-works">How Indexing Works</h2>
 
-    <p>Indexing has five layers: <strong>structural</strong> (always on), <strong>semantic</strong> (opt-in), <strong>architecture</strong> (opt-in), <strong>documentation</strong> (opt-in), and <strong>data</strong> (opt-in).</p>
+    <p>Indexing has six layers: <strong>structural</strong> (always on), <strong>semantic</strong> (opt-in), <strong>architecture</strong> (opt-in), <strong>documentation</strong> (opt-in), <strong>data</strong> (opt-in), and <strong>security</strong> (opt-in).</p>
 
     <h3 id="structural-layer">Structural layer</h3>
     <p>tree-sitter parses every source file into an AST. Nodes and edges are extracted and written to <code>.kirograph/kirograph.db</code>. This powers all graph traversal tools and exact/FTS symbol search. No extra dependencies. Runs on every <code>kirograph index</code> or <code>kirograph sync</code>.</p>
@@ -1074,6 +1075,77 @@ kirograph docs reembed                      # re-embed with current model</code>
         </tbody>
       </table>
     </div>
+
+    <!-- ── Security ── -->
+    <h2 id="security">Security</h2>
+
+    <p>When <code>enableSecurity: true</code>, KiroGraph scans dependency manifests for known vulnerabilities and performs reachability analysis to determine if vulnerable code is actually reachable from entry points.</p>
+
+    <h3>Configuration</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>enableSecurity</code></td><td>boolean</td><td><code>false</code></td><td>Enable dependency scanning and vulnerability detection</td></tr>
+          <tr><td><code>securityDatabases</code></td><td>string[]</td><td><code>["OSV"]</code></td><td>Vulnerability databases to query</td></tr>
+          <tr><td><code>securityAutoEnrich</code></td><td>boolean</td><td><code>true</code></td><td>Auto-run vulnerability enrichment after manifest parsing</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Pipeline</h3>
+    <p>The security pipeline runs <strong>after architecture analysis</strong> during indexing:</p>
+    <pre><code>code extraction → reference resolution → architecture analysis → security analysis</code></pre>
+    <p>Phases: manifest discovery → dependency parsing → dependency graph integration → vulnerability enrichment (OSV) → reachability analysis → impact analysis.</p>
+
+    <h3>Supported ecosystems</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ecosystem</th><th>Manifest</th><th>Lock File</th><th>Purl Prefix</th></tr></thead>
+        <tbody>
+          <tr><td>npm</td><td><code>package.json</code></td><td><code>package-lock.json</code>, <code>yarn.lock</code></td><td><code>pkg:npm/</code></td></tr>
+          <tr><td>Maven</td><td><code>pom.xml</code></td><td>—</td><td><code>pkg:maven/</code></td></tr>
+          <tr><td>Go</td><td><code>go.mod</code></td><td><code>go.sum</code></td><td><code>pkg:golang/</code></td></tr>
+          <tr><td>pip</td><td><code>requirements.txt</code></td><td>—</td><td><code>pkg:pypi/</code></td></tr>
+          <tr><td>Cargo</td><td><code>Cargo.toml</code></td><td><code>Cargo.lock</code></td><td><code>pkg:cargo/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Reachability verdicts</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>affected</code></td><td>At least one path exists from an entry point to the vulnerable dependency through call, import, or reference edges</td></tr>
+          <tr><td><code>not_affected</code></td><td>No path exists from any entry point to the vulnerable dependency, and no unresolved imports were encountered</td></tr>
+          <tr><td><code>under_investigation</code></td><td>The traversal encountered unresolved imports — the vulnerability might be reachable through an unresolved path</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>CLI commands</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>kirograph security [path]</code></td><td>Overview: dep count, vulnerability count, verdict breakdown, stale data warnings</td></tr>
+          <tr><td><code>kirograph vulns [path]</code></td><td>List vulnerabilities — filter by <code>--severity</code>, <code>--verdict</code>, refresh with <code>--refresh</code>, register with <code>--add</code></td></tr>
+          <tr><td><code>kirograph reachability &lt;target&gt;</code></td><td>Check reachability for a CVE ID or package name — verdict, call paths, impact summary</td></tr>
+          <tr><td><code>kirograph vex [--output file]</code></td><td>Export CycloneDX 1.5 VEX document</td></tr>
+          <tr><td><code>kirograph sbom [--output file]</code></td><td>Export CycloneDX 1.5 SBOM document</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>CycloneDX output</h3>
+    <p>KiroGraph-Sec exports industry-standard CycloneDX 1.5 documents:</p>
+    <ul>
+      <li><strong>SBOM</strong> — Full software bill of materials with all dependencies as components, package URLs, and dependency relationships</li>
+      <li><strong>VEX</strong> — Vulnerability Exploitability eXchange with reachability-derived analysis states and justifications</li>
+    </ul>
+
+    <p><a href="guide/security.html">Full security documentation →</a></p>
 
     <!-- ── Caveman Mode ── -->
     <h2 id="caveman-mode">Caveman Mode</h2>

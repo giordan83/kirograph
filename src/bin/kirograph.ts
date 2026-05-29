@@ -43,6 +43,11 @@ import { register as registerCommunities } from './commands/communities';
 import { register as registerRefactor } from './commands/refactor';
 import { register as registerRead } from './commands/read';
 import { register as registerBudget } from './commands/budget';
+import { register as registerSecurity } from './commands/security';
+import { register as registerSbom } from './commands/sbom';
+import { register as registerVex } from './commands/vex';
+import { register as registerVulns } from './commands/vulns';
+import { register as registerReachability } from './commands/reachability';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -131,6 +136,11 @@ registerCommunities(program);
 registerRefactor(program);
 registerRead(program);
 registerBudget(program);
+registerSecurity(program);
+registerSbom(program);
+registerVex(program);
+registerVulns(program);
+registerReachability(program);
 
 // Register the help command for `kirograph help`
 program

@@ -38,6 +38,8 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | <h4>Semantic Search</h4> | |
 | ⚡ **7 Semantic Engines** | Cosine, sqlite-vec, Orama, PGlite, LanceDB, Qdrant, Typesense — pick the best fit for your project |
 | 🤖 **Custom Embedding Models** | Use any HuggingFace `feature-extraction` model — nomic, Gemma, MiniLM, BGE, or bring your own |
+| <h4>Security</h4> | |
+| 🔒 **Vulnerability Detection** | Dependency scanning with OSV integration, reachability-aware impact analysis, CycloneDX 1.5 SBOM/VEX export |
 | <h4>Knowledge & Data</h4> | |
 | 🧠 **Persistent Memory** | Cross-session observations — decisions, errors, patterns — auto-linked to code symbols |
 | 📖 **Documentation Indexing** | Section-level retrieval from Markdown, MDX, RST, AsciiDoc, OpenAPI — 92-97% token savings |
@@ -86,6 +88,7 @@ All Kiro integration files are written to `.kiro/`. Restart Kiro IDE, or switch 
 | [MCP Tools](docs/guide/mcp-tools.md) | Full reference for all MCP tools |
 | [CLI Reference](docs/guide/cli.md) | All CLI commands with examples |
 | [Configuration](docs/guide/configuration.md) | Config fields, semantic engines, architecture analysis |
+| [Security](docs/guide/security.md) | Vulnerability detection, reachability analysis, SBOM/VEX export |
 | [Languages & Frameworks](docs/guide/languages.md) | Supported languages, frameworks, and detection |
 | [Changelog](CHANGELOG.md) | Release history |
 | [Contributing](CONTRIBUTING.md) | How to contribute |

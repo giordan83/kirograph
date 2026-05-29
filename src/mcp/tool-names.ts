@@ -41,5 +41,11 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_data_join',
   'kirograph_data_correlations',
   'kirograph_data_quality',
+  'kirograph_security',
+  'kirograph_vulns',
+  'kirograph_sbom',
+  'kirograph_vex',
+  'kirograph_reachability',
+  'kirograph_vuln_add',
 ];
 

@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.19.0] - 2026-05-29: Security Module
+
+### Added
+
+- **Security module** (`enableSecurity: true`): dependency vulnerability detection with reachability-aware impact analysis. Leverages the existing call graph and architecture layers to classify vulnerabilities as `affected`, `not_affected`, or `under_investigation`.
+  - **`enableSecurity` config flag**: Guards the security pipeline. Requires `enableArchitecture: true` (auto-enabled if missing).
+  - **CLI commands**:
+    - `kirograph security`: Overview of vulnerability status — dependency counts, verdict breakdown, stale data warnings.
+    - `kirograph vulns`: List vulnerabilities with severity/verdict filters, `--refresh` for on-demand enrichment, `--add` for manual CVE registration.
+    - `kirograph reachability <target>`: Reachability analysis for a CVE ID or package name — verdict, call paths (up to 5), unresolved symbols, impact summary.
+    - `kirograph sbom`: Export CycloneDX 1.5 SBOM to stdout or file (`--output`; parent directory created automatically).
+    - `kirograph vex`: Export CycloneDX 1.5 VEX with reachability verdicts to stdout or file (`--output`; parent directory created automatically).
+  - **MCP tools**:
+    - `kirograph_security`: Security overview — vulnerability counts, verdict breakdown, stale data warnings.
+    - `kirograph_vulns`: List vulnerabilities with filtering by severity, verdict, and limit.
+    - `kirograph_sbom`: Generate CycloneDX 1.5 SBOM JSON.
+    - `kirograph_vex`: Generate CycloneDX 1.5 VEX JSON with reachability verdicts.
+    - `kirograph_reachability`: Analyze reachability for a CVE ID or package name — verdict, paths, impact summary.
+    - `kirograph_vuln_add`: Manually register a CVE against a dependency (private advisories).
+  - **`🔒 Security` section** in `kirograph --help`: lists all 5 security commands with options and examples.
+  - **5 ecosystem parsers**: npm (package.json + lock), Maven (pom.xml), Go (go.mod + go.sum), pip (requirements.txt), Cargo (Cargo.toml + Cargo.lock).
+  - **OSV integration**: Primary vulnerability database via /v1/query endpoint. 30-second timeout per dependency. Staleness tracking with `vulnDataStale` flag.
+  - **Reachability analysis**: BFS traversal from entry points through call/import/reference edges. Three verdicts: `affected` (path exists), `not_affected` (no path, no unresolved imports), `under_investigation` (unresolved symbols encountered).
+  - **Architecture-aware impact analysis**: Identifies affected layers, entry points, and distinct code paths (capped at 100). Reads `arch_file_layers` table populated by the architecture module.
+  - **CycloneDX 1.5 SBOM export**: All dependencies as components with purl, scope, direct/transitive classification, and dependency relationships.
+  - **CycloneDX 1.5 VEX export**: Vulnerability entries with reachability-derived analysis states and justifications.
+  - **Fix suggestions**: Ecosystem-appropriate upgrade commands (`npm install`, `go get`, `pip install`, `cargo update`, Maven pom.xml update) shown alongside vulnerabilities.
+  - **`kirograph_context` integration**: Automatically surfaces security warnings (max 3 CVEs) when queried symbols are reachable from affected vulnerabilities.
+  - **Manual CVE registration**: `kirograph vulns --add <cveId> --package <name> --version <ver>` for private/internal advisories.
+  - **On-demand refresh**: `kirograph vulns --refresh` triggers fresh enrichment from configured databases.
+- **Installer prompt**: "Security analysis?" added to the interactive installer after the Architecture section.
+- **Steering file security section**: Teaches the agent to use `kirograph_security`, `kirograph_vulns`, `kirograph_sbom`, `kirograph_vex`, `kirograph_reachability`, and `kirograph_vuln_add`.
+- **3 new config fields**: `enableSecurity`, `securityDatabases`, `securityAutoEnrich`.
+
+### Changed
+
+- MCP tool count: 37 → 43 (`kirograph_security`, `kirograph_vulns`, `kirograph_sbom`, `kirograph_vex`, `kirograph_reachability`, `kirograph_vuln_add`).
+- `IndexProgress.phase` type extended with `'security'` phase.
+- `NodeKind` extended with `'dependency' | 'vulnerability'`.
+- `EdgeKind` extended with `'has_vulnerability' | 'depends_on' | 'declared_in'`.
+- `GraphDatabase` exposes `applySecuritySchema()` for security module access.
+- Installer `installLate` signature extended with `enableSecurity` parameter.
+- `ConfigPatch` type extended with `enableSecurity`.
+- Build script copies `security-schema.sql` to dist; `vex`/`sbom --output` create parent directories automatically.
+- `KIROGRAPH_TOOL_NAMES` updated with 6 new security tools.
+
+---
+
 ## [0.18.6] - 2026-05-22: Antigravity, Gemini CLI & OpenCode Fixes
 
 ### Fixed

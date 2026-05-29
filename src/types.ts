@@ -6,11 +6,13 @@ export type NodeKind =
   | 'file' | 'module' | 'class' | 'struct' | 'interface' | 'trait' | 'protocol'
   | 'function' | 'method' | 'property' | 'field' | 'variable' | 'constant'
   | 'enum' | 'enum_member' | 'type_alias' | 'namespace' | 'parameter'
-  | 'import' | 'export' | 'route' | 'component';
+  | 'import' | 'export' | 'route' | 'component'
+  | 'dependency' | 'vulnerability';
 
 export type EdgeKind =
   | 'contains' | 'calls' | 'imports' | 'exports' | 'extends' | 'implements'
-  | 'references' | 'type_of' | 'returns' | 'instantiates' | 'overrides' | 'decorates';
+  | 'references' | 'type_of' | 'returns' | 'instantiates' | 'overrides' | 'decorates'
+  | 'has_vulnerability' | 'depends_on' | 'declared_in';
 
 export type Language =
   | 'typescript' | 'javascript' | 'tsx' | 'jsx' | 'python' | 'go' | 'rust'
@@ -128,7 +130,7 @@ export interface TaskContext {
 }
 
 export interface IndexProgress {
-  phase: 'scanning' | 'parsing' | 'storing' | 'resolving' | 'detecting frameworks' | 'embeddings' | 'architecture' | 'docs' | 'data' | 'retrying';
+  phase: 'scanning' | 'parsing' | 'storing' | 'resolving' | 'detecting frameworks' | 'embeddings' | 'architecture' | 'security' | 'docs' | 'data' | 'retrying';
   current: number;
   total: number;
   currentFile?: string;

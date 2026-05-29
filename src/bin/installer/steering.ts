@@ -42,6 +42,11 @@ KiroGraph builds a semantic knowledge graph of your codebase. Use its MCP tools 
 | What columns does this dataset have? | \`kirograph_data_describe\` |
 | Query rows with filters | \`kirograph_data_query\` |
 | Aggregate data (sum, avg, count) | \`kirograph_data_aggregate\` |
+| Are there vulnerable dependencies? | \`kirograph_security\` |
+| Which CVEs affect my project? | \`kirograph_vulns\` |
+| Is this vulnerability reachable? | \`kirograph_reachability\` |
+| Generate SBOM/VEX | \`kirograph_sbom\` / \`kirograph_vex\` |
+| Add a private CVE | \`kirograph_vuln_add\` |
 
 ---
 
@@ -311,6 +316,7 @@ export interface SteeringOptions {
   enableMemory?: boolean;
   enableDocs?: boolean;
   enableData?: boolean;
+  enableSecurity?: boolean;
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
@@ -333,6 +339,15 @@ function buildSteeringContent(opts?: SteeringOptions): string {
   if (!enableCompression) {
     content = content.replace('| Run a command with token savings | `kirograph_exec` |\n', '');
     content = content.replace('| Check token savings stats | `kirograph_gain` |\n', '');
+  }
+
+  // Remove security tools from decision guide if disabled
+  if (!opts?.enableSecurity) {
+    content = content.replace('| Are there vulnerable dependencies? | `kirograph_security` |\n', '');
+    content = content.replace('| Which CVEs affect my project? | `kirograph_vulns` |\n', '');
+    content = content.replace('| Is this vulnerability reachable? | `kirograph_reachability` |\n', '');
+    content = content.replace('| Generate SBOM/VEX | `kirograph_sbom` / `kirograph_vex` |\n', '');
+    content = content.replace('| Add a private CVE | `kirograph_vuln_add` |\n', '');
   }
 
   const caveman = cavemanMode && cavemanMode !== 'off' ? CAVEMAN_RULES[cavemanMode] : null;
@@ -413,6 +428,36 @@ kirograph_data_aggregate(dataset: "data-orders", groupBy: ["region"], metrics: [
 \`\`\`
 `;
     content = content.trimEnd() + '\n\n' + dataSection.trim() + '\n';
+  }
+
+  // Security section
+  if (opts?.enableSecurity) {
+    const securitySection = `
+## Security
+
+KiroGraph scans dependency manifests for known vulnerabilities and performs reachability analysis
+to determine if vulnerable code paths are actually reachable from your entry points.
+
+**Available tools:**
+- \`kirograph_security\` — security overview: vulnerability counts, verdicts, stale data warnings
+- \`kirograph_vulns\` — list vulnerabilities with severity, affected components, and reachability verdicts
+- \`kirograph_reachability\` — check if a specific CVE is reachable from entry points
+- \`kirograph_sbom\` — export CycloneDX 1.5 SBOM (Software Bill of Materials)
+- \`kirograph_vex\` — export CycloneDX 1.5 VEX (Vulnerability Exploitability eXchange)
+- \`kirograph_vuln_add\` — manually register a private/internal CVE against a dependency
+
+**Security workflow:**
+1. \`kirograph_security\`: get overview of vulnerability status
+2. \`kirograph_vulns\`: list vulnerabilities sorted by severity
+3. \`kirograph_reachability\`: check if a specific CVE is reachable
+4. \`kirograph_vex\`: export VEX for compliance
+
+**When to use:** Before deploying or during security reviews, use \`kirograph_security\` for a
+quick overview. Use \`kirograph_reachability\` to determine if a CVE actually affects your
+application (many vulnerabilities are in code paths that are never reached). Use \`kirograph_sbom\`
+and \`kirograph_vex\` for compliance reporting.
+`;
+    content = content.trimEnd() + '\n\n' + securitySection.trim() + '\n';
   }
 
   return content;

@@ -663,6 +663,79 @@ export const tools: ToolDefinition[] = [
       required: ['dataset'],
     },
   },
+  // ── Security tools (require enableSecurity=true) ────────────────────────────
+  {
+    name: 'kirograph_security',
+    description: 'Security overview: vulnerability counts, affected/not_affected verdicts, stale data warnings. Requires enableSecurity=true and enableArchitecture=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_vulns',
+    description: 'List vulnerabilities with reachability verdicts, severity, and affected components. Supports on-demand refresh.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        severity: { type: 'string', description: 'Filter by severity level', enum: ['critical', 'high', 'medium', 'low'] },
+        verdict: { type: 'string', description: 'Filter by reachability verdict', enum: ['affected', 'not_affected', 'under_investigation'] },
+        limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
+        refresh: { type: 'boolean', description: 'Trigger fresh vulnerability enrichment before listing (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_vuln_add',
+    description: 'Manually register a CVE against a dependency without querying external databases.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cveId: { type: 'string', description: 'CVE identifier (e.g., "CVE-2023-12345")' },
+        package: { type: 'string', description: 'Package name to associate the CVE with' },
+        severity: { type: 'number', description: 'CVSS v3.1 base score (optional)' },
+        summary: { type: 'string', description: 'Vulnerability summary (optional)' },
+        fixedVersion: { type: 'string', description: 'Version that fixes the vulnerability (optional)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['cveId', 'package'],
+    },
+  },
+  {
+    name: 'kirograph_sbom',
+    description: 'Generate and return CycloneDX 1.5 SBOM JSON for the project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_vex',
+    description: 'Generate and return CycloneDX 1.5 VEX JSON with reachability verdicts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_reachability',
+    description: 'Check reachability for a specific dependency or vulnerability. Returns verdict, paths, and impact summary.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: 'Dependency name or CVE ID to check reachability for' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['target'],
+    },
+  },
 ];
 
 export class ToolHandler {
@@ -1120,6 +1193,44 @@ export class ToolHandler {
             }
           }
         } catch { /* data is non-critical */ }
+
+        // Security integration: surface vulnerability warnings if enableSecurity is true
+        try {
+          const projectRootSec = cg.getProjectRoot();
+          const configSec = await (await import('../config')).loadConfig(projectRootSec);
+          if (configSec.enableSecurity) {
+            const dbSec = cg.getDatabase();
+            dbSec.applySecuritySchema();
+            const rawDbSec = dbSec.getRawDb();
+
+            // Collect node IDs from entry points and related nodes
+            const contextNodeIds = [
+              ...ctx.entryPoints.map((n: any) => n.id),
+              ...ctx.relatedNodes.map((n: any) => n.id),
+            ].filter(Boolean);
+
+            if (contextNodeIds.length > 0) {
+              const { getSecurityWarningsForNodes, formatSecurityWarnings } = await import('../security/context-warnings');
+              const warnings = getSecurityWarningsForNodes(rawDbSec, contextNodeIds);
+
+              if (warnings.length > 0) {
+                // Build a name map for entry points
+                const nodeNames = new Map<string, string>();
+                for (const n of ctx.entryPoints) {
+                  nodeNames.set(n.id, n.name);
+                }
+                for (const n of ctx.relatedNodes) {
+                  nodeNames.set(n.id, n.name);
+                }
+
+                const secSection = formatSecurityWarnings(warnings, nodeNames);
+                if (secSection) {
+                  lines.push(secSection);
+                }
+              }
+            }
+          }
+        } catch { /* security is non-critical */ }
 
         // Context savings estimation
         const graphTokens = lines.join('\n').length / 4; // rough token estimate
@@ -2359,6 +2470,375 @@ export class ToolHandler {
           `${q.column} (risk: ${(q.riskScore * 100).toFixed(0)}%): ${q.issues.join('; ')}`
         );
         return `Quality report for "${args.dataset}" (${quality.length} columns with issues):\n\n${lines.join('\n')}`;
+      }
+
+      // ── Security tools (require enableSecurity=true) ──────────────────────────
+
+      case 'kirograph_security': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+        if (!config.enableArchitecture) return 'Security requires architecture analysis. Set enableArchitecture: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        const depCount: { count: number } = rawDb.get(
+          `SELECT COUNT(*) as count FROM sec_dependencies`,
+        ) ?? { count: 0 };
+
+        const vulnCount: { count: number } = rawDb.get(
+          `SELECT COUNT(*) as count FROM sec_vulnerabilities`,
+        ) ?? { count: 0 };
+
+        const verdictRows: Array<{ verdict: string; count: number }> = rawDb.all(
+          `SELECT verdict, COUNT(*) as count FROM sec_reachability GROUP BY verdict`,
+        );
+        const verdicts: Record<string, number> = {};
+        for (const row of verdictRows) {
+          verdicts[row.verdict] = row.count;
+        }
+
+        const staleCount: { count: number } = rawDb.get(
+          `SELECT COUNT(*) as count FROM sec_dependencies WHERE vuln_data_stale = 1`,
+        ) ?? { count: 0 };
+
+        const lines: string[] = [
+          '# Security Overview',
+          '',
+          `Dependencies: ${depCount.count}`,
+          `Vulnerabilities: ${vulnCount.count}`,
+        ];
+
+        if (vulnCount.count > 0) {
+          const affected = verdicts['affected'] ?? 0;
+          const notAffected = verdicts['not_affected'] ?? 0;
+          const underInvestigation = verdicts['under_investigation'] ?? 0;
+          const pending = vulnCount.count - affected - notAffected - underInvestigation;
+
+          lines.push('', '## Reachability Verdicts', '');
+          if (affected > 0) lines.push(`● Affected: ${affected}`);
+          if (notAffected > 0) lines.push(`● Not affected: ${notAffected}`);
+          if (underInvestigation > 0) lines.push(`● Under investigation: ${underInvestigation}`);
+          if (pending > 0) lines.push(`● Pending analysis: ${pending}`);
+        }
+
+        if (staleCount.count > 0) {
+          lines.push('', `⚠ ${staleCount.count} dependenc${staleCount.count === 1 ? 'y has' : 'ies have'} stale vulnerability data. Use kirograph_vulns with refresh=true to update.`);
+        }
+
+        return lines.join('\n');
+      }
+
+      case 'kirograph_vulns': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        // Handle refresh
+        if (args.refresh === true) {
+          const { OsvAdapter } = await import('../security/vuln/osv-adapter');
+          const { VulnerabilityDatabaseClient } = await import('../security/vuln/client');
+
+          const adapters = config.securityDatabases.map((dbName: string) => {
+            if (dbName.toUpperCase() === 'OSV') return new OsvAdapter();
+            return null;
+          }).filter(Boolean) as any[];
+
+          const client = new VulnerabilityDatabaseClient(adapters, db);
+          await client.enrichAll();
+        }
+
+        // Build query
+        let query = `
+          SELECT
+            v.node_id, v.cve_id, v.severity_score, v.fixed_version, v.summary,
+            d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
+            r.verdict
+          FROM sec_vulnerabilities v
+          LEFT JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
+          LEFT JOIN sec_dependencies d ON d.node_id = e.source
+          LEFT JOIN sec_reachability r ON r.vulnerability_node_id = v.node_id
+          WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        // Severity filter
+        if (args.severity) {
+          const severityRanges: Record<string, [number, number]> = {
+            critical: [9.0, 10.0],
+            high: [7.0, 8.9],
+            medium: [4.0, 6.9],
+            low: [0.1, 3.9],
+          };
+          const range = severityRanges[(args.severity as string).toLowerCase()];
+          if (!range) return `Invalid severity: ${args.severity}. Use: critical, high, medium, low`;
+          query += ` AND v.severity_score >= ? AND v.severity_score <= ?`;
+          params.push(range[0], range[1]);
+        }
+
+        // Verdict filter
+        if (args.verdict) {
+          const validVerdicts = ['affected', 'not_affected', 'under_investigation'];
+          if (!validVerdicts.includes(args.verdict as string)) {
+            return `Invalid verdict: ${args.verdict}. Use: affected, not_affected, under_investigation`;
+          }
+          query += ` AND r.verdict = ?`;
+          params.push(args.verdict);
+        }
+
+        const limit = clampLimit(args.limit as number | undefined, 20);
+        query += ` ORDER BY v.severity_score DESC NULLS LAST LIMIT ?`;
+        params.push(limit);
+
+        const rows: Array<{
+          node_id: string;
+          cve_id: string;
+          severity_score: number | null;
+          fixed_version: string | null;
+          summary: string | null;
+          package_name: string | null;
+          ecosystem: string | null;
+          resolved_version: string | null;
+          declared_constraint: string | null;
+          verdict: string | null;
+        }> = rawDb.all(query, params);
+
+        if (rows.length === 0) {
+          return 'No vulnerabilities found' + ((args.severity || args.verdict) ? ' matching filters.' : '.');
+        }
+
+        const { formatFixSuggestion } = await import('../security/export/fix-suggestions');
+
+        const lines: string[] = [`Vulnerabilities (${rows.length}):\n`];
+
+        for (const row of rows) {
+          const score = row.severity_score;
+          let severityLabel: string;
+          if (score == null) severityLabel = 'UNKNOWN';
+          else if (score >= 9.0) severityLabel = 'CRITICAL';
+          else if (score >= 7.0) severityLabel = 'HIGH';
+          else if (score >= 4.0) severityLabel = 'MEDIUM';
+          else severityLabel = 'LOW';
+
+          let verdictLabel: string;
+          if (!row.verdict) verdictLabel = 'pending';
+          else if (row.verdict === 'affected') verdictLabel = 'affected';
+          else if (row.verdict === 'not_affected') verdictLabel = 'not affected';
+          else verdictLabel = 'investigating';
+
+          const pkg = row.package_name
+            ? `${row.package_name}@${row.resolved_version || row.declared_constraint || '?'}`
+            : 'unknown package';
+
+          lines.push(`${severityLabel}  ${row.cve_id}  ${pkg}  [${verdictLabel}]`);
+
+          if (row.summary && row.summary !== 'Manually registered') {
+            const truncSummary = row.summary.length > 120 ? row.summary.slice(0, 120) + '…' : row.summary;
+            lines.push(`  ${truncSummary}`);
+          }
+
+          if (row.fixed_version && row.ecosystem && row.package_name) {
+            const fix = formatFixSuggestion(row.ecosystem, row.package_name, row.fixed_version);
+            if (fix) lines.push(`  ${fix}`);
+          }
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_vuln_add': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const cveId = args.cveId as string;
+        const pkgName = args.package as string;
+        if (!cveId) return 'Error: cveId is required.';
+        if (!pkgName) return 'Error: package is required.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        // Find matching Dependency_Node
+        const depRow: { node_id: string; ecosystem: string } | undefined = rawDb.get(
+          `SELECT node_id, ecosystem FROM sec_dependencies WHERE package_name = ?`,
+          [pkgName],
+        );
+
+        if (!depRow) {
+          return `No dependency found matching "${pkgName}". Run kirograph index first to discover dependencies.`;
+        }
+
+        // Create Vulnerability_Node
+        const vulnNodeId = `vuln:${cveId}`;
+        const now = Date.now();
+        const severity = args.severity as number | undefined;
+        const summary = (args.summary as string) ?? 'Manually registered';
+        const fixedVersion = (args.fixedVersion as string) ?? null;
+
+        rawDb.run(
+          `INSERT OR REPLACE INTO nodes
+            (id, kind, name, qualified_name, file_path, language,
+             start_line, end_line, start_column, end_column,
+             is_exported, is_async, is_static, is_abstract, updated_at)
+           VALUES (?, 'vulnerability', ?, ?, '', 'unknown', 0, 0, 0, 0, 0, 0, 0, 0, ?)`,
+          [vulnNodeId, cveId, cveId, now],
+        );
+
+        rawDb.run(
+          `INSERT OR REPLACE INTO sec_vulnerabilities
+            (node_id, cve_id, severity_score, affected_ranges, fixed_version, summary, source_database)
+           VALUES (?, ?, ?, '[]', ?, ?, 'manual')`,
+          [vulnNodeId, cveId, severity ?? null, fixedVersion, summary],
+        );
+
+        // Create has_vulnerability edge
+        rawDb.run(
+          `INSERT OR IGNORE INTO edges (source, target, kind, confidence, confidence_score)
+           VALUES (?, ?, 'has_vulnerability', 'extracted', 1.0)`,
+          [depRow.node_id, vulnNodeId],
+        );
+
+        return `Registered ${cveId} against ${pkgName}.`;
+      }
+
+      case 'kirograph_sbom': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { SBOMExporter } = await import('../security/export/sbom');
+        const exporter = new SBOMExporter(db, projectRoot);
+        const json = exporter.exportJSON();
+
+        return truncate(json);
+      }
+
+      case 'kirograph_vex': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { VEXExporter } = await import('../security/export/vex');
+        const exporter = new VEXExporter(db, projectRoot);
+        const json = exporter.exportJSON();
+
+        return truncate(json);
+      }
+
+      case 'kirograph_reachability': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const target = args.target as string;
+        if (!target) return 'Error: target is required (dependency name or CVE ID).';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+        const rawDb = db.getRawDb();
+
+        // Try to find target as a CVE ID in sec_vulnerabilities
+        let vulnerabilityNodeId: string | null = null;
+        let targetLabel = target;
+
+        const vulnRow: { node_id: string } | undefined = rawDb.get(
+          `SELECT node_id FROM sec_vulnerabilities WHERE cve_id = ?`,
+          [target],
+        );
+
+        if (vulnRow) {
+          vulnerabilityNodeId = vulnRow.node_id;
+        } else {
+          // Try to find target as a dependency name
+          const depRow: { node_id: string; package_name: string } | undefined = rawDb.get(
+            `SELECT node_id, package_name FROM sec_dependencies WHERE package_name = ?`,
+            [target],
+          );
+
+          if (depRow) {
+            targetLabel = depRow.package_name;
+            // Find vulnerabilities linked to this dependency
+            const vulnEdge: { target: string } | undefined = rawDb.get(
+              `SELECT target FROM edges WHERE source = ? AND kind = 'has_vulnerability' LIMIT 1`,
+              [depRow.node_id],
+            );
+
+            if (vulnEdge) {
+              vulnerabilityNodeId = vulnEdge.target;
+            } else {
+              return `No vulnerabilities found for dependency "${target}". The dependency exists but has no known vulnerabilities.`;
+            }
+          } else {
+            return `Target "${target}" not found. Provide a valid CVE ID or dependency package name.`;
+          }
+        }
+
+        // Run reachability analysis
+        const { ReachabilityAnalyzer } = await import('../security/reachability');
+        const analyzer = new ReachabilityAnalyzer(db, config);
+        const result = await analyzer.analyze(vulnerabilityNodeId);
+
+        const lines: string[] = [
+          `# Reachability: ${targetLabel}`,
+          '',
+          `Verdict: ${result.verdict}`,
+          `Reaching entry points: ${result.reachingEntryPointCount}`,
+        ];
+
+        if (result.paths.length > 0) {
+          lines.push('', '## Paths');
+          for (const p of result.paths.slice(0, 5)) {
+            lines.push(`- From ${p.entryPoint}: ${p.path.join(' → ')}`);
+          }
+          if (result.paths.length > 5) {
+            lines.push(`  …and ${result.paths.length - 5} more paths`);
+          }
+        }
+
+        if (result.unresolvedSymbols.length > 0) {
+          lines.push('', '## Unresolved Symbols');
+          for (const sym of result.unresolvedSymbols.slice(0, 10)) {
+            lines.push(`- ${sym}`);
+          }
+          if (result.unresolvedSymbols.length > 10) {
+            lines.push(`  …and ${result.unresolvedSymbols.length - 10} more`);
+          }
+        }
+
+        // Get impact summary if affected
+        if (result.verdict === 'affected') {
+          const impact = await analyzer.getImpactSummary(vulnerabilityNodeId);
+          if (impact) {
+            lines.push('', '## Impact Summary');
+            if (impact.affectedLayers.length > 0) {
+              lines.push(`Affected layers: ${impact.affectedLayers.join(', ')}`);
+            }
+            lines.push(`Affected entry points: ${impact.affectedEntryPoints.length}`);
+            lines.push(`Distinct paths: ${impact.distinctPathCount}`);
+          }
+        }
+
+        return truncate(lines.join('\n'));
       }
 
       default:

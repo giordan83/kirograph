@@ -211,13 +211,31 @@ export class IndexPipeline {
         );
       }
 
-      // Analyze architecture (if enabled)
-      if (this.config.enableArchitecture) {
+      // Analyze architecture (if enabled, or auto-enabled for security)
+      if (this.config.enableArchitecture || this.config.enableSecurity) {
+        if (this.config.enableSecurity && !this.config.enableArchitecture) {
+          const { logWarn } = await import('../errors');
+          logWarn('enableSecurity requires enableArchitecture — auto-enabling architecture analysis for this run');
+        }
         opts?.onProgress?.({ phase: 'architecture', current: 0, total: 1 });
         await this.arch.analyze(msg =>
           opts?.onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } })
         );
         opts?.onProgress?.({ phase: 'architecture', current: 1, total: 1 });
+      }
+
+      // Run security analysis (if enabled)
+      if (this.config.enableSecurity) {
+        try {
+          const { SecurityPipeline } = await import('../security/pipeline');
+          this.db.applySecuritySchema();
+          const secPipeline = new SecurityPipeline(this.db, this.config, this.projectRoot);
+          opts?.onProgress?.({ phase: 'security', current: 0, total: 1 });
+          await secPipeline.run((phase, current, total) =>
+            opts?.onProgress?.({ phase: 'security', current, total, meta: { secPhase: phase } })
+          );
+          opts?.onProgress?.({ phase: 'security', current: 1, total: 1 });
+        } catch { /* security analysis is non-critical */ }
       }
 
       // Index documentation (if enabled)
@@ -439,13 +457,31 @@ export class IndexPipeline {
         );
       }
 
-      // Analyze architecture (if enabled)
-      if (this.config.enableArchitecture) {
+      // Analyze architecture (if enabled, or auto-enabled for security)
+      if (this.config.enableArchitecture || this.config.enableSecurity) {
+        if (this.config.enableSecurity && !this.config.enableArchitecture) {
+          const { logWarn } = await import('../errors');
+          logWarn('enableSecurity requires enableArchitecture — auto-enabling architecture analysis for this run');
+        }
         onProgress?.({ phase: 'architecture', current: 0, total: 1 });
         await this.arch.analyze(msg =>
           onProgress?.({ phase: 'architecture', current: 0, total: 1, meta: { msg } })
         );
         onProgress?.({ phase: 'architecture', current: 1, total: 1 });
+      }
+
+      // Run security analysis (if enabled)
+      if (this.config.enableSecurity) {
+        try {
+          const { SecurityPipeline } = await import('../security/pipeline');
+          this.db.applySecuritySchema();
+          const secPipeline = new SecurityPipeline(this.db, this.config, this.projectRoot);
+          onProgress?.({ phase: 'security', current: 0, total: 1 });
+          await secPipeline.run((phase, current, total) =>
+            onProgress?.({ phase: 'security', current, total, meta: { secPhase: phase } })
+          );
+          onProgress?.({ phase: 'security', current: 1, total: 1 });
+        } catch { /* security analysis is non-critical */ }
       }
 
       // Re-index documentation (if enabled)

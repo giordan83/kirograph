@@ -99,6 +99,12 @@ export interface KiroGraphConfig {
   dataQueryLimit: number;
   /** Max token budget per response. Default: 8000. */
   dataMaxResponseTokens: number;
+  /** Enable security analysis (dependency scanning + vulnerability detection). Default: false. */
+  enableSecurity: boolean;
+  /** Vulnerability databases to query. Default: ['OSV']. */
+  securityDatabases: string[];
+  /** Auto-run vulnerability enrichment after manifest parsing. Default: true. */
+  securityAutoEnrich: boolean;
   /** Context budget governance settings. */
   contextBudget?: {
     maxTokensPerSession: number;
@@ -124,6 +130,7 @@ const KNOWN_FIELDS = new Set<string>([
   'docsContextLimit', 'docsContextThreshold', 'docsMaxFileSize', 'docsSummarization',
   'enableData', 'dataInclude', 'dataExclude', 'dataLinkCode',
   'dataContextLimit', 'dataMaxFileSize', 'dataMaxRows', 'dataQueryLimit', 'dataMaxResponseTokens',
+  'enableSecurity', 'securityDatabases', 'securityAutoEnrich',
   'contextBudget',
   // Legacy aliases (still accepted, mapped during validation)
   'enableCompression', 'compressionLevel',
@@ -196,6 +203,9 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     dataMaxRows: 1_000_000,
     dataQueryLimit: 500,
     dataMaxResponseTokens: 8000,
+    enableSecurity: false,
+    securityDatabases: ['OSV'],
+    securityAutoEnrich: true,
   };
 }
 
@@ -366,6 +376,52 @@ export function validateConfig(config: unknown): KiroGraphConfig {
   const dataMaxResponseTokens = typeof raw.dataMaxResponseTokens === 'number' && raw.dataMaxResponseTokens > 0
     ? Math.round(raw.dataMaxResponseTokens) : defaults.dataMaxResponseTokens;
 
+  // ── Security config ───────────────────────────────────────────────────────
+  let enableSecurity: boolean;
+  if (typeof raw.enableSecurity === 'boolean') {
+    enableSecurity = raw.enableSecurity;
+  } else {
+    if (raw.enableSecurity !== undefined) {
+      logWarn('Invalid config field enableSecurity: expected boolean, applying default (false)');
+    }
+    enableSecurity = defaults.enableSecurity;
+  }
+
+  let securityAutoEnrich: boolean;
+  if (typeof raw.securityAutoEnrich === 'boolean') {
+    securityAutoEnrich = raw.securityAutoEnrich;
+  } else {
+    if (raw.securityAutoEnrich !== undefined) {
+      logWarn('Invalid config field securityAutoEnrich: expected boolean, applying default (true)');
+    }
+    securityAutoEnrich = defaults.securityAutoEnrich;
+  }
+
+  const SUPPORTED_SECURITY_DATABASES = new Set(['OSV']);
+  let securityDatabases: string[];
+  if (Array.isArray(raw.securityDatabases) && raw.securityDatabases.every((d: unknown) => typeof d === 'string')) {
+    const valid = (raw.securityDatabases as string[]).filter(d => {
+      if (!SUPPORTED_SECURITY_DATABASES.has(d)) {
+        logWarn(`Unsupported security database "${d}" in securityDatabases, ignoring`);
+        return false;
+      }
+      return true;
+    });
+    securityDatabases = valid.length > 0 ? valid : defaults.securityDatabases;
+  } else {
+    if (raw.securityDatabases !== undefined) {
+      logWarn('Invalid config field securityDatabases: expected array of strings, applying default (["OSV"])');
+    }
+    securityDatabases = defaults.securityDatabases;
+  }
+
+  // Dependency constraint: enableSecurity requires enableArchitecture
+  let finalEnableArchitecture = enableArchitecture;
+  if (enableSecurity && !enableArchitecture) {
+    logWarn('enableSecurity requires enableArchitecture \u2014 auto-enabling architecture analysis');
+    finalEnableArchitecture = true;
+  }
+
   // ── Context budget config ─────────────────────────────────────────────────
   let contextBudget: KiroGraphConfig['contextBudget'] | undefined;
   if (raw.contextBudget && typeof raw.contextBudget === 'object' && !Array.isArray(raw.contextBudget)) {
@@ -402,7 +458,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     minLogLevel,
     frameworkHints,
     fuzzyResolutionThreshold,
-    enableArchitecture,
+    enableArchitecture: finalEnableArchitecture,
     cavemanMode,
     shellCompressionLevel,
     syncWarningThreshold,
@@ -431,6 +487,9 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     dataMaxRows,
     dataQueryLimit,
     dataMaxResponseTokens,
+    enableSecurity,
+    securityDatabases,
+    securityAutoEnrich,
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
     ...(contextBudget !== undefined ? { contextBudget } : {}),
   };

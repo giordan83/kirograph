@@ -408,3 +408,89 @@ Data quality triage: rank columns by composite risk score (null rate, cardinalit
 |-----------|------|---------|-------------|
 | `dataset` | string | required | Dataset ID |
 | `projectPath` | string | cwd | Project root path |
+
+---
+
+## Security Tools *(require `enableSecurity: true` and `enableArchitecture: true`)*
+
+### `kirograph_security`
+
+Security overview: total dependencies, vulnerability counts, verdict breakdown (affected/not_affected/under_investigation), and stale data warnings.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_vulns`
+
+List vulnerabilities with filtering by severity and reachability verdict. Includes fix suggestions when a fixed version is available.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `severity` | string | - | Filter: `critical`, `high`, `medium`, `low` |
+| `verdict` | string | - | Filter: `affected`, `not_affected`, `under_investigation` |
+| `limit` | number | 20 | Max results |
+| `refresh` | boolean | false | Trigger fresh enrichment from configured databases before listing |
+| `projectPath` | string | cwd | Project root path |
+
+**Example response:**
+
+```
+CVE-2023-44270 (7.5 HIGH) — postcss
+  Verdict: affected
+  Paths: 2 entry points reach this dependency
+  Layers: api, service
+  💡 Fix: npm install postcss@8.4.31
+```
+
+### `kirograph_sbom`
+
+Generate a CycloneDX 1.5 SBOM JSON document containing all project dependencies as components with purl identifiers, scope classification, and dependency relationships.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_vex`
+
+Generate a CycloneDX 1.5 VEX JSON document with reachability-derived analysis states. Maps graph verdicts to CycloneDX VEX states: `affected` → "affected", `not_affected` → "not_affected" (justification: "code_not_reachable"), `under_investigation` → "under_investigation".
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_reachability`
+
+Analyze reachability for a specific CVE or dependency. Returns the verdict, shortest paths from each reaching entry point, unresolved symbols (if any), and impact summary (affected layers, entry points, distinct path count).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `target` | string | required | CVE identifier (e.g. `CVE-2024-1234`) or package name (e.g. `lodash`) |
+| `projectPath` | string | cwd | Project root path |
+
+**Example response:**
+
+```
+CVE-2024-1234 — lodash@4.17.20
+  Verdict: affected
+  Reaching entry points: 3
+  Paths:
+    POST /api/users → UserService.create → validateInput → lodash
+    GET /api/users → UserService.list → formatResponse → lodash
+    POST /api/auth → AuthController.login → sanitize → lodash
+  Affected layers: api, service
+  Distinct paths: 5
+```
+
+### `kirograph_vuln_add`
+
+Manually register a CVE against a dependency. Creates a Vulnerability_Node linked to the matching Dependency_Node. Useful for private/internal advisories not in public databases.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cveId` | string | required | CVE identifier (e.g. `CVE-2024-9999`) |
+| `package` | string | required | Package name (must match an existing indexed dependency) |
+| `severity` | number | - | CVSS v3.1 base score (0.0–10.0) |
+| `summary` | string | - | Human-readable description (truncated to 500 chars) |
+| `fixedVersion` | string | - | Version that fixes the vulnerability |
+| `projectPath` | string | cwd | Project root path |

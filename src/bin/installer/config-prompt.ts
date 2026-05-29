@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import { KiroGraphConfig } from '../../config';
 type CavemanMode = 'lite' | 'full' | 'ultra';
 import { ask, askToggle, arrowSelect, printSection, printSeparator, dim, reset, violet } from './prompts';
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit'> & { embeddingModel?: string; embeddingDim?: number };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -55,7 +55,7 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     'Enables natural-language code search via vector embeddings. A local model (~130MB) is downloaded on first use.',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0 };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0, enableSecurity: false };
 
   if (enableEmbeddings) {
     // ── Model selection ────────────────────────────────────────────────────────
@@ -139,6 +139,20 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     'Detects packages from manifests and architectural layers. Enables kirograph_architecture, kirograph_coupling, kirograph_package.',
     false,
   );
+
+  // ── Security ────────────────────────────────────────────────────────────────
+  printSection('🔒', 'Security');
+
+  patch.enableSecurity = await askToggle(rl,
+    'Security analysis (vulnerability scanning + reachability):',
+    'Scans dependency manifests for known vulnerabilities and performs reachability analysis. Requires Architecture analysis (will be auto-enabled). Enables kirograph_security, kirograph_vulns, kirograph_sbom, kirograph_vex, kirograph_reachability MCP tools.',
+    false,
+  );
+
+  if (patch.enableSecurity && !patch.enableArchitecture) {
+    patch.enableArchitecture = true;
+    console.log('  ℹ  Architecture analysis auto-enabled (required by Security module)');
+  }
 
   // ── Documentation ───────────────────────────────────────────────────────────
   printSection('📖', 'Documentation');

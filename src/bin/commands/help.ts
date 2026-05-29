@@ -112,6 +112,34 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    icon: '🔒', title: 'Security',
+    commands: [
+      { name: 'security', args: '[path]', desc: 'Security overview: vulnerabilities, verdicts, stale-data warnings' },
+      { name: 'vulns',    args: '[path]', desc: 'List vulnerabilities with reachability verdicts and severity',
+        opts: [
+          '--severity <level>  Filter by severity: critical, high, medium, low',
+          '--verdict <verdict>  Filter by verdict: affected, not_affected, under_investigation',
+          '--refresh  Trigger fresh vulnerability enrichment before listing',
+          '--add <cveId>  Manually register a CVE (requires --package and --version)',
+        ],
+      },
+      { name: 'reachability', args: '<target>', desc: 'Check reachability for a CVE or dependency: verdict, call paths, impact' },
+      { name: 'vex',  args: '[path]', desc: 'Export a VEX document (Vulnerability Exploitability eXchange)', opts: ['--output <file>  Write to file instead of stdout'] },
+      { name: 'sbom', args: '[path]', desc: 'Export a Software Bill of Materials',                           opts: ['--output <file>  Write to file instead of stdout'] },
+    ],
+    examples: [
+      ['kirograph security', 'Overview: dep count, vuln count, verdict breakdown'],
+      ['kirograph vulns', 'List all vulnerabilities with severity and verdict'],
+      ['kirograph vulns --verdict under_investigation', 'Show only vulnerabilities still being investigated'],
+      ['kirograph vulns --severity critical --verdict affected', 'Critical confirmed vulnerabilities'],
+      ['kirograph vulns --refresh', 'Re-query OSV before listing'],
+      ['kirograph reachability CVE-2023-12345', 'Check reachability for a specific CVE'],
+      ['kirograph reachability lodash', 'Check reachability for a dependency by package name'],
+      ['kirograph vex --output vex.json', 'Export CycloneDX VEX document'],
+      ['kirograph sbom --output sbom.json', 'Export SPDX SBOM'],
+    ],
+  },
+  {
     icon: '⚙️', title: 'Agent',
     commands: [
       { name: 'caveman',     args: '[mode]',  desc: 'Communication style (off | lite | full | ultra)' },
@@ -351,6 +379,20 @@ export function printColoredHelp(): void {
         ['kirograph architecture --packages',              'List all detected packages'],
         ['kirograph coupling --sort instability',          'Show packages ranked by instability'],
         ['kirograph package src/auth',                     'Inspect the auth package'],
+      ],
+    },
+    {
+      title: '🔒 Security',
+      examples: [
+        ['kirograph security',                                        'Overview: dep count, vuln count, verdict breakdown'],
+        ['kirograph vulns',                                           'List all vulnerabilities'],
+        ['kirograph vulns --verdict under_investigation',             'Vulnerabilities still being investigated'],
+        ['kirograph vulns --severity critical --verdict affected',    'Critical confirmed vulnerabilities'],
+        ['kirograph vulns --refresh',                                 'Re-query OSV then list'],
+        ['kirograph reachability CVE-2023-12345',                     'Check reachability for a specific CVE'],
+        ['kirograph reachability lodash',                             'Check reachability for a dependency by package name'],
+        ['kirograph vex --output vex.json',                          'Export CycloneDX VEX document'],
+        ['kirograph sbom --output sbom.json',                        'Export SPDX SBOM'],
       ],
     },
     {

@@ -246,6 +246,59 @@ kirograph coupling --package auth          # Detail view for a single package
 kirograph coupling --format json           # JSON output
 ```
 
+## Security *(requires `enableSecurity: true`)*
+
+### Security Overview
+
+```bash
+kirograph security [path]                  # Vulnerability status overview
+```
+
+Shows: total dependencies, vulnerabilities found, verdict breakdown (affected/not_affected/under_investigation), stale data warnings.
+
+### SBOM Export
+
+```bash
+kirograph sbom [path]                      # Export CycloneDX 1.5 SBOM to stdout
+kirograph sbom --output sbom.json          # Export to file
+```
+
+### VEX Export
+
+```bash
+kirograph vex [path]                       # Export CycloneDX 1.5 VEX to stdout
+kirograph vex --output vex.json            # Export to file
+```
+
+### Vulnerability Management
+
+```bash
+kirograph vulns [path]                     # List all vulnerabilities
+kirograph vulns --severity critical        # Filter by severity
+kirograph vulns --verdict affected         # Filter by reachability verdict
+kirograph vulns --refresh                  # Refresh from vulnerability databases first
+kirograph vulns --add CVE-2024-1234 --package lodash --version 4.17.20  # Register private CVE
+```
+
+| Flag | Description |
+|------|-------------|
+| `--severity <level>` | Filter: `critical`, `high`, `medium`, `low` |
+| `--verdict <verdict>` | Filter: `affected`, `not_affected`, `under_investigation` |
+| `--refresh` | Trigger fresh enrichment from configured databases before listing |
+| `--add <cveId>` | Manually register a CVE (requires `--package` and `--version`) |
+| `--package <name>` | Package name for manual CVE registration |
+| `--version <ver>` | Package version for manual CVE registration |
+
+### Reachability Analysis
+
+```bash
+kirograph reachability <target> [path]     # Check reachability for a CVE or dependency
+kirograph reachability CVE-2023-12345      # By CVE ID
+kirograph reachability lodash              # By package name
+```
+
+Shows: verdict (`affected` / `not affected` / `under investigation`), reaching entry point count, call paths (up to 5), unresolved symbols, and impact summary (affected layers, entry points, distinct paths) when verdict is `affected`.
+
 ## Memory *(requires `enableMemory: true`)*
 
 ```bash

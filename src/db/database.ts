@@ -93,6 +93,18 @@ export class GraphDatabase {
   }
 
   /**
+   * Apply security schema tables. Called when enableSecurity is true.
+   * Safe to call multiple times (CREATE IF NOT EXISTS).
+   */
+  applySecuritySchema(): void {
+    const schemaPath = path.join(__dirname, '../db/security-schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      const sql = fs.readFileSync(schemaPath, 'utf8');
+      this.db.exec(sql);
+    }
+  }
+
+  /**
    * Get the raw database handle (for MemoryDatabase).
    */
   getRawDb(): any {

@@ -47,6 +47,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
     let enableMemory = false;
     let enableDocs = false;
     let enableData = false;
+    let enableSecurity = false;
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
     let qdrantDashboard = false;
@@ -59,6 +60,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         enableMemory = config.enableMemory ?? false;
         enableDocs = config.enableDocs ?? false;
         enableData = (config as any).enableData ?? false;
+        enableSecurity = (config as any).enableSecurity ?? false;
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
         console.log(`  • enableEmbeddings: ${config.enableEmbeddings}`);
@@ -68,6 +70,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         console.log(`  • enableMemory: ${enableMemory}`);
         console.log(`  • enableDocs: ${enableDocs}`);
         console.log(`  • enableData: ${enableData}`);
+        console.log(`  • enableSecurity: ${enableSecurity}`);
       } else {
         shouldOfferIndex = true;
         const patch = await promptConfigOptions(rl);
@@ -77,6 +80,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         enableMemory = patch.enableMemory ?? false;
         enableDocs = patch.enableDocs ?? false;
         enableData = patch.enableData ?? false;
+        enableSecurity = patch.enableSecurity ?? false;
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
 
@@ -152,6 +156,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         console.log(`  • enableMemory: ${enableMemory}`);
         console.log(`  • enableDocs: ${enableDocs}`);
         console.log(`  • enableData: ${enableData}`);
+        console.log(`  • enableSecurity: ${enableSecurity}`);
 
         // Install optional data format deps if enableData is on
         if (enableData) {
@@ -176,7 +181,7 @@ export async function runInstaller(target: InstallTarget = 'kiro'): Promise<void
         }
       }
 
-      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData);
+      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`\n  ✗ Failed to write configuration: ${reason}`);
