@@ -140,12 +140,15 @@ fi
 # ── Create GitHub release ────────────────────────────────────────────────────
 step "Creating GitHub release"
 
-echo "$NOTES" | gh release create "$TAG" \
-  --title "$TAG" \
-  --notes-file - \
-  --latest
-
-info "GitHub release created: $TAG"
+if gh release view "$TAG" &> /dev/null 2>&1; then
+  info "GitHub release $TAG already exists — skipping"
+else
+  echo "$NOTES" | gh release create "$TAG" \
+    --title "$TAG" \
+    --notes-file - \
+    --latest
+  info "GitHub release created: $TAG"
+fi
 
 # ── Publish to npm ───────────────────────────────────────────────────────────
 if [ "$NPM_SKIP" = true ]; then
