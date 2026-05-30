@@ -283,15 +283,21 @@ kirograph data lint                         # validate integrity</code></pre>
 
     <h3 id="cli-security">Security</h3>
     <pre><code>kirograph security [path]                  # Vulnerability status overview
-kirograph security --refresh-staleness     # Re-query registries for latest versions first</code></pre>
-    <p>Shows: total dependencies, vulnerabilities found, verdict breakdown (affected/not_affected/under_investigation), stale data warnings, stale dependency count.</p>
+kirograph security --refresh-staleness     # Re-query registries for latest versions first
+kirograph security --fail-on affected      # Exit 1 if any affected CVEs (for CI pipelines)</code></pre>
+    <p>Shows: total dependencies, vulnerabilities found, top-risk CVE, verdict breakdown, stale data warnings, staleness count. Warns when vulnerability data exceeds <code>securityEnrichMaxAgeDays</code> (default: 7 days).</p>
 
-    <pre><code>kirograph vulns [path]                     # List all vulnerabilities
+    <pre><code>kirograph vulns [path]                     # List all vulnerabilities (sorted by risk score)
 kirograph vulns --severity critical        # Filter by severity
 kirograph vulns --verdict affected         # Filter by reachability verdict
 kirograph vulns --epss 0.5                 # Filter by EPSS exploitation probability &gt;= 0.5
+kirograph vulns --sort risk|cvss|epss|name # Sort order (default: risk)
 kirograph vulns --stale                    # Show staleness score alongside each CVE
+kirograph vulns --group-by workspace       # Group by source manifest directory (monorepos)
 kirograph vulns --refresh                  # Refresh from vulnerability databases first
+kirograph vulns --fail-on affected         # Exit 1 if condition met (CI security gate)
+kirograph vulns --fail-on critical         # Exit 1 if any CVSS &gt;= 9.0
+kirograph vulns --fail-on epss=0.5         # Exit 1 if any EPSS &gt;= 0.5
 kirograph vulns --add CVE-2024-1234 --package lodash --version 4.17.20  # Register private CVE</code></pre>
 
     <table>
@@ -324,6 +330,15 @@ kirograph staleness --refresh              # Re-query registries first
 kirograph staleness --format json</code></pre>
     <p>Staleness score 0.0–1.0: <code>0</code> = current, <code>1</code> = very stale. Supports npm, PyPI, crates.io, RubyGems, Packagist.</p>
 
+    <h3 id="cli-suppression">CVE Suppression</h3>
+    <p>Mark CVEs as false positives or accepted risks. Suppressions are stored in <code>.kirograph/security-suppressions.json</code> and filtered from all command output.</p>
+    <pre><code>kirograph vuln suppress CVE-2024-1234                       # Suppress a CVE
+kirograph vuln suppress CVE-2024-1234 --reason "not affected in our usage"
+kirograph vuln suppress CVE-2024-1234 --expires 2026-12-31  # Auto-expire on date
+kirograph vuln unsuppress CVE-2024-1234                     # Remove suppression
+kirograph vuln suppressions                                  # List all active suppressions
+kirograph vuln suppressions --format json</code></pre>
+
     <pre><code>kirograph sbom [path]                      # Export CycloneDX 1.5 SBOM to stdout
 kirograph sbom --output sbom.json          # Export to file</code></pre>
 
@@ -336,6 +351,53 @@ kirograph vex --output vex.json            # Export to file</code></pre>
 kirograph security export --open                    # Generate and open immediately in browser
 kirograph security export --output report.html      # Custom output path</code></pre>
     <p>The dashboard has 6 tabs: <strong>Overview</strong> (stat cards, verdict chart, top CVEs by EPSS×CVSS), <strong>Vulnerabilities</strong> (filterable table with EPSS badges and expandable call paths), <strong>SBOM</strong> (component list + one-click CycloneDX JSON download), <strong>VEX</strong> (analysis states + one-click download), <strong>Licenses</strong> (policy violations highlighted), <strong>Staleness</strong> (score bars, sortable table).</p>
+    <p>Requires <code>enableSecurity: true</code> in <code>.kirograph/config.json</code>.</p>
+
+    <h3 id="cli-attack-surface">Attack Surface</h3>
+    <p>Map HTTP routes to reachable vulnerable dependencies. Shows route name, exposure level (public/authenticated/internal), hop count to vulnerable dependency, and risk score.</p>
+    <pre><code>kirograph attack-surface [path]          # Full attack surface report
+kirograph attack-surface --public-only   # Only public-facing routes
+kirograph attack-surface --limit 10      # Limit number of routes shown
+kirograph attack-surface --format json   # JSON output</code></pre>
+
+    <h3 id="cli-secrets">Secrets Detection</h3>
+    <p>Scan for 14 secret types (AWS keys, GitHub tokens, database URLs, JWT secrets, etc.) enriched with call-graph blast radius — shows which entry points reach the file containing the secret.</p>
+    <pre><code>kirograph security secrets [path]          # Scan for secrets in the project
+kirograph security secrets --include-tests # Include test files in the scan
+kirograph security secrets --severity critical  # Filter by severity
+kirograph security secrets --format json   # JSON output</code></pre>
+
+    <h3 id="cli-security-flows">Security Flows (SAST-lite)</h3>
+    <p>Detect dangerous code patterns: SQL injection, dangerous eval/exec, unsafe deserialization, path traversal, and weak crypto. Each finding is tagged with an OWASP Top 10 (2021) category.</p>
+    <pre><code>kirograph security flows [path]            # Detect all security flow types
+kirograph security flows --type sql        # Filter to SQL injection only
+kirograph security flows --format json     # JSON output</code></pre>
+    <p>Supported flow types: <code>sql</code>, <code>eval</code>, <code>deserialization</code>, <code>path-traversal</code>, <code>crypto</code>.</p>
+
+    <h3 id="cli-ci-report">CI/CD Security Report</h3>
+    <p>Generate a structured security report for CI/CD pipelines. Supports JSON, SARIF 2.1.0 (uploadable to the GitHub Security tab), or compact text format.</p>
+    <pre><code>kirograph security ci-report [path]                          # Compact text report
+kirograph security ci-report --format sarif --output results.sarif  # SARIF for GitHub
+kirograph security ci-report --format json                   # Machine-readable JSON
+kirograph security ci-report --fail-on critical              # Exit 1 if critical issues found</code></pre>
+
+    <h3 id="cli-supply-chain">Supply Chain</h3>
+    <p>Assess supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection (&gt;365 days inactive), and new package risk (&lt;30 days old).</p>
+    <pre><code>kirograph supply-chain [path]              # Full supply chain report
+kirograph supply-chain --threshold high    # Only show high or critical risk packages
+kirograph supply-chain --refresh           # Re-query external sources first
+kirograph supply-chain --format json       # JSON output</code></pre>
+
+    <h3 id="cli-dep-confusion">Dependency Confusion</h3>
+    <p>Detect dependency confusion attacks: internal packages whose names exist in public registries. Also detects typosquatting (Levenshtein distance ≤ 2 from popular package names).</p>
+    <pre><code>kirograph dep-confusion [path]             # Check for dependency confusion risks
+kirograph dep-confusion --format json      # JSON output</code></pre>
+
+    <h3 id="cli-remediation">Remediation SLA</h3>
+    <p>Track SLA compliance per CVE. Thresholds: critical=7 days, high=30 days, medium=90 days. Shows days open, days since fix became available, and SLA status (ok/warning/overdue).</p>
+    <pre><code>kirograph remediation [path]               # Full SLA report for all CVEs
+kirograph remediation --overdue-only       # Show only CVEs past their SLA deadline
+kirograph remediation --format json        # JSON output</code></pre>
     <p>Requires <code>enableSecurity: true</code> in <code>.kirograph/config.json</code>.</p>
 
   </main>
@@ -363,7 +425,15 @@ kirograph security export --output report.html      # Custom output path</code><
       <a href="#cli-docs" class="sidebar-link">Documentation</a>
       <a href="#cli-data" class="sidebar-link">Data</a>
       <a href="#cli-security" class="sidebar-link">Security</a>
+      <a href="#cli-suppression" class="sidebar-link" style="padding-left:1.5rem;">↳ CVE Suppression</a>
       <a href="#cli-security-export" class="sidebar-link" style="padding-left:1.5rem;">↳ Security Dashboard</a>
+      <a href="#cli-attack-surface" class="sidebar-link" style="padding-left:1.5rem;">↳ Attack Surface</a>
+      <a href="#cli-secrets" class="sidebar-link" style="padding-left:1.5rem;">↳ Secrets Detection</a>
+      <a href="#cli-security-flows" class="sidebar-link" style="padding-left:1.5rem;">↳ Security Flows</a>
+      <a href="#cli-ci-report" class="sidebar-link" style="padding-left:1.5rem;">↳ CI/CD Report</a>
+      <a href="#cli-supply-chain" class="sidebar-link" style="padding-left:1.5rem;">↳ Supply Chain</a>
+      <a href="#cli-dep-confusion" class="sidebar-link" style="padding-left:1.5rem;">↳ Dep Confusion</a>
+      <a href="#cli-remediation" class="sidebar-link" style="padding-left:1.5rem;">↳ Remediation SLA</a>
     </div>
   </aside>
 

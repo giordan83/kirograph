@@ -3,6 +3,30 @@ import * as path from 'path';
 import { loadConfig } from '../../config';
 import { dim, reset, violet, bold, green } from '../ui';
 import { formatFixSuggestion } from '../../security/export/fix-suggestions';
+import { SuppressionManager } from '../../security/suppressions';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Parse an `epss=N` fail-on value and return the threshold, or null if not an epss condition. */
+function parseEpssFailOn(failOn: string): number | null {
+  const m = failOn.match(/^epss=(.+)$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return isNaN(n) ? null : n;
+}
+
+/** Extract workspace label from a source_manifests JSON string. */
+function workspaceFromManifests(sourceManifests: string | null): string {
+  if (!sourceManifests) return 'root';
+  try {
+    const manifests: string[] = JSON.parse(sourceManifests);
+    if (!manifests.length) return 'root';
+    const dir = path.dirname(manifests[0]);
+    return dir === '.' ? 'root' : dir;
+  } catch {
+    return 'root';
+  }
+}
 
 export function register(program: Command): void {
   program
@@ -13,18 +37,24 @@ export function register(program: Command): void {
     .option('--refresh', 'Trigger fresh vulnerability enrichment before listing')
     .option('--epss <threshold>', 'Filter by EPSS score (e.g. 0.5 shows only vulns with EPSS >= 0.5)')
     .option('--stale', 'Show staleness score of the affected dependency alongside each CVE')
+    .option('--sort <key>', 'Sort results by: risk (default), cvss, epss, name')
     .option('--add <cveId>', 'Manually register a CVE')
     .option('--package <name>', 'Package name for --add')
     .option('--version <ver>', 'Package version for --add')
+    .option('--fail-on <condition>', 'Exit 1 if condition is met: affected, any, critical, high, epss=N')
+    .option('--group-by <key>', 'Group output by: workspace')
     .action(async (projectPath: string | undefined, opts: {
       severity?: string;
       verdict?: string;
       refresh?: boolean;
       epss?: string;
       stale?: boolean;
+      sort?: string;
       add?: string;
       package?: string;
       version?: string;
+      failOn?: string;
+      groupBy?: string;
     }) => {
       const target = path.resolve(projectPath ?? process.cwd());
       const config = await loadConfig(target);
@@ -33,6 +63,22 @@ export function register(program: Command): void {
         console.error(`\n  ${'\x1b[33m'}⚠ Security analysis is disabled.${reset}`);
         console.error(`  ${dim}Enable it in .kirograph/config.json:${reset} ${violet}${bold}"enableSecurity": true${reset}`);
         console.error(`  ${dim}Then re-run:${reset} ${violet}${bold}kirograph index${reset}\n`);
+        process.exit(1);
+      }
+
+      // Validate --fail-on early
+      if (opts.failOn !== undefined) {
+        const validFailOns = ['affected', 'any', 'critical', 'high'];
+        const isEpss = parseEpssFailOn(opts.failOn) !== null;
+        if (!validFailOns.includes(opts.failOn) && !isEpss) {
+          console.error(`  ✖ Invalid --fail-on value: ${opts.failOn}. Use: affected, any, critical, high, epss=N`);
+          process.exit(1);
+        }
+      }
+
+      // Validate --group-by early
+      if (opts.groupBy !== undefined && opts.groupBy !== 'workspace') {
+        console.error(`  ✖ Invalid --group-by value: ${opts.groupBy}. Supported: workspace`);
         process.exit(1);
       }
 
@@ -125,13 +171,15 @@ export function register(program: Command): void {
       }
 
       // Build query for listing vulnerabilities
+      // Include source_manifests when group-by workspace is requested
+      const selectSourceManifests = opts.groupBy === 'workspace' ? `,\n          d.source_manifests` : '';
       let query = `
         SELECT
           v.node_id, v.cve_id, v.severity_score, v.fixed_version, v.summary, v.source_database,
-          v.epss_score, v.epss_percentile,
+          v.epss_score, v.epss_percentile, v.risk_score,
           d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
           d.staleness_score,
-          r.verdict
+          r.verdict${selectSourceManifests}
         FROM sec_vulnerabilities v
         LEFT JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
         LEFT JOIN sec_dependencies d ON d.node_id = e.source
@@ -179,7 +227,19 @@ export function register(program: Command): void {
         params.push(epssThreshold);
       }
 
-      query += ` ORDER BY v.severity_score DESC NULLS LAST`;
+      // Resolve sort order
+      const sortKey = opts.sort?.toLowerCase() ?? 'risk';
+      const validSortKeys = ['risk', 'cvss', 'epss', 'name'];
+      if (!validSortKeys.includes(sortKey)) {
+        console.error(`  ✖ Invalid sort key: ${opts.sort}. Use: risk, cvss, epss, name`);
+        cg.close(); process.exit(1);
+      }
+      const sortClause =
+        sortKey === 'risk' ? `v.risk_score DESC NULLS LAST` :
+        sortKey === 'cvss' ? `v.severity_score DESC NULLS LAST` :
+        sortKey === 'epss' ? `v.epss_score DESC NULLS LAST` :
+        `v.cve_id ASC`;
+      query += ` ORDER BY ${sortClause}`;
 
       const rows: Array<{
         node_id: string;
@@ -190,26 +250,36 @@ export function register(program: Command): void {
         source_database: string;
         epss_score: number | null;
         epss_percentile: number | null;
+        risk_score: number | null;
         package_name: string | null;
         ecosystem: string | null;
         resolved_version: string | null;
         declared_constraint: string | null;
         staleness_score: number | null;
         verdict: string | null;
+        source_manifests?: string | null;
       }> = rawDb.all(query, params);
 
-      if (rows.length === 0) {
+      // Filter out suppressed CVEs
+      const suppressions = new SuppressionManager(target);
+      const suppressedRows = rows.filter(row => suppressions.isSuppressed(row.cve_id));
+      const filteredRows = rows.filter(row => !suppressions.isSuppressed(row.cve_id));
+
+      if (filteredRows.length === 0) {
         const filterNote = (opts.severity || opts.verdict)
           ? ` matching filters`
           : '';
         console.log(`\n  ${dim}No vulnerabilities found${filterNote}.${reset}\n`);
+        if (suppressedRows.length > 0) {
+          console.log(`  ${dim}${suppressedRows.length} CVE(s) suppressed — kirograph vuln suppressions to review${reset}\n`);
+        }
         cg.close();
         return;
       }
 
-      console.log(`\n  ${bold}Vulnerabilities${reset} (${rows.length})\n`);
+      // ── Render a single vulnerability row ────────────────────────────────────
 
-      for (const row of rows) {
+      function printVulnRow(row: (typeof filteredRows)[0], indent = '  '): void {
         // Severity badge
         const score = row.severity_score;
         let severityLabel: string;
@@ -261,29 +331,115 @@ export function register(program: Command): void {
           epssBadge = `  ${epssColor}${dim}[EPSS: ${scoreStr} / ${pctStr}]${reset}`;
         }
 
-        console.log(`  ${severityColor}${severityLabel}${reset}  ${violet}${bold}${row.cve_id}${reset}  ${dim}${pkg}${reset}  [${verdictColor}${verdictLabel}${reset}]${epssBadge}`);
+        // Risk score badge
+        let riskBadge = '';
+        if (row.risk_score != null) {
+          const riskColor = row.risk_score >= 7 ? '\x1b[31m' : row.risk_score >= 4 ? '\x1b[33m' : dim;
+          riskBadge = `  ${riskColor}[Risk: ${row.risk_score.toFixed(1)}]${reset}`;
+        }
+
+        console.log(`${indent}${severityColor}${severityLabel}${reset}  ${violet}${bold}${row.cve_id}${reset}  ${dim}${pkg}${reset}  [${verdictColor}${verdictLabel}${reset}]${epssBadge}${riskBadge}`);
 
         if (row.summary && row.summary !== 'Manually registered') {
           const truncated = row.summary.length > 100 ? row.summary.slice(0, 100) + '…' : row.summary;
-          console.log(`    ${dim}${truncated}${reset}`);
+          console.log(`${indent}  ${dim}${truncated}${reset}`);
         }
 
         // Staleness badge (when --stale flag is set)
         if (opts.stale && row.staleness_score != null) {
           const s = row.staleness_score;
           const staleColor = s >= 0.7 ? '\x1b[31m' : s >= 0.4 ? '\x1b[33m' : dim;
-          console.log(`    ${staleColor}${dim}[staleness: ${s.toFixed(2)}]${reset}`);
+          console.log(`${indent}  ${staleColor}${dim}[staleness: ${s.toFixed(2)}]${reset}`);
         }
 
         // Fix suggestion
         if (row.fixed_version && row.ecosystem && row.package_name) {
           const fix = formatFixSuggestion(row.ecosystem, row.package_name, row.fixed_version);
           if (fix) {
-            console.log(`    ${fix}`);
+            console.log(`${indent}  ${fix}`);
           }
         }
 
         console.log();
+      }
+
+      // ── Output: grouped or flat ───────────────────────────────────────────────
+
+      if (opts.groupBy === 'workspace') {
+        // Group by workspace (directory of first source manifest)
+        const groups = new Map<string, Array<(typeof filteredRows)[0]>>();
+        for (const row of filteredRows) {
+          const ws = workspaceFromManifests(row.source_manifests ?? null);
+          if (!groups.has(ws)) groups.set(ws, []);
+          groups.get(ws)!.push(row);
+        }
+
+        // Only apply workspace grouping when there are multiple distinct workspaces
+        const workspaces = Array.from(groups.keys());
+        if (workspaces.length <= 1) {
+          // Single workspace — fall through to flat output
+          console.log(`\n  ${bold}Vulnerabilities${reset} (${filteredRows.length})\n`);
+          for (const row of filteredRows) {
+            printVulnRow(row);
+          }
+        } else {
+          console.log(`\n  ${bold}Vulnerabilities${reset} (${filteredRows.length})\n`);
+          for (const ws of workspaces) {
+            const wsRows = groups.get(ws)!;
+            const count = wsRows.length;
+            const header = `Workspace: ${ws} (${count} vulnerabilit${count === 1 ? 'y' : 'ies'})`;
+            const line = '─'.repeat(header.length);
+            console.log(`  ${bold}${header}${reset}`);
+            console.log(`  ${dim}${line}${reset}`);
+            for (const row of wsRows) {
+              printVulnRow(row);
+            }
+          }
+        }
+      } else {
+        console.log(`\n  ${bold}Vulnerabilities${reset} (${filteredRows.length})\n`);
+        for (const row of filteredRows) {
+          printVulnRow(row);
+        }
+      }
+
+      if (suppressedRows.length > 0) {
+        console.log(`  ${dim}${suppressedRows.length} CVE(s) suppressed — kirograph vuln suppressions to review${reset}\n`);
+      }
+
+      // ── CI exit codes: --fail-on ──────────────────────────────────────────────
+
+      if (opts.failOn !== undefined) {
+        const failOn = opts.failOn;
+
+        let failCount = 0;
+        let failReason = '';
+
+        if (failOn === 'affected') {
+          failCount = filteredRows.filter(r => r.verdict === 'affected').length;
+          failReason = `affected`;
+        } else if (failOn === 'any') {
+          failCount = filteredRows.length;
+          failReason = `any`;
+        } else if (failOn === 'critical') {
+          failCount = filteredRows.filter(r => r.severity_score != null && r.severity_score >= 9.0).length;
+          failReason = `critical`;
+        } else if (failOn === 'high') {
+          failCount = filteredRows.filter(r => r.severity_score != null && r.severity_score >= 7.0).length;
+          failReason = `high`;
+        } else {
+          const epssThreshold = parseEpssFailOn(failOn);
+          if (epssThreshold !== null) {
+            failCount = filteredRows.filter(r => r.epss_score != null && r.epss_score >= epssThreshold).length;
+            failReason = `epss=${epssThreshold}`;
+          }
+        }
+
+        if (failCount > 0) {
+          console.log(`  \x1b[31m✖\x1b[0m --fail-on ${failReason}: ${failCount} ${failReason === 'any' ? '' : `${failReason} `}vulnerabilit${failCount === 1 ? 'y' : 'ies'} found. Exiting with code 1.`);
+          cg.close();
+          process.exit(1);
+        }
       }
 
       cg.close();

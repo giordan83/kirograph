@@ -495,6 +495,64 @@ Manually register a CVE against a dependency. Creates a Vulnerability_Node linke
 | `fixedVersion` | string | - | Version that fixes the vulnerability |
 | `projectPath` | string | cwd | Project root path |
 
+## Advanced Security Tools
+
+### `kirograph_attack_surface`
+
+Map all HTTP routes to reachable vulnerable dependencies. Shows route name, exposure level (public/authenticated/internal), hop count to vulnerable dependency, and risk score.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | - | Max routes to return |
+| `publicOnly` | boolean | false | Return only public-facing routes |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_secrets`
+
+Scan for 14 secret types (AWS keys, GitHub tokens, DB URLs, JWT, etc.) enriched with call-graph blast radius — shows which entry points reach each detected secret.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `includeTests` | boolean | false | Include test files in the scan |
+| `severity` | string | - | Filter by severity: `critical`, `high`, `medium`, `low` |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_security_flows`
+
+SAST-lite: detect SQL injection, dangerous eval/exec, unsafe deserialization, path traversal, and weak crypto. Each finding is tagged with an OWASP Top 10 (2021) category.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `type` | string | - | Filter flow type: `sql`, `eval`, `deserialization`, `path-traversal`, `crypto` |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_supply_chain`
+
+Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection (>365 days inactive), and new package risk (<30 days old).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | string | - | Minimum risk threshold to include: `low`, `medium`, `high`, `critical` |
+| `refresh` | boolean | false | Re-query external sources before returning results |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_dep_confusion`
+
+Detect dependency confusion: internal packages whose names exist in public registries (supply chain attack vector). Also detects typosquatting (Levenshtein distance ≤ 2 from popular packages).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_remediation`
+
+SLA tracking per CVE. Thresholds: critical=7 days, high=30 days, medium=90 days. Returns days open, days with fix available, and SLA status (ok/warning/overdue).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `overdueOnly` | boolean | false | Return only CVEs that have breached their SLA threshold |
+| `projectPath` | string | cwd | Project root path |
+
 ### `kirograph_licenses`
 
 List dependency licenses and check against the configured policy (`securityLicensePolicy`).

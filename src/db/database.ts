@@ -114,6 +114,12 @@ export class GraphDatabase {
     tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_deps_license ON sec_dependencies(license)');
     tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_deps_staleness ON sec_dependencies(staleness_score)');
     tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_vulns_epss ON sec_vulnerabilities(epss_score)');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN risk_score REAL');
+    tryAlter('CREATE INDEX IF NOT EXISTS idx_sec_vulns_risk ON sec_vulnerabilities(risk_score)');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN first_detected_at INTEGER');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN fix_available_since INTEGER');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN suppressed_at INTEGER');
+    tryAlter('ALTER TABLE sec_vulnerabilities ADD COLUMN remediated_at INTEGER');
   }
 
   /**

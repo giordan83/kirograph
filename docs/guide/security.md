@@ -116,6 +116,80 @@ kirograph reachability lodash
 
 Accepts either a CVE ID or a package name. Shows: verdict, reaching entry point count, call paths (up to 5), unresolved symbols if any, and full impact summary (affected layers, entry points, distinct paths) when verdict is `affected`.
 
+### `kirograph attack-surface`
+
+Maps all HTTP routes to reachable vulnerable dependencies.
+
+```bash
+kirograph attack-surface [path]
+kirograph attack-surface --public-only
+kirograph attack-surface --limit 10
+kirograph attack-surface --format json
+```
+
+Shows: route name, exposure level (public/authenticated/internal), hop count to vulnerable dependency, risk score.
+
+### `kirograph security secrets`
+
+Scans for 14 secret types (AWS keys, GitHub tokens, DB URLs, JWT, etc.) enriched with call-graph blast radius — shows which entry points reach the secret.
+
+```bash
+kirograph security secrets [path]
+kirograph security secrets --include-tests
+kirograph security secrets --severity critical
+kirograph security secrets --format json
+```
+
+### `kirograph security flows`
+
+SAST-lite: detects SQL injection, dangerous eval/exec, unsafe deserialization, path traversal, weak crypto. Each finding is tagged with OWASP Top 10 (2021) category.
+
+```bash
+kirograph security flows [path]
+kirograph security flows --type sql
+kirograph security flows --format json
+```
+
+### `kirograph security ci-report`
+
+Generates structured CI/CD report: JSON, SARIF 2.1.0 (uploadable to GitHub Security tab), or compact text.
+
+```bash
+kirograph security ci-report [path]
+kirograph security ci-report --format sarif --output results.sarif
+kirograph security ci-report --fail-on critical
+```
+
+### `kirograph supply-chain`
+
+Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection (>365 days inactive), new package risk (<30 days old).
+
+```bash
+kirograph supply-chain [path]
+kirograph supply-chain --threshold high
+kirograph supply-chain --refresh
+kirograph supply-chain --format json
+```
+
+### `kirograph dep-confusion`
+
+Detects dependency confusion: internal packages whose names exist in public registries (supply chain attack vector). Also detects typosquatting (Levenshtein distance ≤ 2 from popular packages).
+
+```bash
+kirograph dep-confusion [path]
+kirograph dep-confusion --format json
+```
+
+### `kirograph remediation`
+
+SLA tracking per CVE. Thresholds: critical=7 days, high=30 days, medium=90 days. Shows days open, days with fix available, SLA status (ok/warning/overdue).
+
+```bash
+kirograph remediation [path]
+kirograph remediation --overdue-only
+kirograph remediation --format json
+```
+
 ### `kirograph licenses`
 
 List dependency licenses and check against configured policy.
@@ -200,6 +274,62 @@ Manually register a CVE against a dependency. Useful for private/internal adviso
 | `severity` | number | - | CVSS v3.1 base score (0.0–10.0) |
 | `summary` | string | - | Human-readable description (truncated to 500 chars) |
 | `fixedVersion` | string | - | Version that fixes the vulnerability |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_attack_surface`
+
+Map HTTP routes to reachable vulnerable dependencies with exposure levels and risk scores.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | - | Max routes to return |
+| `publicOnly` | boolean | false | Return only public-facing routes |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_secrets`
+
+Scan for secrets (AWS keys, GitHub tokens, DB URLs, JWT, etc.) with call-graph blast radius showing which entry points reach each secret.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `includeTests` | boolean | false | Include test files in the scan |
+| `severity` | string | - | Filter by severity: `critical`, `high`, `medium`, `low` |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_security_flows`
+
+SAST-lite: detect SQL injection, dangerous eval/exec, unsafe deserialization, path traversal, and weak crypto. Results tagged with OWASP Top 10 (2021) category.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `type` | string | - | Filter flow type: `sql`, `eval`, `deserialization`, `path-traversal`, `crypto` |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_supply_chain`
+
+Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection, new package risk.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | string | - | Minimum risk threshold to include: `low`, `medium`, `high`, `critical` |
+| `refresh` | boolean | false | Re-query external sources before returning results |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_dep_confusion`
+
+Detect dependency confusion attacks: internal packages whose names exist in public registries, and typosquatting (Levenshtein distance ≤ 2 from popular packages).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_remediation`
+
+SLA tracking per CVE: critical=7 days, high=30 days, medium=90 days. Shows days open, days with fix available, SLA status.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `overdueOnly` | boolean | false | Return only CVEs that have breached their SLA threshold |
 | `projectPath` | string | cwd | Project root path |
 
 ### `kirograph_licenses`
@@ -312,3 +442,6 @@ The traversal encountered at least one unresolved import or symbol whose outgoin
 - **Performance**: Reachability analysis completes within 5 seconds for projects with up to 50,000 graph nodes. Larger projects may experience longer analysis times.
 - **Vulnerability database timeout**: Each dependency query has a 30-second timeout. Unreachable databases result in stale data (clearly marked).
 - **Architecture dependency**: The security module requires `enableArchitecture: true`. Without it, layer classification is omitted from impact summaries but reachability analysis still works using call graph edges.
+- **OWASP mapping**: OWASP Top 10 category tagging in `kirograph security flows` is heuristic-based on CVE text analysis; categories may not be accurate for all findings.
+- **Secrets scanner false positives**: The secrets scanner may produce false positives for generic patterns (e.g. placeholder strings that match key formats). Review findings before acting on them.
+- **SAST flows are structural**: Security flow detection (`kirograph security flows`) uses structural call-graph analysis, not data taint tracking. Results indicate potential risk but do not confirm exploitability.

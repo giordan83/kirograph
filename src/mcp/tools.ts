@@ -705,6 +705,20 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'kirograph_vuln_suppress',
+    description: 'Suppress a CVE so it no longer appears in vulnerability reports (mark as false positive or accepted risk). Suppressions are stored in .kirograph/security-suppressions.json.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cveId: { type: 'string', description: 'CVE identifier to suppress (e.g., "CVE-2024-1234")' },
+        reason: { type: 'string', description: 'Reason for suppression (optional)' },
+        expires: { type: 'string', description: 'Expiry date in ISO format after which the suppression is removed (e.g. "2026-12-31", optional)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['cveId'],
+    },
+  },
+  {
     name: 'kirograph_sbom',
     description: 'Generate and return CycloneDX 1.5 SBOM JSON for the project.',
     inputSchema: {
@@ -755,6 +769,74 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         policy: { type: 'boolean', description: 'Return only policy violations (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_attack_surface',
+    description: 'Map the attack surface: all HTTP routes and their paths to vulnerable dependencies, with hop count, authentication status, and risk score.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max routes to return (default: 20)', default: 20 },
+        publicOnly: { type: 'boolean', description: 'Only return public/unauthenticated routes', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_secrets',
+    description: 'Scan for hardcoded secrets and credentials, enriched with call-graph blast radius showing which entry points reach the secret.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeTests: { type: 'boolean', description: 'Include test files in scan', default: false },
+        severity: { type: 'string', description: 'Filter by severity: critical, high, medium, low', enum: ['critical', 'high', 'medium', 'low'] },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_security_flows',
+    description: 'SAST-lite: detect dangerous data flows (SQL injection, dangerous eval, unsafe deserialization, path traversal, weak crypto). Each finding tagged with OWASP Top 10 category.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', description: 'Filter by type: sql, eval, deserialize, path, crypto, all', default: 'all' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_supply_chain',
+    description: 'Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection for project dependencies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        threshold: { type: 'string', description: 'Minimum risk level: critical, high, medium', enum: ['critical', 'high', 'medium'] },
+        refresh: { type: 'boolean', description: 'Re-fetch from APIs', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_dep_confusion',
+    description: 'Detect dependency confusion vulnerabilities: internal package names that exist in public registries (typosquatting/supply chain attack vectors).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_remediation',
+    description: 'Remediation SLA tracking: which vulnerabilities are overdue for fixing based on severity thresholds (critical=7d, high=30d, medium=90d).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        overdueOnly: { type: 'boolean', description: 'Show only overdue items', default: false },
         projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
     },
@@ -2547,18 +2629,25 @@ export class ToolHandler {
           `SELECT COUNT(*) as count FROM sec_dependencies WHERE vuln_data_stale = 1`,
         ) ?? { count: 0 };
 
+        // Count suppressed CVEs
+        const { SuppressionManager: SecSuppressionManager } = await import('../security/suppressions');
+        const secSuppressions = new SecSuppressionManager(projectRoot);
+        const allCveIds: Array<{ cve_id: string }> = rawDb.all(`SELECT cve_id FROM sec_vulnerabilities`);
+        const suppressedCveCount = allCveIds.filter(r => secSuppressions.isSuppressed(r.cve_id)).length;
+        const visibleVulnCount = vulnCount.count - suppressedCveCount;
+
         const lines: string[] = [
           '# Security Overview',
           '',
           `Dependencies: ${depCount.count}`,
-          `Vulnerabilities: ${vulnCount.count}`,
+          `Vulnerabilities: ${visibleVulnCount}${suppressedCveCount > 0 ? ` (${suppressedCveCount} suppressed)` : ''}`,
         ];
 
-        if (vulnCount.count > 0) {
+        if (visibleVulnCount > 0) {
           const affected = verdicts['affected'] ?? 0;
           const notAffected = verdicts['not_affected'] ?? 0;
           const underInvestigation = verdicts['under_investigation'] ?? 0;
-          const pending = vulnCount.count - affected - notAffected - underInvestigation;
+          const pending = visibleVulnCount - affected - notAffected - underInvestigation;
 
           lines.push('', '## Reachability Verdicts', '');
           if (affected > 0) lines.push(`● Affected: ${affected}`);
@@ -2569,6 +2658,19 @@ export class ToolHandler {
 
         if (staleCount.count > 0) {
           lines.push('', `⚠ ${staleCount.count} dependenc${staleCount.count === 1 ? 'y has' : 'ies have'} stale vulnerability data. Use kirograph_vulns with refresh=true to update.`);
+        }
+
+        // Check if vulnerability data is stale by age
+        const lastVulnCheck = (rawDb.get(
+          `SELECT MIN(last_vuln_check) as oldest FROM sec_dependencies WHERE last_vuln_check IS NOT NULL`,
+        ) as { oldest: number | null } | undefined)?.oldest;
+        if (lastVulnCheck != null) {
+          const ageMs = Date.now() - lastVulnCheck;
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          const maxAge = config.securityEnrichMaxAgeDays ?? 7;
+          if (ageDays > maxAge) {
+            lines.push('', `⚠ Vulnerability data is ${Math.floor(ageDays)} days old (max: ${maxAge}). Run kirograph vulns --refresh to update.`);
+          }
         }
 
         return lines.join('\n');
@@ -2602,7 +2704,7 @@ export class ToolHandler {
         let query = `
           SELECT
             v.node_id, v.cve_id, v.severity_score, v.fixed_version, v.summary,
-            v.epss_score, v.epss_percentile,
+            v.epss_score, v.epss_percentile, v.risk_score,
             d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
             r.verdict
           FROM sec_vulnerabilities v
@@ -2638,7 +2740,7 @@ export class ToolHandler {
         }
 
         const limit = clampLimit(args.limit as number | undefined, 20);
-        query += ` ORDER BY v.severity_score DESC NULLS LAST LIMIT ?`;
+        query += ` ORDER BY v.risk_score DESC NULLS LAST LIMIT ?`;
         params.push(limit);
 
         const rows: Array<{
@@ -2649,6 +2751,7 @@ export class ToolHandler {
           summary: string | null;
           epss_score: number | null;
           epss_percentile: number | null;
+          risk_score: number | null;
           package_name: string | null;
           ecosystem: string | null;
           resolved_version: string | null;
@@ -2656,15 +2759,22 @@ export class ToolHandler {
           verdict: string | null;
         }> = rawDb.all(query, params);
 
-        if (rows.length === 0) {
-          return 'No vulnerabilities found' + ((args.severity || args.verdict) ? ' matching filters.' : '.');
+        // Filter out suppressed CVEs
+        const { SuppressionManager } = await import('../security/suppressions');
+        const suppressionMgr = new SuppressionManager(projectRoot);
+        const suppressedCount = rows.filter(row => suppressionMgr.isSuppressed(row.cve_id)).length;
+        const filteredRows = rows.filter(row => !suppressionMgr.isSuppressed(row.cve_id));
+
+        if (filteredRows.length === 0) {
+          const noMatch = 'No vulnerabilities found' + ((args.severity || args.verdict) ? ' matching filters.' : '.');
+          return suppressedCount > 0 ? `${noMatch} (${suppressedCount} suppressed)` : noMatch;
         }
 
         const { formatFixSuggestion } = await import('../security/export/fix-suggestions');
 
-        const lines: string[] = [`Vulnerabilities (${rows.length}):\n`];
+        const lines: string[] = [`Vulnerabilities (${filteredRows.length}${suppressedCount > 0 ? `, ${suppressedCount} suppressed` : ''}):\n`];
 
-        for (const row of rows) {
+        for (const row of filteredRows) {
           const score = row.severity_score;
           let severityLabel: string;
           if (score == null) severityLabel = 'UNKNOWN';
@@ -2686,7 +2796,10 @@ export class ToolHandler {
           const epssNote = row.epss_score != null
             ? ` [EPSS: ${row.epss_score.toFixed(2)}]`
             : '';
-          lines.push(`${severityLabel}  ${row.cve_id}  ${pkg}  [${verdictLabel}]${epssNote}`);
+          const riskNote = row.risk_score != null
+            ? ` [Risk: ${row.risk_score.toFixed(1)}]`
+            : '';
+          lines.push(`${severityLabel}  ${row.cve_id}  ${pkg}  [${verdictLabel}]${epssNote}${riskNote}`);
 
           if (row.summary && row.summary !== 'Manually registered') {
             const truncSummary = row.summary.length > 120 ? row.summary.slice(0, 120) + '…' : row.summary;
@@ -2758,6 +2871,20 @@ export class ToolHandler {
         );
 
         return `Registered ${cveId} against ${pkgName}.`;
+      }
+
+      case 'kirograph_vuln_suppress': {
+        const projectRoot = cg.getProjectRoot();
+        const cveId = args.cveId as string;
+        if (!cveId) return 'Error: cveId is required.';
+
+        const { SuppressionManager } = await import('../security/suppressions');
+        const manager = new SuppressionManager(projectRoot);
+        manager.add(cveId, args.reason as string | undefined, args.expires as string | undefined);
+
+        const reasonNote = args.reason ? ` Reason: ${args.reason}.` : '';
+        const expiresNote = args.expires ? ` Expires: ${args.expires}.` : '';
+        return `${cveId} suppressed.${reasonNote}${expiresNote}`;
       }
 
       case 'kirograph_sbom': {
@@ -3031,6 +3158,303 @@ export class ToolHandler {
         if (warnCount > 0) lines.push(`${warnCount} license warning${warnCount !== 1 ? 's' : ''}`);
         if (unknownCount > 0) lines.push(`${unknownCount} unknown license${unknownCount !== 1 ? 's' : ''}`);
         if (denyCount === 0 && warnCount === 0) lines.push('No policy violations');
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_attack_surface': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { AttackSurfaceAnalyzer } = await import('../security/attack-surface');
+        const analyzer = new AttackSurfaceAnalyzer(db);
+        const result = await analyzer.analyze();
+
+        if (result.totalRoutes === 0) {
+          return 'No route nodes found in the graph. Ensure the project has been indexed with architecture analysis enabled.';
+        }
+
+        const limit = clampLimit(args.limit as number | undefined, 20);
+        const routes = (args.publicOnly === true)
+          ? result.criticalPaths.filter(r => r.exposureLevel === 'public')
+          : result.criticalPaths;
+
+        const lines: string[] = [
+          '# Attack Surface',
+          '',
+          `Total routes: ${result.totalRoutes}  Public: ${result.publicRoutes}  Authenticated: ${result.authenticatedRoutes}  Routes with vulns: ${result.routesWithVulns}`,
+          '',
+        ];
+
+        const displayed = routes.slice(0, limit);
+        if (displayed.length === 0) {
+          lines.push(args.publicOnly === true
+            ? 'No public routes with vulnerable dependencies found.'
+            : 'No routes with vulnerable dependencies found.');
+        } else {
+          for (const entry of displayed) {
+            const authTag = entry.isAuthenticated ? '[auth]' : '[public]';
+            const riskTag = entry.riskScore > 0 ? ` risk=${entry.riskScore.toFixed(1)}` : '';
+            lines.push(`${authTag} ${entry.route} (${entry.exposureLevel})${riskTag}  ${entry.filePath}`);
+            for (const dep of entry.vulnerableDeps.slice(0, 3)) {
+              lines.push(`  └ ${dep.cveId} via ${dep.packageName} (${dep.hopCount} hop${dep.hopCount !== 1 ? 's' : ''}${dep.verdict ? `, ${dep.verdict}` : ''})`);
+            }
+            if (entry.vulnerableDeps.length > 3) {
+              lines.push(`  └ …and ${entry.vulnerableDeps.length - 3} more vulns`);
+            }
+          }
+          if (routes.length > limit) {
+            lines.push('', `…and ${routes.length - limit} more routes (increase limit to see all)`);
+          }
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_secrets': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { SecretsScanner } = await import('../security/secrets');
+        const scanner = new SecretsScanner(db, projectRoot);
+        const result = await scanner.scan({ includeTests: args.includeTests === true });
+
+        if (result.totalFindings === 0) {
+          return `No secrets found. Scanned ${result.filesScanned} file${result.filesScanned !== 1 ? 's' : ''}.`;
+        }
+
+        let findings = result.findings;
+        if (args.severity) {
+          findings = findings.filter(f => f.severity === (args.severity as string));
+        }
+
+        if (findings.length === 0) {
+          return `No secrets found matching severity "${args.severity}". Total findings (all severities): ${result.totalFindings}.`;
+        }
+
+        const lines: string[] = [
+          `# Secrets Scan (${result.filesScanned} files scanned)`,
+          '',
+          `Found: ${result.totalFindings}  Critical: ${result.criticalCount}  High: ${result.highCount}`,
+          '',
+        ];
+
+        for (const f of findings) {
+          lines.push(`${f.severity.toUpperCase()}  ${f.type}`);
+          lines.push(`  ${f.filePath}:${f.line}:${f.column}  snippet: ${f.snippet}`);
+          if (f.nodeName) {
+            lines.push(`  in function: ${f.nodeName}`);
+          }
+          if (f.entryPointCount > 0) {
+            lines.push(`  reachable from ${f.entryPointCount} entry point${f.entryPointCount !== 1 ? 's' : ''}`);
+          }
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_security_flows': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { DataFlowAnalyzer } = await import('../security/data-flows');
+        const analyzer = new DataFlowAnalyzer(db);
+        let findings = await analyzer.analyze();
+
+        const typeFilter = (args.type as string | undefined) ?? 'all';
+        const TYPE_MAP: Record<string, string> = {
+          sql: 'sql-injection',
+          eval: 'dangerous-eval',
+          deserialize: 'unsafe-deserialize',
+          path: 'path-traversal',
+          crypto: 'hardcoded-crypto',
+        };
+
+        if (typeFilter !== 'all') {
+          const mapped = TYPE_MAP[typeFilter];
+          if (!mapped) return `Invalid type filter "${typeFilter}". Use: sql, eval, deserialize, path, crypto, all`;
+          findings = findings.filter(f => f.type === mapped);
+        }
+
+        if (findings.length === 0) {
+          return typeFilter === 'all'
+            ? 'No dangerous data flows detected.'
+            : `No "${typeFilter}" findings detected.`;
+        }
+
+        const lines: string[] = [
+          `# Security Flows (${findings.length} finding${findings.length !== 1 ? 's' : ''})`,
+          '',
+        ];
+
+        for (const f of findings) {
+          lines.push(`${f.severity.toUpperCase()}  [${f.owaspCategory}]  ${f.type}`);
+          lines.push(`  ${f.filePath}:${f.line}  symbol: ${f.symbol}`);
+          lines.push(`  ${f.description}`);
+          lines.push(`  Fix: ${f.recommendation}`);
+          lines.push('');
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_supply_chain': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { SupplyChainChecker } = await import('../security/supply-chain');
+        const checker = new SupplyChainChecker(db);
+        const { results, errors } = await checker.checkAll();
+
+        const RISK_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        const thresholdArg = args.threshold as string | undefined;
+        const thresholdOrder = thresholdArg ? (RISK_ORDER[thresholdArg] ?? 4) : 2; // default: medium and above
+
+        const filtered = results
+          .filter(r => (RISK_ORDER[r.riskLevel] ?? 4) <= thresholdOrder)
+          .sort((a, b) => (RISK_ORDER[a.riskLevel] ?? 4) - (RISK_ORDER[b.riskLevel] ?? 4));
+
+        if (filtered.length === 0) {
+          return `No supply chain risks found at threshold "${thresholdArg ?? 'medium'}" or above. Checked ${results.length} dependencies.`;
+        }
+
+        const lines: string[] = [
+          `# Supply Chain Health (${filtered.length} risks, threshold: ${thresholdArg ?? 'medium'})`,
+          '',
+        ];
+
+        for (const r of filtered) {
+          const scoreStr = r.scorecardScore !== null ? ` scorecard=${r.scorecardScore.toFixed(1)}/10` : '';
+          const maintainerStr = r.maintainerCount !== null ? ` maintainers=${r.maintainerCount}` : '';
+          lines.push(`${r.riskLevel.toUpperCase()}  ${r.packageName} (${r.ecosystem})${scoreStr}${maintainerStr}`);
+          for (const reason of r.riskReasons) {
+            lines.push(`  • ${reason}`);
+          }
+        }
+
+        if (errors.length > 0) {
+          lines.push('', `⚠ ${errors.length} package${errors.length !== 1 ? 's' : ''} could not be checked (network errors)`);
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_dep_confusion': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { DepConfusionChecker } = await import('../security/dep-confusion');
+        const checker = new DepConfusionChecker(db);
+        const findings = await checker.check();
+
+        if (findings.length === 0) {
+          return 'No dependency confusion vulnerabilities detected.';
+        }
+
+        const RISK_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2 };
+        const sorted = [...findings].sort((a, b) => (RISK_ORDER[a.riskLevel] ?? 3) - (RISK_ORDER[b.riskLevel] ?? 3));
+
+        const lines: string[] = [
+          `# Dependency Confusion (${findings.length} finding${findings.length !== 1 ? 's' : ''})`,
+          '',
+        ];
+
+        for (const f of sorted) {
+          lines.push(`${f.riskLevel.toUpperCase()}  ${f.packageName} (${f.ecosystem})`);
+          lines.push(`  ${f.explanation}`);
+          if (f.publicExists && f.publicVersion) {
+            lines.push(`  Public version: ${f.publicVersion}${f.publicPublishedAt ? `  published: ${f.publicPublishedAt}` : ''}`);
+          }
+        }
+
+        return truncate(lines.join('\n'));
+      }
+
+      case 'kirograph_remediation': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableSecurity) return 'Security analysis is not enabled. Set enableSecurity: true in .kirograph/config.json and run kirograph index.';
+
+        const db = cg.getDatabase();
+        db.applySecuritySchema();
+
+        const { RemediationTracker } = await import('../security/remediation');
+        const tracker = new RemediationTracker(db);
+        let statuses = tracker.getStatus();
+
+        if (args.overdueOnly === true) {
+          statuses = statuses.filter(s => s.isOverdue);
+        }
+
+        if (statuses.length === 0) {
+          return args.overdueOnly === true
+            ? 'No overdue vulnerabilities found.'
+            : 'No open vulnerabilities with SLA tracking data found.';
+        }
+
+        // Sort: overdue first, then by slaStatus, then by severity desc
+        const SLA_ORDER: Record<string, number> = { overdue: 0, warning: 1, no_fix: 2, ok: 3 };
+        statuses.sort((a, b) => {
+          const slaA = SLA_ORDER[a.slaStatus] ?? 3;
+          const slaB = SLA_ORDER[b.slaStatus] ?? 3;
+          if (slaA !== slaB) return slaA - slaB;
+          return (b.severity ?? 0) - (a.severity ?? 0);
+        });
+
+        const overdueCount = statuses.filter(s => s.isOverdue).length;
+        const warningCount = statuses.filter(s => s.slaStatus === 'warning').length;
+
+        const lines: string[] = [
+          `# Remediation SLA (${statuses.length} open${overdueCount > 0 ? `, ${overdueCount} overdue` : ''}${warningCount > 0 ? `, ${warningCount} warning` : ''})`,
+          '',
+        ];
+
+        for (const s of statuses) {
+          const severityLabel = s.severity == null ? 'UNKNOWN'
+            : s.severity >= 9 ? 'CRITICAL'
+            : s.severity >= 7 ? 'HIGH'
+            : s.severity >= 4 ? 'MEDIUM'
+            : 'LOW';
+
+          const slaTag = s.slaStatus === 'overdue' ? '[OVERDUE]'
+            : s.slaStatus === 'warning' ? '[WARNING]'
+            : s.slaStatus === 'no_fix' ? '[NO_FIX]'
+            : '[OK]';
+
+          lines.push(`${slaTag}  ${severityLabel}  ${s.cveId}  ${s.packageName}`);
+          if (s.daysOpen !== null) lines.push(`  Open for ${s.daysOpen} day${s.daysOpen !== 1 ? 's' : ''}`);
+          if (s.daysWithFixAvailable !== null) lines.push(`  Fix available for ${s.daysWithFixAvailable} day${s.daysWithFixAvailable !== 1 ? 's' : ''}`);
+          if (s.slaDeadline !== null) {
+            const deadlineDate = new Date(s.slaDeadline).toISOString().slice(0, 10);
+            lines.push(`  SLA deadline: ${deadlineDate}`);
+          }
+        }
 
         return truncate(lines.join('\n'));
       }

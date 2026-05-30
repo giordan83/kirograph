@@ -9,7 +9,8 @@ export function register(program: Command): Command {
     .description('Security analysis: overview, dashboard export, and vulnerability management')
     .argument('[projectPath]', 'Project root path (optional)')
     .option('--refresh-staleness', 'Fetch latest version info from registries and show stale dependency count')
-    .action(async (projectPath: string | undefined, opts: { refreshStaleness?: boolean }) => {
+    .option('--fail-on <condition>', 'Exit 1 if condition is met. Supported: affected')
+    .action(async (projectPath: string | undefined, opts: { refreshStaleness?: boolean; failOn?: string }) => {
       const target = path.resolve(projectPath ?? process.cwd());
       const config = await loadConfig(target);
 
@@ -26,6 +27,11 @@ export function register(program: Command): Command {
         console.error(`    ${violet}${bold}"enableArchitecture": true${reset}`);
         console.error(`    ${violet}${bold}"enableSecurity": true${reset}`);
         console.error(`  ${dim}Then re-run:${reset} ${violet}${bold}kirograph index${reset}\n`);
+        process.exit(1);
+      }
+
+      if (opts.failOn !== undefined && opts.failOn !== 'affected') {
+        console.error(`  ✖ Invalid --fail-on value: ${opts.failOn}. Supported: affected`);
         process.exit(1);
       }
 
@@ -84,6 +90,25 @@ export function register(program: Command): Command {
       console.log();
 
       if (vulnCount.count > 0) {
+        // Show top-risk CVE when data is available
+        const topCVE: { cve_id: string; risk_score: number | null; package_name: string | null } | undefined =
+          rawDb.get(
+            `SELECT v.cve_id, v.risk_score, d.package_name
+             FROM sec_vulnerabilities v
+             LEFT JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
+             LEFT JOIN sec_dependencies d ON d.node_id = e.source
+             LEFT JOIN sec_reachability r ON r.vulnerability_node_id = v.node_id
+             WHERE r.verdict = 'affected' AND v.risk_score IS NOT NULL
+             ORDER BY v.risk_score DESC NULLS LAST
+             LIMIT 1`,
+          );
+        if (topCVE && topCVE.risk_score != null) {
+          const riskColor = topCVE.risk_score >= 7 ? '\x1b[31m' : topCVE.risk_score >= 4 ? '\x1b[33m' : dim;
+          const pkgLabel = topCVE.package_name ? ` in ${dim}${topCVE.package_name}${reset}` : '';
+          console.log(`  ${riskColor}Top risk:${reset}              ${violet}${bold}${topCVE.cve_id}${reset} ${riskColor}(Risk: ${topCVE.risk_score.toFixed(1)})${reset}${pkgLabel}`);
+          console.log();
+        }
+
         console.log(`  ${section('Reachability Verdicts')}\n`);
         const affected = verdicts['affected'] ?? 0;
         const notAffected = verdicts['not_affected'] ?? 0;
@@ -126,6 +151,30 @@ export function register(program: Command): Command {
         console.log();
       } else if (!opts.refreshStaleness) {
         console.log(`  ${dim}No staleness data.${reset} ${dim}Run${reset} ${violet}${bold}kirograph security --refresh-staleness${reset} ${dim}to score dependencies.${reset}\n`);
+      }
+
+      // Check if vulnerability data is stale
+      const lastCheck = (rawDb.get(
+        `SELECT MIN(last_vuln_check) as oldest FROM sec_dependencies WHERE last_vuln_check IS NOT NULL`,
+      ) as { oldest: number | null } | undefined)?.oldest;
+      if (lastCheck != null) {
+        const ageMs = Date.now() - lastCheck;
+        const ageDays = ageMs / (1000 * 60 * 60 * 24);
+        const maxAge = config.securityEnrichMaxAgeDays ?? 7;
+        if (ageDays > maxAge) {
+          console.log(`\n  ${'\x1b[33m'}⚠ Vulnerability data is ${Math.floor(ageDays)} days old (max: ${maxAge}).${reset}`);
+          console.log(`  ${dim}Run${reset} ${violet}${bold}kirograph vulns --refresh${reset} ${dim}to update.${reset}`);
+        }
+      }
+
+      // --fail-on: exit 1 if condition is met (after all output)
+      if (opts.failOn === 'affected') {
+        const affectedCount = verdicts['affected'] ?? 0;
+        if (affectedCount > 0) {
+          console.log(`\n  \x1b[31m✖\x1b[0m --fail-on affected: ${affectedCount} affected vulnerabilit${affectedCount === 1 ? 'y' : 'ies'} found. Exiting with code 1.`);
+          cg.close();
+          process.exit(1);
+        }
       }
 
       cg.close();

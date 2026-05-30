@@ -51,6 +51,14 @@ import { register as registerReachability } from './commands/reachability';
 import { register as registerStaleness } from './commands/staleness';
 import { register as registerLicenses } from './commands/licenses';
 import { register as registerSecurityExport } from './commands/security-export';
+import { register as registerVulnSuppress } from './commands/vuln-suppress';
+import { register as registerAttackSurface } from './commands/attack-surface';
+import { register as registerSecuritySecrets } from './commands/security-secrets';
+import { register as registerSecurityFlows } from './commands/security-flows';
+import { register as registerSecurityCiReport } from './commands/security-ci-report';
+import { register as registerSupplyChain } from './commands/supply-chain';
+import { register as registerDepConfusion } from './commands/dep-confusion';
+import { register as registerRemediation } from './commands/remediation';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -147,6 +155,14 @@ registerReachability(program);
 registerStaleness(program);
 registerLicenses(program);
 registerSecurityExport(securityCmd);
+registerSecuritySecrets(securityCmd);
+registerSecurityFlows(securityCmd);
+registerSecurityCiReport(securityCmd);
+registerVulnSuppress(program);
+registerAttackSurface(program);
+registerSupplyChain(program);
+registerDepConfusion(program);
+registerRemediation(program);
 
 // Register the help command for `kirograph help`
 program

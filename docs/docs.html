@@ -244,6 +244,14 @@ kirograph install --target kiro   # install for a specific platform only</code><
         <tr><td>Dashboard security overlay</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Manual CVE registration</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Queryable via MCP by AI agents</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Call-graph attack surface mapping</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Secrets detection with blast radius</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>SAST-lite (SQL injection, eval, path traversal)</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Supply chain health (OpenSSF Scorecard)</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Dependency confusion detection</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Remediation SLA tracking</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>CI/CD SARIF export (GitHub Security tab)</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>OWASP Top 10 mapping</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
       </tbody>
     </table>
     </div>
@@ -1222,7 +1230,21 @@ kirograph docs reembed                      # re-embed with current model</code>
           <tr><td><code>kirograph staleness [path]</code></td><td>Check dependency freshness against registries (<code>--threshold</code>, <code>--refresh</code>)</td></tr>
           <tr><td><code>kirograph vex [--output file]</code></td><td>Export CycloneDX 1.5 VEX document</td></tr>
           <tr><td><code>kirograph sbom [--output file]</code></td><td>Export CycloneDX 1.5 SBOM document</td></tr>
+          <tr><td><code>kirograph vulns --fail-on &lt;condition&gt;</code></td><td>Exit code 1 if condition met: <code>affected</code>, <code>any</code>, <code>critical</code>, <code>high</code>, <code>epss=0.5</code>. Use in CI pipelines.</td></tr>
+          <tr><td><code>kirograph vulns --group-by workspace</code></td><td>Group vulnerabilities by source manifest directory (monorepo support).</td></tr>
+          <tr><td><code>kirograph vulns --sort risk|cvss|epss|name</code></td><td>Sort order. Default: <code>risk</code> (combined score: reachability × CVSS × EPSS × staleness).</td></tr>
+          <tr><td><code>kirograph vuln suppress &lt;cveId&gt; [--reason] [--expires]</code></td><td>Mark a CVE as suppressed (false positive or accepted risk). Stored in <code>.kirograph/security-suppressions.json</code>.</td></tr>
+          <tr><td><code>kirograph vuln unsuppress &lt;cveId&gt;</code></td><td>Remove a suppression.</td></tr>
+          <tr><td><code>kirograph vuln suppressions</code></td><td>List all active suppressions.</td></tr>
+          <tr><td><code>kirograph security --fail-on affected</code></td><td>Exit code 1 if any affected vulnerabilities exist.</td></tr>
           <tr><td><code>kirograph security export [--output file] [--open]</code></td><td>Generate self-contained HTML dashboard — Overview, Vulnerabilities, SBOM, VEX, Licenses, Staleness tabs. <code>--open</code> launches in browser immediately.</td></tr>
+          <tr><td><code>kirograph attack-surface [path]</code></td><td>Map HTTP routes to reachable vulnerable dependencies — exposure level (public/authenticated/internal), hop count, risk score. <code>--public-only</code>, <code>--limit</code>, <code>--format json</code>.</td></tr>
+          <tr><td><code>kirograph security secrets [path]</code></td><td>Scan for 14 secret types (AWS keys, GitHub tokens, DB URLs, JWT, etc.) with call-graph blast radius. <code>--include-tests</code>, <code>--severity</code>, <code>--format json</code>.</td></tr>
+          <tr><td><code>kirograph security flows [path]</code></td><td>SAST-lite: SQL injection, eval/exec, unsafe deserialization, path traversal, weak crypto. Each finding tagged with OWASP Top 10 (2021) category. <code>--type sql</code>, <code>--format json</code>.</td></tr>
+          <tr><td><code>kirograph security ci-report [path]</code></td><td>Generate CI/CD security report in JSON, SARIF 2.1.0 (GitHub Security tab), or compact text. <code>--format sarif --output results.sarif</code>, <code>--fail-on critical</code>.</td></tr>
+          <tr><td><code>kirograph supply-chain [path]</code></td><td>Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection (&gt;365 days), new package risk (&lt;30 days). <code>--threshold high</code>, <code>--refresh</code>.</td></tr>
+          <tr><td><code>kirograph dep-confusion [path]</code></td><td>Detect dependency confusion (internal package names in public registries) and typosquatting (Levenshtein ≤ 2 from popular packages). <code>--format json</code>.</td></tr>
+          <tr><td><code>kirograph remediation [path]</code></td><td>SLA tracking per CVE — critical=7d, high=30d, medium=90d. Shows days open, days with fix available, SLA status. <code>--overdue-only</code>, <code>--format json</code>.</td></tr>
         </tbody>
       </table>
     </div>

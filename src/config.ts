@@ -105,6 +105,8 @@ export interface KiroGraphConfig {
   securityDatabases: string[];
   /** Auto-run vulnerability enrichment after manifest parsing. Default: true. */
   securityAutoEnrich: boolean;
+  /** Max age in days for vulnerability data before showing a staleness warning. Default: 7. */
+  securityEnrichMaxAgeDays: number;
   /**
    * License policy for dependency compliance.
    * deny: licenses to block (build fails / command exits non-zero).
@@ -141,7 +143,7 @@ const KNOWN_FIELDS = new Set<string>([
   'docsContextLimit', 'docsContextThreshold', 'docsMaxFileSize', 'docsSummarization',
   'enableData', 'dataInclude', 'dataExclude', 'dataLinkCode',
   'dataContextLimit', 'dataMaxFileSize', 'dataMaxRows', 'dataQueryLimit', 'dataMaxResponseTokens',
-  'enableSecurity', 'securityDatabases', 'securityAutoEnrich', 'securityLicensePolicy',
+  'enableSecurity', 'securityDatabases', 'securityAutoEnrich', 'securityEnrichMaxAgeDays', 'securityLicensePolicy',
   'contextBudget',
   // Legacy aliases (still accepted, mapped during validation)
   'enableCompression', 'compressionLevel',
@@ -217,6 +219,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     enableSecurity: false,
     securityDatabases: ['OSV'],
     securityAutoEnrich: true,
+    securityEnrichMaxAgeDays: 7,
     securityLicensePolicy: { deny: [], warn: [] },
   };
 }
@@ -409,6 +412,16 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     securityAutoEnrich = defaults.securityAutoEnrich;
   }
 
+  let securityEnrichMaxAgeDays: number;
+  if (typeof raw.securityEnrichMaxAgeDays === 'number' && raw.securityEnrichMaxAgeDays > 0) {
+    securityEnrichMaxAgeDays = raw.securityEnrichMaxAgeDays;
+  } else {
+    if (raw.securityEnrichMaxAgeDays !== undefined) {
+      logWarn('Invalid config field securityEnrichMaxAgeDays: expected positive number, applying default (7)');
+    }
+    securityEnrichMaxAgeDays = defaults.securityEnrichMaxAgeDays;
+  }
+
   const SUPPORTED_SECURITY_DATABASES = new Set(['OSV']);
   let securityDatabases: string[];
   if (Array.isArray(raw.securityDatabases) && raw.securityDatabases.every((d: unknown) => typeof d === 'string')) {
@@ -519,6 +532,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     enableSecurity,
     securityDatabases,
     securityAutoEnrich,
+    securityEnrichMaxAgeDays,
     securityLicensePolicy,
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
     ...(contextBudget !== undefined ? { contextBudget } : {}),

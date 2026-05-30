@@ -37,12 +37,18 @@ CREATE TABLE IF NOT EXISTS sec_vulnerabilities (
   affected_ranges TEXT NOT NULL,    -- JSON array of VersionRange objects
   fixed_version TEXT,
   summary TEXT,                     -- truncated to 500 chars
-  source_database TEXT NOT NULL     -- which database provided this record
+  source_database TEXT NOT NULL,    -- which database provided this record
+  risk_score REAL,                  -- combined risk score 0.0–10.0 (reachability × CVSS × EPSS × staleness)
+  first_detected_at INTEGER,        -- epoch ms when first added to our DB
+  fix_available_since INTEGER,      -- epoch ms when fixed_version was first known
+  suppressed_at INTEGER,            -- epoch ms when suppressed (NULL if not)
+  remediated_at INTEGER             -- epoch ms when no longer present (fixed)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sec_vulns_cve ON sec_vulnerabilities(cve_id);
 CREATE INDEX IF NOT EXISTS idx_sec_vulns_severity ON sec_vulnerabilities(severity_score);
 CREATE INDEX IF NOT EXISTS idx_sec_vulns_epss ON sec_vulnerabilities(epss_score);
+CREATE INDEX IF NOT EXISTS idx_sec_vulns_risk ON sec_vulnerabilities(risk_score);
 
 -- Reachability analysis results
 CREATE TABLE IF NOT EXISTS sec_reachability (

@@ -5,6 +5,10 @@ import { spawn } from 'child_process';
 import { loadConfig } from '../../config';
 import { dim, reset, violet, bold, green } from '../ui';
 import { checkLicensePolicy } from '../../security/license';
+import type { AttackSurfaceResult } from '../../security/attack-surface';
+import type { SecretsResult } from '../../security/secrets';
+import type { DataFlowFinding } from '../../security/data-flows';
+import type { RemediationStatus } from '../../security/remediation';
 
 function openBrowser(filePath: string): void {
   const cmd = process.platform === 'darwin' ? 'open'
@@ -18,6 +22,7 @@ function openBrowser(filePath: string): void {
 interface VulnRow {
   cve_id: string;
   severity_score: number | null;
+  risk_score: number | null;
   epss_score: number | null;
   epss_percentile: number | null;
   fixed_version: string | null;
@@ -61,8 +66,13 @@ function generateHtml(params: {
   vexJson: string;
   denyList: string[];
   warnList: string[];
+  attackSurface: AttackSurfaceResult | null;
+  secretsResult: SecretsResult | null;
+  flowsResult: DataFlowFinding[] | null;
+  remediationStatus: RemediationStatus[] | null;
 }): string {
-  const { projectName, generatedAt, vulns, deps, sbomJson, vexJson, denyList, warnList } = params;
+  const { projectName, generatedAt, vulns, deps, sbomJson, vexJson, denyList, warnList,
+          attackSurface, secretsResult, flowsResult, remediationStatus } = params;
 
   // Compute license violations for the HTML
   const licDeps = deps.map(d => ({ package_name: d.package_name, ecosystem: d.ecosystem, license: d.license }));
@@ -99,6 +109,30 @@ function generateHtml(params: {
   const directCount = deps.filter(d => d.classification === 'direct').length;
   const transitiveCount = deps.filter(d => d.classification !== 'direct').length;
   const stalenessRows = deps.filter(d => d.staleness_score != null).sort((a, b) => (b.staleness_score ?? 0) - (a.staleness_score ?? 0));
+
+  // Top risk CVE (by risk_score if available, fallback to CVSS)
+  const topRiskCve = vulns.length > 0
+    ? [...vulns].sort((a, b) => ((b as any).risk_score ?? b.severity_score ?? 0) - ((a as any).risk_score ?? a.severity_score ?? 0))[0]
+    : null;
+
+  // OWASP category breakdown from flows
+  const owaspCounts: Record<string, number> = {};
+  if (flowsResult) {
+    for (const f of flowsResult) {
+      owaspCounts[f.owaspCategory] = (owaspCounts[f.owaspCategory] ?? 0) + 1;
+    }
+  }
+  const owaspOrder = ['A01','A02','A03','A04','A05','A06','A07','A08','A09','A10'];
+  const owaspNames: Record<string, string> = {
+    A01: 'Broken Access Control', A02: 'Cryptographic Failures', A03: 'Injection',
+    A04: 'Insecure Design', A05: 'Security Misconfiguration', A06: 'Vulnerable Components',
+    A07: 'Auth Failures', A08: 'Integrity Failures', A09: 'Logging Failures', A10: 'SSRF',
+  };
+  const owaspMaxCount = Math.max(1, ...Object.values(owaspCounts));
+
+  // New feature counts
+  const secretsCount = secretsResult?.totalFindings ?? null;
+  const criticalFlowsCount = flowsResult?.filter(f => f.severity === 'critical').length ?? null;
 
   // Embed JSON data safely
   const safeJson = (obj: unknown) => JSON.stringify(obj).replace(/<\/script>/gi, '<\\/script>');
@@ -364,6 +398,10 @@ tr.verdict-not-affected td:first-child { border-left: 3px solid var(--green); }
   <button class="tab" data-tab="vex">VEX</button>
   <button class="tab" data-tab="licenses">Licenses</button>
   <button class="tab" data-tab="staleness">Staleness</button>
+  <button class="tab" data-tab="attack-surface">⚔️ Attack Surface</button>
+  <button class="tab" data-tab="secrets">🔑 Secrets</button>
+  <button class="tab" data-tab="sast">🔍 SAST Flows</button>
+  <button class="tab" data-tab="remediation">⏱️ Remediation</button>
 </div>
 
 <div class="content">
@@ -395,7 +433,32 @@ tr.verdict-not-affected td:first-child { border-left: 3px solid var(--green); }
         <div class="stat-label">Stale Dependencies</div>
         <div class="stat-value ${staleDeps > 0 ? 'yellow' : 'green'}">${staleDeps}</div>
       </div>
+      ${secretsCount !== null ? `<div class="stat-card">
+        <div class="stat-label">Secrets Found</div>
+        <div class="stat-value ${secretsCount > 0 ? 'red' : 'green'}">${secretsCount}</div>
+      </div>` : ''}
+      ${criticalFlowsCount !== null ? `<div class="stat-card">
+        <div class="stat-label">Critical SAST Findings</div>
+        <div class="stat-value ${criticalFlowsCount > 0 ? 'red' : 'green'}">${criticalFlowsCount}</div>
+      </div>` : ''}
     </div>
+
+    ${topRiskCve ? `
+    <div class="section-title">Top Risk CVE</div>
+    <div class="top-cve-list" style="margin-bottom:1.5rem">
+      <div class="top-cve-item">
+        <div class="top-cve-rank">#1</div>
+        <div class="top-cve-id">${topRiskCve.cve_id}</div>
+        <div class="top-cve-pkg">${topRiskCve.package_name ?? '—'} ${topRiskCve.ecosystem ? `<span style="color:var(--text-muted);font-size:0.75rem">[${topRiskCve.ecosystem}]</span>` : ''}</div>
+        <div class="top-cve-scores">
+          ${topRiskCve.risk_score != null ? `<span class="badge ${topRiskCve.risk_score >= 7 ? 'badge-red' : topRiskCve.risk_score >= 4 ? 'badge-yellow' : 'badge-gray'}">Risk ${topRiskCve.risk_score.toFixed(1)}</span>` : ''}
+          ${topRiskCve.severity_score != null ? `<span class="badge ${topRiskCve.severity_score >= 9 ? 'badge-red' : topRiskCve.severity_score >= 7 ? 'badge-orange' : topRiskCve.severity_score >= 4 ? 'badge-yellow' : 'badge-gray'}">CVSS ${topRiskCve.severity_score.toFixed(1)}</span>` : ''}
+          ${topRiskCve.epss_score != null ? `<span class="badge ${topRiskCve.epss_score >= 0.5 ? 'badge-red' : topRiskCve.epss_score >= 0.1 ? 'badge-yellow' : 'badge-gray'}">EPSS ${(topRiskCve.epss_score*100).toFixed(2)}%</span>` : ''}
+          ${topRiskCve.verdict ? `<span class="badge ${topRiskCve.verdict === 'affected' ? 'badge-red' : topRiskCve.verdict === 'not_affected' ? 'badge-green' : 'badge-yellow'}">${topRiskCve.verdict}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    ` : ''}
 
     ${totalVulns > 0 ? `
     <div class="section-title">Verdict Breakdown</div>
@@ -420,6 +483,17 @@ tr.verdict-not-affected td:first-child { border-left: 3px solid var(--green); }
         <div class="bar-track"><div class="bar-fill" style="width:${Math.round((totalVulns-affected-underInvestigation-notAffected)/totalVulns*100)}%;background:var(--text-muted)"></div></div>
         <div class="bar-count">${totalVulns - affected - underInvestigation - notAffected}</div>
       </div>` : ''}
+    </div>
+    ` : ''}
+
+    ${Object.keys(owaspCounts).length > 0 ? `
+    <div class="section-title">OWASP Category Breakdown</div>
+    <div class="bar-chart" style="margin-bottom:1.5rem">
+      ${owaspOrder.filter(cat => owaspCounts[cat] > 0).map(cat => `<div class="bar-row">
+        <div class="bar-label" style="width:200px"><span class="badge badge-accent" style="margin-right:0.4rem">${cat}</span>${owaspNames[cat] ?? cat}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((owaspCounts[cat]??0)/owaspMaxCount*100)}%;background:var(--orange)"></div></div>
+        <div class="bar-count">${owaspCounts[cat]}</div>
+      </div>`).join('')}
     </div>
     ` : ''}
 
@@ -475,6 +549,7 @@ tr.verdict-not-affected td:first-child { border-left: 3px solid var(--green); }
             <th class="sortable" data-col="severity_score">CVSS</th>
             <th class="sortable sorted-desc" data-col="epss_score">EPSS</th>
             <th class="sortable" data-col="epss_percentile">Percentile</th>
+            <th class="sortable" data-col="risk_score">Risk Score</th>
             <th>Verdict</th>
             <th>Fix</th>
           </tr>
@@ -628,6 +703,223 @@ tr.verdict-not-affected td:first-child { border-left: 3px solid var(--green); }
     <div id="staleEmpty" class="empty-state" style="display:none">No staleness data available.</div>
   </div>
 
+  <!-- Tab: Attack Surface -->
+  <div class="tab-panel" id="tab-attack-surface">
+    ${attackSurface ? `
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);max-width:700px;margin-bottom:1.5rem">
+      <div class="stat-card">
+        <div class="stat-label">Total Routes</div>
+        <div class="stat-value accent">${attackSurface.totalRoutes}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Public</div>
+        <div class="stat-value ${attackSurface.publicRoutes > 0 ? 'yellow' : 'green'}">${attackSurface.publicRoutes}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Authenticated</div>
+        <div class="stat-value accent">${attackSurface.authenticatedRoutes}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">With Vulnerabilities</div>
+        <div class="stat-value ${attackSurface.routesWithVulns > 0 ? 'red' : 'green'}">${attackSurface.routesWithVulns}</div>
+      </div>
+    </div>
+    ${attackSurface.allRoutes.length > 0 ? `
+    <div class="table-wrap">
+      <table id="attackSurfaceTable">
+        <thead>
+          <tr>
+            <th>Route</th>
+            <th>Exposure</th>
+            <th>Vuln Count</th>
+            <th>Highest Risk</th>
+            <th>Hops</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${attackSurface.allRoutes.map(entry => {
+            const exposureBadge = entry.exposureLevel === 'public'
+              ? '<span class="badge badge-red">public</span>'
+              : entry.exposureLevel === 'authenticated'
+              ? '<span class="badge badge-yellow">authenticated</span>'
+              : entry.exposureLevel === 'internal'
+              ? '<span class="badge badge-gray">internal</span>'
+              : '<span class="badge badge-gray">unknown</span>';
+            const hasVulns = entry.vulnerableDeps.length > 0;
+            const rowStyle = (entry.exposureLevel === 'public' && hasVulns)
+              ? 'style="background:rgba(248,81,73,0.06)"'
+              : (entry.exposureLevel === 'authenticated' && hasVulns)
+              ? 'style="background:rgba(210,153,34,0.06)"'
+              : '';
+            const highestRisk = entry.riskScore > 0 ? entry.riskScore.toFixed(1) : '—';
+            const minHop = entry.vulnerableDeps.length > 0
+              ? Math.min(...entry.vulnerableDeps.map(d => d.hopCount))
+              : null;
+            return `<tr ${rowStyle}>
+              <td><code style="font-size:0.8rem;color:var(--accent)">${entry.route.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code><br><span style="font-size:0.72rem;color:var(--text-muted)">${(entry.filePath || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></td>
+              <td>${exposureBadge}</td>
+              <td>${entry.vulnerableDeps.length > 0 ? `<span class="badge badge-red">${entry.vulnerableDeps.length}</span>` : '<span style="color:var(--text-muted)">0</span>'}</td>
+              <td>${entry.riskScore >= 7 ? `<span class="score-critical">${highestRisk}</span>` : entry.riskScore >= 4 ? `<span class="score-medium">${highestRisk}</span>` : `<span class="score-low">${highestRisk}</span>`}</td>
+              <td>${minHop != null ? minHop : '—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div class="empty-state">No routes found.</div>'}
+    ` : '<div class="empty-state">No routes found.</div>'}
+  </div>
+
+  <!-- Tab: Secrets -->
+  <div class="tab-panel" id="tab-secrets">
+    ${secretsResult ? `
+    <div style="margin-bottom:1rem;color:var(--text-muted);font-size:0.85rem">
+      ${secretsResult.totalFindings} finding${secretsResult.totalFindings !== 1 ? 's' : ''} in ${secretsResult.filesScanned} file${secretsResult.filesScanned !== 1 ? 's' : ''} scanned
+      ${secretsResult.criticalCount > 0 ? `— <span style="color:var(--red);font-weight:600">${secretsResult.criticalCount} critical</span>` : ''}
+      ${secretsResult.highCount > 0 ? `— <span style="color:var(--orange);font-weight:600">${secretsResult.highCount} high</span>` : ''}
+    </div>
+    ${secretsResult.findings.length > 0 ? `
+    <div class="table-wrap">
+      <table id="secretsTable">
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Type</th>
+            <th>File:Line</th>
+            <th>Function</th>
+            <th>Reachable From</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${secretsResult.findings.map(f => {
+            const sevBadge = f.severity === 'critical'
+              ? '<span class="badge badge-red">critical</span>'
+              : f.severity === 'high'
+              ? '<span class="badge badge-orange">high</span>'
+              : f.severity === 'medium'
+              ? '<span class="badge badge-yellow">medium</span>'
+              : '<span class="badge badge-gray">low</span>';
+            const fileDisplay = (f.filePath || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const funcDisplay = (f.nodeName || '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const typeDisplay = (f.type || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return `<tr>
+              <td>${sevBadge}</td>
+              <td>${typeDisplay}</td>
+              <td><code style="font-size:0.75rem;color:var(--text-muted)">${fileDisplay}:${f.line}</code></td>
+              <td><code style="font-size:0.78rem">${funcDisplay}</code></td>
+              <td>${f.entryPointCount > 0 ? `<span class="badge badge-yellow">${f.entryPointCount} entry point${f.entryPointCount !== 1 ? 's' : ''}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div class="empty-state">No secrets detected.</div>'}
+    ` : '<div class="empty-state">No secrets detected.</div>'}
+  </div>
+
+  <!-- Tab: SAST Flows -->
+  <div class="tab-panel" id="tab-sast">
+    ${flowsResult ? `
+    <div style="margin-bottom:1rem;color:var(--text-muted);font-size:0.85rem">
+      ${flowsResult.length} finding${flowsResult.length !== 1 ? 's' : ''} across ${new Set(flowsResult.map(f => f.owaspCategory)).size} OWASP categor${new Set(flowsResult.map(f => f.owaspCategory)).size !== 1 ? 'ies' : 'y'}
+    </div>
+    ${flowsResult.length > 0 ? `
+    <div class="table-wrap">
+      <table id="sastTable">
+        <thead>
+          <tr>
+            <th>OWASP</th>
+            <th>Severity</th>
+            <th>Type</th>
+            <th>File:Line</th>
+            <th>Symbol</th>
+            <th>Recommendation</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${flowsResult.map(f => {
+            const owaspBadge = `<span class="badge badge-accent">${f.owaspCategory}</span>`;
+            const sevBadge = f.severity === 'critical'
+              ? '<span class="badge badge-red">critical</span>'
+              : f.severity === 'high'
+              ? '<span class="badge badge-orange">high</span>'
+              : '<span class="badge badge-yellow">medium</span>';
+            const fileDisplay = (f.filePath || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const typeDisplay = (f.type || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const symbolDisplay = (f.symbol || '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const recDisplay = (f.recommendation || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return `<tr>
+              <td>${owaspBadge}</td>
+              <td>${sevBadge}</td>
+              <td><code style="font-size:0.78rem">${typeDisplay}</code></td>
+              <td><code style="font-size:0.75rem;color:var(--text-muted)">${fileDisplay}:${f.line}</code></td>
+              <td><code style="font-size:0.78rem;color:var(--accent)">${symbolDisplay}</code></td>
+              <td style="max-width:300px;font-size:0.78rem;color:var(--text-muted)">${recDisplay}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div class="empty-state">No dangerous patterns detected.</div>'}
+    ` : '<div class="empty-state">No dangerous patterns detected.</div>'}
+  </div>
+
+  <!-- Tab: Remediation -->
+  <div class="tab-panel" id="tab-remediation">
+    ${remediationStatus ? `
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);max-width:500px;margin-bottom:1.5rem">
+      <div class="stat-card">
+        <div class="stat-label">Overdue</div>
+        <div class="stat-value ${remediationStatus.filter(r => r.slaStatus === 'overdue').length > 0 ? 'red' : 'green'}">${remediationStatus.filter(r => r.slaStatus === 'overdue').length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">On Track</div>
+        <div class="stat-value green">${remediationStatus.filter(r => r.slaStatus === 'ok' || r.slaStatus === 'warning').length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">No Fix Available</div>
+        <div class="stat-value yellow">${remediationStatus.filter(r => r.slaStatus === 'no_fix').length}</div>
+      </div>
+    </div>
+    ${remediationStatus.length > 0 ? `
+    <div class="table-wrap">
+      <table id="remediationTable">
+        <thead>
+          <tr>
+            <th>CVE</th>
+            <th>Package</th>
+            <th>Days Open</th>
+            <th>Fix Available</th>
+            <th>SLA (days)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${remediationStatus.map(r => {
+            const statusChip = r.slaStatus === 'ok'
+              ? '<span class="badge badge-green">ok</span>'
+              : r.slaStatus === 'warning'
+              ? '<span class="badge badge-yellow">warning</span>'
+              : r.slaStatus === 'overdue'
+              ? '<span class="badge badge-red">overdue</span>'
+              : '<span class="badge badge-gray">no fix</span>';
+            const cveDisplay = (r.cveId || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const pkgDisplay = (r.packageName || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const slaDays = r.severity !== null
+              ? (r.severity >= 9 ? 7 : r.severity >= 7 ? 30 : r.severity >= 4 ? 90 : 180)
+              : 180;
+            return `<tr>
+              <td><code style="font-size:0.8rem;color:var(--accent)">${cveDisplay}</code></td>
+              <td>${pkgDisplay}</td>
+              <td>${r.daysOpen != null ? r.daysOpen + 'd' : '—'}</td>
+              <td>${r.daysWithFixAvailable != null ? `<span class="badge badge-green">${r.daysWithFixAvailable}d ago</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+              <td>${slaDays}d</td>
+              <td>${statusChip}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div class="empty-state">No open remediation items.</div>'}
+    ` : '<div class="empty-state">No remediation data available.</div>'}
+  </div>
+
 </div>
 
 <script>
@@ -737,9 +1029,10 @@ function renderVulns() {
     const rowClass = v.verdict === 'affected' ? 'verdict-affected'
                    : v.verdict === 'under_investigation' ? 'verdict-investigating'
                    : v.verdict === 'not_affected' ? 'verdict-not-affected' : '';
-    const purl = v.ecosystem && v.package_name && (v.resolved_version || v.declared_constraint)
-      ? 'pkg:' + esc(v.ecosystem) + '/' + esc(v.package_name) + '@' + esc(v.resolved_version || v.declared_constraint)
-      : '';
+    const riskScore = v.risk_score;
+    const riskBadge = riskScore != null
+      ? \`<span class="badge \${riskScore >= 7 ? 'badge-red' : riskScore >= 4 ? 'badge-yellow' : 'badge-gray'}">[Risk: \${riskScore.toFixed(1)}]</span>\`
+      : '<span style="color:var(--text-muted)">—</span>';
     return \`<tr class="row-toggle \${rowClass}" onclick="toggleExpand(this, \${JSON.stringify(v).replace(/"/g,'&quot;')})">
       <td><code style="font-size:0.8rem;color:var(--accent)">\${esc(v.cve_id)}</code></td>
       <td>\${esc(v.package_name ?? '—')}</td>
@@ -747,11 +1040,12 @@ function renderVulns() {
       <td class="\${cvssClass(v.severity_score)}">\${v.severity_score != null ? v.severity_score.toFixed(1) : '—'}</td>
       <td><span class="badge \${epssClass(v.epss_score)}">\${v.epss_score != null ? (v.epss_score*100).toFixed(2)+'%' : '—'}</span></td>
       <td>\${v.epss_percentile != null ? (v.epss_percentile*100).toFixed(0)+'th' : '—'}</td>
+      <td>\${riskBadge}</td>
       <td>\${verdictBadge(v.verdict)}</td>
       <td>\${v.fixed_version ? '<span class="badge badge-green">'+esc(v.fixed_version)+'</span>' : '<span style="color:var(--text-muted)">—</span>'}</td>
     </tr>
     <tr class="expand-row" style="display:none">
-      <td colspan="8">
+      <td colspan="9">
         <div class="expand-body" id="expand-\${esc(v.cve_id)}"></div>
       </td>
     </tr>\`;
@@ -1019,7 +1313,7 @@ export function register(secCmd: import('commander').Command): void {
 
       // Query all vulnerability + dep data in one JOIN
       const vulns: VulnRow[] = rawDb.all(`
-        SELECT v.cve_id, v.severity_score, v.epss_score, v.epss_percentile,
+        SELECT v.cve_id, v.severity_score, v.risk_score, v.epss_score, v.epss_percentile,
                v.fixed_version, v.summary, v.affected_ranges,
                d.package_name, d.ecosystem, d.resolved_version, d.declared_constraint,
                d.scope, d.license,
@@ -1056,6 +1350,38 @@ export function register(secCmd: import('commander').Command): void {
       const sbomJson = sbomExporter.exportJSON();
       const vexJson  = vexExporter.exportJSON();
 
+      // Attack surface data
+      let attackSurface: AttackSurfaceResult | null = null;
+      try {
+        const { AttackSurfaceAnalyzer } = await import('../../security/attack-surface');
+        const analyzer = new AttackSurfaceAnalyzer(db);
+        attackSurface = await analyzer.analyze();
+      } catch { /* non-critical */ }
+
+      // Secrets data
+      let secretsResult: SecretsResult | null = null;
+      try {
+        const { SecretsScanner } = await import('../../security/secrets');
+        const scanner = new SecretsScanner(db, target);
+        secretsResult = await scanner.scan();
+      } catch { /* non-critical */ }
+
+      // Data flows
+      let flowsResult: DataFlowFinding[] | null = null;
+      try {
+        const { DataFlowAnalyzer } = await import('../../security/data-flows');
+        const analyzer = new DataFlowAnalyzer(db);
+        flowsResult = await analyzer.analyze();
+      } catch { /* non-critical */ }
+
+      // Remediation
+      let remediationStatus: RemediationStatus[] | null = null;
+      try {
+        const { RemediationTracker } = await import('../../security/remediation');
+        const tracker = new RemediationTracker(db);
+        remediationStatus = tracker.getStatus();
+      } catch { /* non-critical */ }
+
       cg.close();
 
       // Determine license policy
@@ -1074,6 +1400,10 @@ export function register(secCmd: import('commander').Command): void {
         vexJson,
         denyList,
         warnList,
+        attackSurface,
+        secretsResult,
+        flowsResult,
+        remediationStatus,
       });
 
       // Write output

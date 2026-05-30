@@ -18,6 +18,45 @@ import { EpssClient } from './epss-client';
 const BATCH_CHUNK_SIZE = 1000;
 
 /**
+ * Compute a combined risk score (0.0–10.0) for a vulnerability.
+ *
+ * Formula:
+ *   risk = reachability_factor × (0.4 × cvss_normalized + 0.6 × epss) × staleness_bonus
+ *   scaled to 0–10: min(risk × 10, 10.0)
+ *
+ * @param cvss        - CVSS base score (0.0–10.0), null treated as 5.0
+ * @param epss        - EPSS exploitation probability (0.0–1.0), null treated as 0.0
+ * @param verdict     - Reachability verdict or null/undefined
+ * @param staleness   - Dependency staleness score (0.0–1.0), null treated as 0.0
+ */
+export function computeRiskScore(
+  cvss: number | null | undefined,
+  epss: number | null | undefined,
+  verdict: string | null | undefined,
+  staleness: number | null | undefined,
+): number {
+  const cvssNormalized = (cvss ?? 5.0) / 10.0;
+  const epssValue = epss ?? 0.0;
+
+  let reachabilityFactor: number;
+  if (verdict === 'affected') {
+    reachabilityFactor = 1.0;
+  } else if (verdict === 'under_investigation') {
+    reachabilityFactor = 0.5;
+  } else if (verdict === 'not_affected') {
+    reachabilityFactor = 0.1;
+  } else {
+    // no verdict
+    reachabilityFactor = 0.3;
+  }
+
+  const stalenessBonus = 1.0 + ((staleness ?? 0) * 0.2);
+
+  const raw = reachabilityFactor * (0.4 * cvssNormalized + 0.6 * epssValue) * stalenessBonus;
+  return Math.min(raw * 10, 10.0);
+}
+
+/**
  * Dependency row from sec_dependencies table.
  */
 interface DependencyRow {
@@ -88,6 +127,9 @@ export class VulnerabilityDatabaseClient {
     // Enrich stored vulnerabilities with EPSS scores
     await this.enrichEpss(rawDb);
 
+    // Compute combined risk scores after all enrichment is done
+    await this.computeRiskScores(rawDb);
+
     return result;
   }
 
@@ -122,6 +164,32 @@ export class VulnerabilityDatabaseClient {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       logWarn(`[sec:epss] EPSS enrichment failed (non-critical): ${msg}`);
+    }
+  }
+
+  /**
+   * Compute and persist combined risk scores for all stored vulnerabilities.
+   * Called after EPSS enrichment so epss_score values are up to date.
+   */
+  private async computeRiskScores(rawDb: any): Promise<void> {
+    const rows: Array<{
+      node_id: string;
+      severity_score: number | null;
+      epss_score: number | null;
+      verdict: string | null;
+      staleness_score: number | null;
+    }> = rawDb.all(`
+      SELECT v.node_id, v.severity_score, v.epss_score,
+             r.verdict,
+             d.staleness_score
+      FROM sec_vulnerabilities v
+      LEFT JOIN edges e ON e.target = v.node_id AND e.kind = 'has_vulnerability'
+      LEFT JOIN sec_dependencies d ON d.node_id = e.source
+      LEFT JOIN sec_reachability r ON r.vulnerability_node_id = v.node_id
+    `);
+    for (const row of rows) {
+      const score = computeRiskScore(row.severity_score, row.epss_score, row.verdict, row.staleness_score);
+      rawDb.run(`UPDATE sec_vulnerabilities SET risk_score = ? WHERE node_id = ?`, [score, row.node_id]);
     }
   }
 

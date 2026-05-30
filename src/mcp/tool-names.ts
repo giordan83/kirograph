@@ -47,7 +47,14 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_vex',
   'kirograph_reachability',
   'kirograph_vuln_add',
+  'kirograph_vuln_suppress',
   'kirograph_staleness',
   'kirograph_licenses',
+  'kirograph_attack_surface',
+  'kirograph_secrets',
+  'kirograph_security_flows',
+  'kirograph_supply_chain',
+  'kirograph_dep_confusion',
+  'kirograph_remediation',
 ];
 
