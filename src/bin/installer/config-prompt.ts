@@ -261,7 +261,7 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
           {
             value: 'agent',
             label: 'Active agent',
-            description: '⚠ Uses the active AI agent (Kiro/Claude) to synthesize. Consumes API tokens/credits on every synthesis. Kiro only — other tools are not supported.',
+            description: '⚠ Kiro only. Uses the active Kiro agent to synthesize. Consumes API tokens/credits on every synthesis. Not supported for other tools.',
           },
         ],
       );
