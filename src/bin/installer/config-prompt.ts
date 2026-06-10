@@ -215,6 +215,12 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
       false,
     );
 
+    (patch as any).dataInstallPdf = await askToggle(rl,
+      'Install PDF support (@firecrawl/pdf-inspector package)?',
+      'Required for .pdf files. Rust/NAPI binary — prebuilts for linux-x64 and macOS ARM64.',
+      false,
+    );
+
     const contextChoice = await arrowSelect<number>(rl, 'Include dataset schemas in kirograph_context results?', [
       { value: 0,  label: '0 (disabled)', description: 'Data stays separate — use kirograph_data_* tools explicitly (recommended)' },
       { value: 2,  label: '2 datasets',   description: 'Include up to 2 relevant dataset schemas in context results' },

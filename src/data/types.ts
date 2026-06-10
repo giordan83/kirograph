@@ -10,13 +10,14 @@
 export interface DataSet {
   id: string;              // derived from file path (slugified)
   filePath: string;        // relative path to data file
-  format: 'csv' | 'tsv' | 'jsonl' | 'json' | 'xlsx' | 'parquet';
+  format: 'csv' | 'tsv' | 'jsonl' | 'json' | 'xlsx' | 'parquet' | 'pdf';
   rowCount: number;
   columnCount: number;
   fileSize: number;        // bytes
   contentHash: string;     // SHA-256 for incremental detection
   summary: string | null;  // auto-generated NL summary
   indexedAt: number;
+  metadataJson?: string | null; // PDF-specific metadata blob (null for non-PDF formats)
 }
 
 // ── Column Profile ────────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ export interface DataFormatParser {
   /** Check if the optional dependency is available */
   isAvailable(): boolean;
   /** Parse a file, yielding rows in batches via callback */
-  parse(filePath: string, opts: { maxRows: number; onBatch: (rows: ParsedRow[], columns: string[]) => void }): Promise<{ columns: string[]; totalRows: number }>;
+  parse(filePath: string, opts: { maxRows: number; onBatch: (rows: ParsedRow[], columns: string[]) => void }): Promise<{ columns: string[]; totalRows: number; metadataJson?: string | null }>;
 }
 
 // ── Index Result ──────────────────────────────────────────────────────────────

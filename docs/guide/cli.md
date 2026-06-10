@@ -407,6 +407,8 @@ kirograph docs reembed                      # re-embed with current model
 
 ## Data *(requires `enableData: true`)*
 
+Supports CSV, TSV, JSONL, JSON, Excel, Parquet, and **PDF** (requires `@firecrawl/pdf-inspector` optional dep).
+
 ![KiroGraph Data](https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/data.png)
 
 ```bash
@@ -434,6 +436,10 @@ kirograph data join users orders --left-col id --right-col user_id
 # Correlations & quality
 kirograph data correlations sales-data --threshold 0.5
 kirograph data quality orders
+
+# Classify a PDF before indexing (fast, no full parse)
+kirograph data classify report.pdf
+kirograph data classify report.pdf --json
 
 # Maintenance
 kirograph data index                        # incremental index

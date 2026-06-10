@@ -239,7 +239,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     docsMaxFileSize: 1_048_576,
     docsSummarization: 'first-sentence',
     enableData: false,
-    dataInclude: ['**/*.csv', '**/*.tsv', '**/*.jsonl', '**/*.ndjson', '**/*.xlsx', '**/*.xls', '**/*.parquet', 'data/**/*.json'],
+    dataInclude: ['**/*.csv', '**/*.tsv', '**/*.jsonl', '**/*.ndjson', '**/*.xlsx', '**/*.xls', '**/*.parquet', 'data/**/*.json', '**/*.pdf'],
     dataExclude: ['node_modules/**', 'dist/**', 'build/**', '.git/**', '**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml', '**/tsconfig.json', '**/jsconfig.json', 'coverage/**', '**/generated/**'],
     dataLinkCode: true,
     dataContextLimit: 0,

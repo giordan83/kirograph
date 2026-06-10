@@ -26,13 +26,17 @@ const READ_PATTERNS = [
   /read_json\s*\(\s*['"`]([^'"`]+)['"`]/g,
   /read_parquet\s*\(\s*['"`]([^'"`]+)['"`]/g,
   /read_table\s*\(\s*['"`]([^'"`]+)['"`]/g,
-  // Python open
-  /open\s*\(\s*['"`]([^'"`]+\.(?:csv|tsv|jsonl|ndjson|json|xlsx|xls|parquet))['"`]/g,
+  // Python open (includes PDF)
+  /open\s*\(\s*['"`]([^'"`]+\.(?:csv|tsv|jsonl|ndjson|json|xlsx|xls|parquet|pdf))['"`]/g,
+  // Python PDF libraries
+  /PdfReader\s*\(\s*['"`]([^'"`]+\.pdf)['"`]/g,
+  /pdfplumber\.open\s*\(\s*['"`]([^'"`]+\.pdf)['"`]/g,
+  /fitz\.open\s*\(\s*['"`]([^'"`]+\.pdf)['"`]/g,
   // SQL COPY
   /COPY\s+\w+\s+FROM\s+['"`]([^'"`]+)['"`]/gi,
   /\\copy\s+\w+\s+from\s+['"`]([^'"`]+)['"`]/gi,
   // Generic path references in strings (data file extensions)
-  /['"`]((?:\.\.?\/)?(?:[\w\-./]+\/)?[\w\-]+\.(?:csv|tsv|jsonl|ndjson|xlsx|xls|parquet))['"`]/g,
+  /['"`]((?:\.\.?\/)?(?:[\w\-./]+\/)?[\w\-]+\.(?:csv|tsv|jsonl|ndjson|xlsx|xls|parquet|pdf))['"`]/g,
 ];
 
 /** Patterns that indicate a code symbol writes a data file */
@@ -120,7 +124,7 @@ function isDataFilePath(filePath: string, knownPaths: Set<string>): boolean {
   if (knownPaths.has(filePath)) return true;
   // Check extension
   const ext = filePath.split('.').pop()?.toLowerCase();
-  return ['csv', 'tsv', 'jsonl', 'ndjson', 'json', 'xlsx', 'xls', 'parquet'].includes(ext ?? '');
+  return ['csv', 'tsv', 'jsonl', 'ndjson', 'json', 'xlsx', 'xls', 'parquet', 'pdf'].includes(ext ?? '');
 }
 
 /**
@@ -152,8 +156,9 @@ export class DataCodeLinker {
     const pathToDatasetId = new Map(datasets.map(d => [d.file_path, d.id]));
 
     // Get all indexed source files (from the graph)
+    // Note: files table uses 'path' as the column name, aliased to file_path for readability.
     const sourceFiles = this.db.all(
-      `SELECT file_path FROM files WHERE file_path NOT LIKE '%.csv' AND file_path NOT LIKE '%.tsv' AND file_path NOT LIKE '%.jsonl' AND file_path NOT LIKE '%.ndjson' AND file_path NOT LIKE '%.xlsx' AND file_path NOT LIKE '%.parquet'`
+      `SELECT path AS file_path FROM files WHERE path NOT LIKE '%.csv' AND path NOT LIKE '%.tsv' AND path NOT LIKE '%.jsonl' AND path NOT LIKE '%.ndjson' AND path NOT LIKE '%.xlsx' AND path NOT LIKE '%.parquet' AND path NOT LIKE '%.pdf'`
     ) as Array<{ file_path: string }>;
 
     // Clear existing refs

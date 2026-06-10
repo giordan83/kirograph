@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS data_datasets (
   file_size     INTEGER NOT NULL,
   content_hash  TEXT NOT NULL,
   summary       TEXT,
-  indexed_at    INTEGER NOT NULL
+  indexed_at    INTEGER NOT NULL,
+  metadata_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_data_datasets_file ON data_datasets(file_path);

@@ -141,14 +141,14 @@ When `enableDocs: true` is set, KiroGraph indexes project documentation by headi
 
 ### Data indexing (opt-in)
 
-When `enableData: true` is set, KiroGraph indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) that live alongside your code — test fixtures, seed data, configuration tables, sample datasets. Inspired by [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/).
+When `enableData: true` is set, KiroGraph indexes tabular data files and documents (CSV, TSV, JSONL, JSON, Excel, Parquet, **PDF**) that live alongside your code — test fixtures, seed data, configuration tables, sample datasets. Inspired by [jDataMunch-MCP](https://github.com/jgravelle/jdatamunch-mcp) by [J. Gravelle](https://www.linkedin.com/in/j-gravelle-2778223/).
 
 - **Streaming parser**: never loads full files into memory. Processes line-by-line (CSV/JSONL) or in chunks (Excel/Parquet)
 - **Column profiling**: type inference, cardinality, null percentages, min/max, sample values
 - **Server-side computation**: filters, aggregations, and joins run in SQLite. Only results enter the context window
 - **Incremental**: content hash (SHA-256) skips unchanged files on re-index
 - **Token savings**: 95–99% reduction vs reading raw data files (tracked in `kirograph_gain`)
-- **Optional format deps**: CSV/TSV/JSONL/JSON are built-in (zero deps). Excel requires `xlsx`, Parquet requires `parquetjs-lite`
+- **Optional format deps**: CSV/TSV/JSONL/JSON are built-in (zero deps). Excel requires `xlsx`, Parquet requires `parquetjs-lite`. PDF requires `@firecrawl/pdf-inspector` (prebuilt Rust binary, linux-x64 and macOS ARM64). PDFs are page-indexed: each page becomes a row with `content` (markdown), `needs_ocr`, `has_tables`, and `has_columns` columns. Scanned pages are flagged rather than skipped.
 
 ```json
 {

@@ -11,6 +11,7 @@ import { jsonlParser } from './jsonl';
 import { jsonArrayParser } from './json-array';
 import { excelParser } from './excel';
 import { parquetParser } from './parquet';
+import { pdfParser } from './pdf';
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ const allParsers: DataFormatParser[] = [
   jsonArrayParser,
   excelParser,
   parquetParser,
+  pdfParser,
 ];
 
 /** Extension → parser lookup */

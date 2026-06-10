@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0] - 2026-06-10: PDF support for the data module
+
+### Added
+
+- **PDF indexing** (`enableData: true`): `.pdf` files are now indexed by the data module via [`@firecrawl/pdf-inspector`](https://github.com/firecrawl/pdf-inspector) (optional dep, pure Rust, no OCR, no network). Each page becomes one row with columns `page`, `content`, `needs_ocr`, `has_tables`, `has_columns`. Text-based PDFs process in under 200ms locally.
+- **Mixed/scanned PDF handling**: text pages index normally; scanned pages are flagged with `needs_ocr = true` and surfaced in `kirograph data quality`.
+- **Encoding issue detection**: `kirograph data quality` warns when `hasEncodingIssues` is set on a PDF dataset (garbled font encodings that may require OCR pre-processing).
+- **`kirograph data classify <file>`**: new subcommand — fast (~10–50ms) PDF classification without full indexing. Reports type (`TextBased`/`Scanned`/`Mixed`/`ImageBased`), confidence, page count, and which pages need OCR. Supports `--json`.
+- **PDF code-reference detection**: `kirograph data lint` / linker now detects `readFileSync`, `createReadStream`, `open`, `pdfplumber.open`, `fitz.open`, and `PdfReader` calls referencing `.pdf` paths.
+- **`metadata_json` column on `data_datasets`**: stores PDF-specific metadata (type, confidence, title, encoding issues, complex layout) surfaced in `kirograph data describe`.
+- **Platform support**: prebuilt binaries for linux-x64 and macOS ARM64. Other platforms degrade gracefully (`isAvailable() = false`, PDFs skipped with a lint warning).
+- **Optional dep**: `npm install --save-optional @firecrawl/pdf-inspector`.
+
 ## [0.21.0] - 2026-06-09: TurboQuant embedding compression
 
 ### Added

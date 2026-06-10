@@ -45,15 +45,13 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | 🧠 **Persistent Memor (KiroGraph-Mem opt-in module)** | Cross-session observations — decisions, errors, patterns — auto-linked to code symbols |
 | 👁️ **Watchmen (KiroGraph-Watchmen opt-in module)** ⚠️ *experimental* | Auto-synthesizes accumulated memory observations into workspace briefs and `inclusion: manual` skill files. Fires via the `watchmenReady` signal in `kirograph_mem_store` when threshold is reached. **Local model** (default, `watchmenSynthesisMode: 'local'`): runs `gemma-4-E4B-it-ONNX` on-device via `@huggingface/transformers` — ~3–4 GB one-time download, ~3–5 GB RAM, 8–15 s on Apple Silicon M1+. No API key, no background daemon, no external calls. **Agent mode** also available for Kiro (`watchmenSynthesisMode: 'agent'`, uses active session). ⚠️ **Experimental:** output quality in local mode depends heavily on the model chosen and your hardware. Smaller models or slower machines may produce incomplete briefs and lower-quality skill files. Use `agent` mode for best results. |
 | 📖 **Documentation Indexing (KiroGraph-Doc opt-in  module)** | Section-level retrieval from Markdown, MDX, RST, AsciiDoc, OpenAPI — 92-97% token savings |
-| 📊 **Data Navigation (KiroGraph-Data opt-in  module)** | Query CSV/JSON/Excel/Parquet with filters, aggregations, joins — all server-side in SQLite |
+| 📊 **Data Navigation (KiroGraph-Data opt-in  module)** | Query CSV/JSON/Excel/Parquet/**PDF** with filters, aggregations, joins — all server-side in SQLite |
 | <h4>Token Optimization</h4> | |
 | 🗜️ **Shell Compression (KiroGraph-RTK opt-in  module)** | Token-optimized command output (git, tests, linters, docker, AWS) — 60-90% savings |
 | 🪨 **Caveman Mode (KiroGraph-Caveman opt-in module)** 🪨 | Agent prose compression (lite → ultra) — fewer tokens on explanations without touching code |
 | 📈 **Token Analytics (KiroGraph-Gain core module)** | Track cumulative savings from graph tools and shell compression over time |
 | <h4>Integration (KiroGraph-Integration core module)</h4> | |
 | 🔌 **Multi-tool Support** | Native Kiro + 32 experimental targets (Cursor, Copilot, Claude Code, Codex, Windsurf, Cline, and more) |
-
-![KiroGraph TurboQuant](https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/turboquant.png)
 
 ## Quick Start
 

@@ -39,6 +39,7 @@ export class DataQueries {
       contentHash: r.content_hash,
       summary: r.summary,
       indexedAt: r.indexed_at,
+      metadataJson: r.metadata_json ?? null,
     }));
   }
 
@@ -59,6 +60,7 @@ export class DataQueries {
         rowCount: ds.row_count, columnCount: ds.column_count,
         fileSize: ds.file_size, contentHash: ds.content_hash,
         summary: ds.summary, indexedAt: ds.indexed_at,
+        metadataJson: ds.metadata_json ?? null,
       },
       columns: cols.map(c => ({
         id: c.id, datasetId: c.dataset_id, name: c.name, position: c.position,
@@ -466,6 +468,46 @@ export class DataQueries {
     if (cols.length === 0) return [];
 
     const results: ColumnQuality[] = [];
+
+    // PDF-specific quality checks
+    if (ds.format === 'pdf') {
+      const tableName = `data_rows_${datasetId.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+      try {
+        const ocrRow = this.db.get(`SELECT COUNT(*) as cnt FROM "${tableName}" WHERE needs_ocr = 'true'`);
+        const ocrCount = ocrRow?.cnt ?? 0;
+        if (ocrCount > 0) {
+          const totalPages = ds.row_count ?? 0;
+          results.push({
+            column: 'needs_ocr',
+            riskScore: Math.min(ocrCount / Math.max(totalPages, 1), 1.0),
+            nullRisk: 0,
+            cardinalityRisk: 0,
+            typeRisk: 0,
+            issues: [`${ocrCount} of ${totalPages} pages need OCR (scanned/image-only content)`],
+          });
+        }
+      } catch {
+        // table may not exist yet — non-critical
+      }
+
+      if (ds.metadata_json) {
+        try {
+          const meta = JSON.parse(ds.metadata_json);
+          if (meta.hasEncodingIssues) {
+            results.push({
+              column: 'content',
+              riskScore: 0.3,
+              nullRisk: 0,
+              cardinalityRisk: 0,
+              typeRisk: 0.3,
+              issues: ['PDF has encoding issues — text extraction may be garbled; consider OCR pre-processing'],
+            });
+          }
+        } catch {
+          // malformed metadata — skip
+        }
+      }
+    }
 
     for (const col of cols) {
       const issues: string[] = [];

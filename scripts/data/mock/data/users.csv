@@ -1,0 +1,6 @@
+id,name,email,age,role
+1,Alice,alice@example.com,30,admin
+2,Bob,bob@example.com,25,user
+3,Charlie,charlie@example.com,35,admin
+4,Diana,diana@example.com,28,user
+5,Eve,eve@example.com,32,moderator

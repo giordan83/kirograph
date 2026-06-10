@@ -107,7 +107,7 @@ export class DataIndexer {
     const allRows: ParsedRow[] = [];
     const maxRows = (this.config as any).dataMaxRows ?? 1_000_000;
 
-    const { columns, totalRows } = await parser.parse(absPath, {
+    const { columns, totalRows, metadataJson } = await parser.parse(absPath, {
       maxRows,
       onBatch: (rows, cols) => {
         profiler.addBatch(rows, cols);
@@ -131,9 +131,9 @@ export class DataIndexer {
 
       // Insert dataset
       this.db.run(`
-        INSERT INTO data_datasets (id, file_path, format, row_count, column_count, file_size, content_hash, summary, indexed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [datasetId, relPath, parser.name, totalRows, columns.length, stat.size, contentHash, null, Date.now()]);
+        INSERT INTO data_datasets (id, file_path, format, row_count, column_count, file_size, content_hash, summary, indexed_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [datasetId, relPath, parser.name, totalRows, columns.length, stat.size, contentHash, null, Date.now(), metadataJson ?? null]);
 
       // Insert column profiles
       for (const col of columnProfiles) {

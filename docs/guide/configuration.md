@@ -61,10 +61,10 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | `docsSummarization` | string | `first-sentence` | Summary strategy: `embedding`, `first-sentence`, `off` |
 | **Data** | | | |
 | `enableData` | boolean | `false` | Enable tabular data indexing and querying |
-| `dataInclude` | string[] | `["**/*.csv", ...]` | Glob patterns for data files to include |
+| `dataInclude` | string[] | `["**/*.csv", "**/*.tsv", "**/*.jsonl", "**/*.ndjson", "**/*.xlsx", "**/*.xls", "**/*.parquet", "data/**/*.json", "**/*.pdf"]` | Glob patterns for data files to include |
 | `dataExclude` | string[] | `["node_modules/**", ...]` | Glob patterns for data files to exclude |
 | `dataLinkCode` | boolean | `true` | Auto-link data files to code symbols via path detection |
-| `dataContextLimit` | number | `0` | Max datasets in `kirograph_context` (0 = disabled) |
+| `dataContextLimit` | number | `0` | Max datasets in `kirograph_context` (0 = disabled). For PDF datasets, keep this at `0`–`1`; PDF `content` columns are verbose and will inflate context significantly. |
 | `dataMaxFileSize` | number | `52428800` | Max data file size in bytes (50MB) |
 | `dataMaxRows` | number | `1000000` | Max rows to index per file |
 | `dataQueryLimit` | number | `500` | Max rows returned per query (hard cap) |

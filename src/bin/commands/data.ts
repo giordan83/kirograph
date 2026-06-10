@@ -664,6 +664,67 @@ export function register(program: Command): void {
       cg.close();
     });
 
+  // ── classify ─────────────────────────────────────────────────────────────────
+  data
+    .command('classify <file>')
+    .description('Classify a PDF file before indexing (fast, no full parse)')
+    .option('--json', 'Output as JSON')
+    .action(async (file: string, opts: { json?: boolean }) => {
+      const path = require('path');
+      const fs = require('fs');
+
+      const absPath = path.isAbsolute(file) ? file : path.join(process.cwd(), file);
+      if (!fs.existsSync(absPath)) {
+        console.error(`  ✖ File not found: ${absPath}`);
+        process.exit(1);
+      }
+      if (!absPath.toLowerCase().endsWith('.pdf')) {
+        console.error(`  ✖ Not a PDF file: ${file}`);
+        process.exit(1);
+      }
+
+      let pdfModule: any;
+      try {
+        pdfModule = require('@firecrawl/pdf-inspector');
+      } catch {
+        console.error(`  ✖ @firecrawl/pdf-inspector is not installed.`);
+        console.error(`  ${dim}Install with:${reset} npm install --save-optional @firecrawl/pdf-inspector`);
+        process.exit(1);
+      }
+
+      const buffer = fs.readFileSync(absPath);
+      let result: any;
+      try {
+        result = pdfModule.classifyPdf(buffer);
+      } catch {
+        // fall back to processPdf
+        try {
+          const meta = pdfModule.processPdf(buffer);
+          result = {
+            pdfType: meta.pdfType,
+            pageCount: meta.pageCount ?? null,
+            pagesNeedingOcr: meta.pagesNeedingOcr ?? [],
+            confidence: meta.confidence ?? null,
+          };
+        } catch (err) {
+          console.error(`  ✖ Classification failed: ${err instanceof Error ? err.message : String(err)}`);
+          process.exit(1);
+        }
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        const ocrPages: number[] = result.pagesNeedingOcr ?? [];
+        console.log(`\n  ${bold}PDF Classification${reset}: ${green}${path.basename(file)}${reset}\n`);
+        console.log(`  ${dim}Type:${reset}       ${result.pdfType ?? 'unknown'}`);
+        if (result.confidence != null) console.log(`  ${dim}Confidence:${reset} ${result.confidence}`);
+        if (result.pageCount != null) console.log(`  ${dim}Pages:${reset}      ${result.pageCount}`);
+        console.log(`  ${dim}OCR needed:${reset} ${ocrPages.length === 0 ? 'none' : ocrPages.length + ' pages'}`);
+        console.log();
+      }
+    });
+
   // ── lint ────────────────────────────────────────────────────────────────────
   data
     .command('lint')

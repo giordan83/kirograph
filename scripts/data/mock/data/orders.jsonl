@@ -1,0 +1,6 @@
+{"order_id":"ORD-001","user_id":"1","amount":"120.50","status":"shipped","region":"EU"}
+{"order_id":"ORD-002","user_id":"2","amount":"85.00","status":"pending","region":"US"}
+{"order_id":"ORD-003","user_id":"1","amount":"200.00","status":"delivered","region":"EU"}
+{"order_id":"ORD-004","user_id":"3","amount":"45.75","status":"shipped","region":"APAC"}
+{"order_id":"ORD-005","user_id":"4","amount":"310.00","status":"delivered","region":"US"}
+{"order_id":"ORD-006","user_id":"2","amount":"60.25","status":"pending","region":"EU"}

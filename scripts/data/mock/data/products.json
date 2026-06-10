@@ -1,0 +1,6 @@
+[
+  {"id":"P001","name":"Widget A","category":"hardware","price":"19.99","in_stock":"true"},
+  {"id":"P002","name":"Widget B","category":"software","price":"49.99","in_stock":"true"},
+  {"id":"P003","name":"Gadget X","category":"hardware","price":"129.99","in_stock":"false"},
+  {"id":"P004","name":"Service Y","category":"software","price":"9.99","in_stock":"true"}
+]

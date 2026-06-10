@@ -90,6 +90,9 @@ export class GraphDatabase {
       const sql = fs.readFileSync(schemaPath, 'utf8');
       this.db.exec(sql);
     }
+    // Migrate existing DBs: add columns introduced after initial release.
+    const tryAlter = (stmt: string) => { try { this.db.run(stmt); } catch { /* already exists */ } };
+    tryAlter('ALTER TABLE data_datasets ADD COLUMN metadata_json TEXT');
   }
 
   /**

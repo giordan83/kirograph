@@ -219,6 +219,15 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
               console.warn(`  ✗ npm install failed. Run manually: npm install parquetjs-lite`);
             }
           }
+          if ((patch as any).dataInstallPdf) {
+            console.log(`\n  Installing @firecrawl/pdf-inspector...`);
+            const pdfResult = spawnSync('npm', ['install', '--save-optional', '@firecrawl/pdf-inspector'], { stdio: 'inherit', shell: true });
+            if (pdfResult.status === 0) {
+              console.log(`  ✓ @firecrawl/pdf-inspector installed`);
+            } else {
+              console.warn(`  ✗ npm install failed. Run manually: npm install --save-optional @firecrawl/pdf-inspector`);
+            }
+          }
         }
 
         if (enablePatterns) {
