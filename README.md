@@ -53,8 +53,6 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | | <h4>Integration (KiroGraph-Integration core module)</h4> | |
 | | 🔌 **Multi-tool Support** | Native Kiro + 32 experimental targets (Cursor, Copilot, Claude Code, Codex, Windsurf, Cline, and more) |
 
-![KiroGraph TurboQuant](https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/turboquant.png)
-
 ## Quick Start
 
 ```bash
