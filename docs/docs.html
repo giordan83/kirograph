@@ -287,10 +287,13 @@ kirograph install --target kiro   # install for a specific platform only</code><
       <thead><tr><th>Feature</th><th>KiroGraph</th><th>CodeGraph</th><th>CRG</th><th>cavemem</th><th>lean-ctx</th></tr></thead>
       <tbody>
         <tr><td>Vector embeddings</td><td>✅</td><td>—</td><td>✅</td><td>✅</td><td>—</td></tr>
-        <tr><td>7 pluggable semantic engines</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>9 pluggable semantic engines</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Custom HuggingFace models</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Embedding compression 20–30× (TurboQuant)</td><td>✅ (v0.21.0)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>SIMD-accelerated ANN (TurboVec/Rust)</td><td>✅ (v0.23.0)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Persistent cross-session memory</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
         <tr><td>Observations linked to symbols</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Session synthesis / workspace briefs</td><td>✅ (v0.20.0)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Compressed storage</td><td>✅</td><td>—</td><td>—</td><td>✅</td><td>✅</td></tr>
         <tr><td>Zero LLM tokens on write</td><td>✅</td><td>—</td><td>—</td><td>✅</td><td>✅</td></tr>
         <tr><td>Knowledge graph (temporal facts)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td></tr>
@@ -311,6 +314,7 @@ kirograph install --target kiro   # install for a specific platform only</code><
         <tr><td>Code ↔ docs cross-references</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Tabular data querying</td><td>✅</td><td>—</td><td>—</td><td>✅</td></tr>
         <tr><td>CSV/JSON/Excel/Parquet</td><td>✅</td><td>—</td><td>—</td><td>✅</td></tr>
+        <tr><td>PDF indexing (page-level)</td><td>✅ (v0.22.0)</td><td>—</td><td>—</td><td>—</td></tr>
         <tr><td>Server-side aggregations</td><td>✅</td><td>—</td><td>—</td><td>✅</td></tr>
       </tbody>
     </table>
@@ -453,9 +457,9 @@ kirograph install --target kiro   # install for a specific platform only</code><
     <p>Sections are cross-referenced to code symbols via backtick detection, CamelCase/snake_case pattern matching, and stored as <code>doc_code_refs</code> using stable <code>qualified_name</code> keys.</p>
 
     <h3 id="data-layer">Data layer (opt-in)</h3>
-    <p>When <code>enableData: true</code>, KiroGraph indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) that live alongside your code. Instead of reading raw data files into context, agents query structured schemas and filtered rows — saving 95–99% of tokens.</p>
-    <p>Supports 6 formats: CSV/TSV (built-in, streaming), JSONL/NDJSON (built-in), JSON arrays (built-in), Excel .xlsx/.xls (optional dep: <code>xlsx</code>), Parquet (optional dep: <code>parquetjs-lite</code>).</p>
-    <p>Each dataset is profiled with column types, cardinality, null rates, min/max, sample values, and auto-generated NL summaries. Data files are cross-referenced to code symbols via path detection (<code>readFileSync</code>, <code>pd.read_csv</code>, SQL <code>COPY FROM</code>, etc.) and stored as <code>data_code_refs</code>.</p>
+    <p>When <code>enableData: true</code>, KiroGraph indexes tabular data files and documents (CSV, TSV, JSONL, JSON, Excel, Parquet, PDF) that live alongside your code. Instead of reading raw data files into context, agents query structured schemas and filtered rows — saving 95–99% of tokens.</p>
+    <p>Supports 7 formats: CSV/TSV (built-in, streaming), JSONL/NDJSON (built-in), JSON arrays (built-in), Excel .xlsx/.xls (optional dep: <code>xlsx</code>), Parquet (optional dep: <code>parquetjs-lite</code>), PDF (optional dep: <code>@firecrawl/pdf-inspector</code>, prebuilt Rust binary). PDFs are page-indexed: each page becomes a row with <code>content</code> (markdown), <code>needs_ocr</code>, <code>has_tables</code>, and <code>has_columns</code> columns. Scanned pages are flagged rather than skipped.</p>
+    <p>Each dataset is profiled with column types, cardinality, null rates, min/max, sample values, and auto-generated NL summaries. Data files are cross-referenced to code symbols via path detection (<code>readFileSync</code>, <code>pd.read_csv</code>, SQL <code>COPY FROM</code>, <code>pdfplumber.open</code>, etc.) and stored as <code>data_code_refs</code>.</p>
 
     <!-- ── Languages & Frameworks ── -->
     <h2 id="languages">Supported Languages</h2>
@@ -1239,7 +1243,7 @@ kirograph docs reembed                      # re-embed with current model</code>
 
     <img src="https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/data.png" alt="KiroGraph Data" style="border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; max-width: 100%;">
 
-    <p>When <code>enableData: true</code> is set in <code>.kirograph/config.json</code>, KiroGraph indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet) that live alongside your code — test fixtures, seed data, configuration tables, sample datasets. Instead of reading raw data files into context, agents query structured schemas and filtered rows — saving <strong>95–99% of tokens</strong>. Inspired by <a href="https://github.com/jgravelle/jdatamunch-mcp" target="_blank" rel="noopener">jDataMunch-MCP</a> by <a href="https://www.linkedin.com/in/j-gravelle-2778223/" target="_blank" rel="noopener">J. Gravelle</a>.</p>
+    <p>When <code>enableData: true</code> is set in <code>.kirograph/config.json</code>, KiroGraph indexes tabular data files and documents (CSV, TSV, JSONL, JSON, Excel, Parquet, PDF) that live alongside your code — test fixtures, seed data, configuration tables, sample datasets, reports. Instead of reading raw data files into context, agents query structured schemas and filtered rows — saving <strong>95–99% of tokens</strong>. Inspired by <a href="https://github.com/jgravelle/jdatamunch-mcp" target="_blank" rel="noopener">jDataMunch-MCP</a> by <a href="https://www.linkedin.com/in/j-gravelle-2778223/" target="_blank" rel="noopener">J. Gravelle</a>.</p>
 
     <h3>Key features</h3>
     <ul>
@@ -1247,7 +1251,7 @@ kirograph docs reembed                      # re-embed with current model</code>
       <li><strong>Column profiling</strong>: type inference (string, integer, float, boolean, date), cardinality, null percentages, min/max, mean, sample values.</li>
       <li><strong>Server-side computation</strong>: filters, aggregations, joins, and correlations run in SQLite. Only results enter the context window.</li>
       <li><strong>Incremental indexing</strong>: content hash (SHA-256) per file. Only re-indexes files that changed.</li>
-      <li><strong>Optional format deps</strong>: CSV/TSV/JSONL/JSON are built-in (zero deps). Excel requires <code>xlsx</code>, Parquet requires <code>parquetjs-lite</code>.</li>
+      <li><strong>Optional format deps</strong>: CSV/TSV/JSONL/JSON are built-in (zero deps). Excel requires <code>xlsx</code>, Parquet requires <code>parquetjs-lite</code>, PDF requires <code>@firecrawl/pdf-inspector</code> (prebuilt Rust binary, linux-x64 and macOS ARM64).</li>
       <li><strong>Code ↔ data linking</strong>: detects file path references in source code and populates <code>data_code_refs</code>. Enables test fixture awareness in <code>kirograph affected</code>.</li>
       <li><strong>Schema drift detection</strong>: tracks profile history across re-indexes. <code>kirograph data drift</code> shows added/removed/changed columns.</li>
       <li><strong>NL summaries</strong>: auto-generated natural-language descriptions for each column based on profile patterns.</li>
@@ -1267,6 +1271,7 @@ kirograph docs reembed                      # re-embed with current model</code>
           <tr><td>JSON array</td><td><code>.json</code> (in data/ dirs)</td><td>None (built-in)</td><td>Streaming array parse</td></tr>
           <tr><td>Excel</td><td><code>.xlsx</code>, <code>.xls</code></td><td><code>xlsx</code> (optional)</td><td>Sheet-by-sheet, row iteration</td></tr>
           <tr><td>Parquet</td><td><code>.parquet</code></td><td><code>parquetjs-lite</code> (optional)</td><td>Column-chunk streaming</td></tr>
+          <tr><td>PDF</td><td><code>.pdf</code></td><td><code>@firecrawl/pdf-inspector</code> (optional, prebuilt Rust)</td><td>Per-page markdown extraction; each page = one row with <code>content</code>, <code>needs_ocr</code>, <code>has_tables</code>, <code>has_columns</code>. Mixed/scanned PDFs: text pages indexed normally, scanned pages flagged. linux-x64 and macOS ARM64 only.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1283,7 +1288,7 @@ kirograph docs reembed                      # re-embed with current model</code>
           <tr><td><code>kirograph_data_search</code></td><td>Search column names and sample values by keyword</td></tr>
           <tr><td><code>kirograph_data_join</code></td><td>Cross-dataset SQL JOIN (inner, left, right)</td></tr>
           <tr><td><code>kirograph_data_correlations</code></td><td>Pairwise Pearson correlations between numeric columns</td></tr>
-          <tr><td><code>kirograph_data_quality</code></td><td>Data quality triage: rank columns by risk score</td></tr>
+          <tr><td><code>kirograph_data_quality</code></td><td>Data quality triage: rank columns by risk score; surfaces OCR-flagged pages and encoding issues for PDF datasets</td></tr>
         </tbody>
       </table>
     </div>
@@ -1294,9 +1299,9 @@ kirograph docs reembed                      # re-embed with current model</code>
         <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td><code>enableData</code></td><td>boolean</td><td><code>false</code></td><td>Enable tabular data indexing and querying</td></tr>
-          <tr><td><code>dataInclude</code></td><td>string[]</td><td><code>['**/*.csv', '**/*.tsv', ...]</code></td><td>Glob patterns for data files to include</td></tr>
+          <tr><td><code>dataInclude</code></td><td>string[]</td><td><code>['**/*.csv', '**/*.tsv', '**/*.jsonl', '**/*.ndjson', 'data/**/*.json', '**/*.pdf']</code></td><td>Glob patterns for data files to include</td></tr>
           <tr><td><code>dataExclude</code></td><td>string[]</td><td><code>['node_modules/**', ...]</code></td><td>Glob patterns for data files to exclude</td></tr>
-          <tr><td><code>dataContextLimit</code></td><td>number</td><td><code>0</code></td><td>Max datasets in <code>kirograph_context</code> results (0 = disabled)</td></tr>
+          <tr><td><code>dataContextLimit</code></td><td>number</td><td><code>0</code></td><td>Max datasets in <code>kirograph_context</code> results (0 = disabled). For PDF datasets, keep this at 0–1 — PDF <code>content</code> columns are verbose and inflate context significantly.</td></tr>
           <tr><td><code>dataMaxFileSize</code></td><td>number</td><td><code>52428800</code></td><td>Max data file size in bytes (50MB)</td></tr>
           <tr><td><code>dataMaxRows</code></td><td>number</td><td><code>1000000</code></td><td>Max rows to index per file</td></tr>
           <tr><td><code>dataQueryLimit</code></td><td>number</td><td><code>500</code></td><td>Max rows returned per query (hard cap)</td></tr>
@@ -1583,6 +1588,7 @@ npm run build   # requires Rust toolchain — https://rustup.rs</code></pre>
       <li><a href="https://github.com/yvgude/lean-ctx" target="_blank" rel="noopener">lean-ctx</a> by <a href="https://github.com/yvgude" target="_blank" rel="noopener">Yves Gugger</a>: file read caching, multiple read modes, and context budget governance concepts.</li>
       <li><a href="https://github.com/danilodevhub/turboquant-js" target="_blank" rel="noopener">turboquant-js</a> by <a href="https://github.com/danilodevhub" target="_blank" rel="noopener">Danilo Dev</a>: the TurboQuant engine — TypeScript implementation of Google's Walsh-Hadamard + Lloyd-Max quantization algorithm used for embedding compression.</li>
       <li><a href="https://github.com/RyanCodrai/turbovec" target="_blank" rel="noopener">turbovec</a> by <a href="https://github.com/RyanCodrai" target="_blank" rel="noopener">Ryan Codrai</a>: the TurboVec engine — Rust implementation of TurboQuant with SIMD acceleration, exposed to Node.js via a napi-rs native addon.</li>
+      <li><a href="https://github.com/firecrawl/pdf-inspector" target="_blank" rel="noopener">pdf-inspector</a> by <a href="https://github.com/firecrawl" target="_blank" rel="noopener">Firecrawl</a>: the PDF parser used in the data module — pure Rust, no OCR, no network, prebuilt binaries for linux-x64 and macOS ARM64. Exposes per-page markdown extraction with OCR and layout flags via a napi-rs native addon.</li>
     </ul>
 
     <h3 id="credits-contributors">Contributors</h3>
