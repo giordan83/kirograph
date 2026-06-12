@@ -453,7 +453,6 @@
 - `GraphDatabase` exposes `applyDocsSchema()` for docs module access.
 - Installer `installLate` signature extended with `enableDocs` parameter.
 - Build script copies `docs-schema.sql` to dist.
->>>>>>> main
 
 ---
 
@@ -499,7 +498,6 @@
 - **Hooks consolidated**: Replaced four per-file hooks (`kirograph-mark-dirty-on-save`, `kirograph-mark-dirty-on-create`, `kirograph-sync-on-delete`, `kirograph-sync-if-dirty`) with a single `agentStop` hook (`kirograph-sync-if-dirty.kiro.hook`) that uses `askAgent` to tell the agent to sync if any files changed during the session.
 - **Hook file extension**: Migrated from `.json` to `.kiro.hook` extension. The installer automatically migrates existing `.json` hooks and removes legacy files.
 - **Compression hint hook**: `kirograph-compress-hint.kiro.hook` now uses `.kiro.hook` extension (was `.json`).
->>>>>>> main
 
 ### Fixed
 
