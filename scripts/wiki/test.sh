@@ -1351,7 +1351,12 @@ if [ $? -ne 0 ]; then
   fail "Queue setup per inferenza fallito"
 else
   ok "  queue: 1 sorgente accodata"
-  warn "  Download modello in corso — può richiedere diversi minuti la prima volta..."
+  MODEL_CACHE_DIR="$HOME/.kirograph/models/onnx-community/gemma-4-E4B-it-ONNX"
+  if [ -d "$MODEL_CACHE_DIR" ]; then
+    info "  Modello già in cache ($MODEL_CACHE_DIR) — caricamento da disco..."
+  else
+    warn "  Download modello in corso — può richiedere diversi minuti la prima volta..."
+  fi
 
   set +e
   $KG wiki synthesize > /tmp/wiki-synth-model-out.txt 2>&1
