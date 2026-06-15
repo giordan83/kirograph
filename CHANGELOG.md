@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.25.0] - 2026-06-15: Wiki — LLM-maintained structured knowledge base
+
+### Added
+
+- **Wiki module** (`enableWiki: true`): Karpathy-style LLM wiki that compounds knowledge across sessions. Knowledge flows through three ops: **ingest** (build a structured prompt for the LLM from source text), **apply-diff** (write the LLM-generated `WIKI_DIFF` to SQLite + markdown files), and **lint** (health check for broken links, orphan pages, contradictions).
+
+- **6 new MCP tools**:
+  - `kirograph_wiki_ingest` — build an ingest prompt (SCHEMA + MANIFEST + source) for the active LLM; returns the prompt string for the agent to process
+  - `kirograph_wiki_apply_diff` — apply a `WIKI_DIFF_START ... WIKI_DIFF_END` block; supports `create`, `upsert`, `append` actions; reports pending conflicts
+  - `kirograph_wiki_search` — FTS5 full-text search over wiki pages with BM25 ranking
+  - `kirograph_wiki_page` — retrieve the full markdown content of a page by slug
+  - `kirograph_wiki_list` — list all pages with slug, title, source count, and last-updated timestamp
+  - `kirograph_wiki_lint` — detect broken `[[slug]]` links, orphan pages, stale sources, and contradiction signals
+
+- **`kirograph wiki` CLI subcommand**: `init`, `ingest`, `apply-diff`, `search`, `page`, `list`, `lint`, `reindex`, `status`
+
+- **WIKI_DIFF format**: block-delimited `WIKI_DIFF_START / WIKI_DIFF_END` with a JSON header per entry and markdown content. Deterministic parser; `WIKI_DIFF_CONFLICTS` blocks for contradiction reporting. Designed so the agent reviews diffs before they are applied (two-tool pattern).
+
+- **Two synthesis modes** (`wikiSynthesisMode`):
+  - `agent` (default): the active LLM generates diffs via the `askAgent` hook
+  - `local`: same HuggingFace/ONNX infra as Watchmen — zero API cost, no data leaves the machine
+
+- **Conflict resolution** (`wikiAutoResolveConflicts: true`): conflicting sections auto-resolved by source date when opt-in; otherwise conflicts are surfaced as pending items for manual review.
+
+- **Context enrichment**: `kirograph_context` auto-includes wiki pages above the score threshold (`wikiContextThreshold: 0.4`, limit `wikiContextLimit: 3`).
+
+- **Installer integration**: `kirograph install` prompts for `enableWiki` and `wikiSynthesisMode`. Writes two Kiro hooks (`kirograph-wiki-ingest.kiro.hook`, `kirograph-wiki-lint.kiro.hook`) and a steering skill file `kirograph-wiki-workflow.md` with the 8-step ingest workflow.
+
+- **Wiki section in `kirograph.md` steering** (when `enableWiki: true`): explains available tools, the two-tool ingest flow, and when to consult vs update the wiki.
+
+- **New config keys**: `enableWiki`, `wikiSynthesisMode`, `wikiLocalModel`, `wikiSources`, `wikiAutoResolveConflicts`, `wikiLintFrequency`, `wikiContextLimit`, `wikiContextThreshold`
+
+- **`applyWikiSchema()`** on `KiroGraphDatabase`: initializes `wiki_pages` table and `wiki_fts` virtual table (FTS5) with INSERT/UPDATE/DELETE triggers. Safe to call multiple times.
+
+- **`scripts/wiki/test.sh`**: end-to-end test covering WikiDatabase API, parseWikiDiff, applyDiff (create + upsert), getIngestPrompt structure, lint (broken_link detection), and CLI subcommands.
+
+---
+
 ## [0.23.0] - 2026-06-12: TurboVec — Rust/SIMD vector engine via napi-rs
 
 ### Added

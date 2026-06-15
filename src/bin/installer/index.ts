@@ -130,6 +130,9 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
     let enableArchitecture = false;
     let enableWatchmen = false;
     let watchmenSynthesisMode: 'local' | 'agent' = 'local';
+    let enableWiki = false;
+    let wikiSynthesisMode: 'local' | 'agent' = 'agent';
+    let wikiLocalModel = 'onnx-community/gemma-4-E4B-it-ONNX';
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
     let qdrantDashboard = false;
@@ -147,6 +150,9 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         watchmenSynthesisMode = config.watchmenSynthesisMode ?? 'local';
         enablePatterns = (config as any).enablePatterns ?? false;
         enableArchitecture = config.enableArchitecture ?? false;
+        enableWiki = config.enableWiki ?? false;
+        wikiSynthesisMode = config.wikiSynthesisMode ?? 'agent';
+        wikiLocalModel = config.wikiLocalModel ?? 'onnx-community/gemma-4-E4B-it-ONNX';
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
         console.log(`  • enableEmbeddings: ${config.enableEmbeddings}`);
@@ -189,6 +195,9 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         enableArchitecture = patch.enableArchitecture ?? false;
         enableWatchmen = patch.enableWatchmen ?? false;
         watchmenSynthesisMode = patch.watchmenSynthesisMode ?? 'local';
+        enableWiki = patch.enableWiki ?? false;
+        wikiSynthesisMode = (patch as any).wikiSynthesisMode ?? 'agent';
+        wikiLocalModel = (patch as any).wikiLocalModel ?? 'onnx-community/gemma-4-E4B-it-ONNX';
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
 
@@ -357,7 +366,7 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         }
       }
 
-      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode);
+      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, wikiLocalModel);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`\n  ✗ Failed to write configuration: ${reason}`);

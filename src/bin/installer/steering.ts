@@ -267,6 +267,8 @@ Read file: .kiro/steering/kirograph-review.md
 | architecture, understand structure, package map | \`.kiro/steering/kirograph-architecture.md\` *(requires enableArchitecture)* |
 | onboard, understand this codebase | \`.kiro/steering/kirograph-onboard.md\` |
 | refactor, rename, safe refactoring | \`.kiro/steering/kirograph-refactor.md\` |
+| memory, recall decisions, conflict detection | \`.kiro/steering/kirograph-mem-workflow.md\` *(requires enableMemory)* |
+| wiki, update knowledge base, ingest docs | \`.kiro/steering/kirograph-wiki-workflow.md\` *(requires enableWiki)* |
 
 Each file contains numbered steps, exact tool calls, and an interpretation reference. Follow the steps in order.
 
@@ -348,6 +350,7 @@ export interface SteeringOptions {
   enableData?: boolean;
   enableSecurity?: boolean;
   enablePatterns?: boolean;
+  enableWiki?: boolean;
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
@@ -486,6 +489,40 @@ KiroGraph can search for structural code patterns using @ast-grep/napi.
 **When to use:** When you need to find code patterns that can't be expressed as symbol names or semantic queries — "all eval() calls", "all SQL string concatenation", "all readFile with request parameters".
 `;
     content = content.trimEnd() + '\n\n' + patternsSection.trim() + '\n';
+  }
+
+  // Wiki section
+  if (opts?.enableWiki) {
+    const wikiSection = `
+## Wiki
+
+KiroGraph maintains a structured LLM wiki — a set of markdown pages that compound knowledge
+across sessions. Use it to look up project decisions, architecture facts, and domain knowledge
+before starting work. Use it to save knowledge that should survive context resets.
+
+**Available tools:**
+- \`kirograph_wiki_ingest\` — build an ingest prompt for a source text; pass the result to yourself to generate a WIKI_DIFF
+- \`kirograph_wiki_apply_diff\` — apply a WIKI_DIFF to create or update wiki pages
+- \`kirograph_wiki_search\` — full-text search over wiki pages
+- \`kirograph_wiki_page\` — retrieve the full content of a page by slug
+- \`kirograph_wiki_list\` — list all pages with metadata
+- \`kirograph_wiki_lint\` — health check: broken links, orphan pages, contradictions
+
+**When to consult the wiki:**
+- Before starting a complex feature or bug fix: \`kirograph_wiki_search(query: "<topic>")\`
+- When the user references a concept you don't recognize from the code graph alone
+- After \`kirograph_context\` returns wiki enrichments (pages above threshold score)
+
+**When to update the wiki:**
+- End of a session that produced durable knowledge (architecture decision, API contract, process)
+- The ingest hook will remind you at agentStop if \`enableWiki: true\` is set
+
+**Quick workflow:**
+1. \`kirograph_wiki_ingest\` — get the prompt with SCHEMA + MANIFEST + your source text
+2. Generate a \`WIKI_DIFF\` block (create/upsert/append per page)
+3. \`kirograph_wiki_apply_diff\` — apply it; review any pending conflicts in the response
+`;
+    content = content.trimEnd() + '\n\n' + wikiSection.trim() + '\n';
   }
 
   // Security section
@@ -940,9 +977,120 @@ rule:
     console.log(`  ✓ Patterns workflow steering file written`);
   }
 
+  // Wiki workflow — only when enableWiki is true
+  if (opts?.enableWiki) {
+    fs.writeFileSync(path.join(steeringDir, 'kirograph-wiki-workflow.md'), `---
+inclusion: manual
+---
+
+# KiroGraph: Wiki Workflow
+
+Use this workflow when you need to consult or update the project wiki.
+Activate with \`/kirograph-wiki-workflow\` in Kiro IDE or read the file directly.
+
+## When to use
+
+- Before a complex task: look up relevant wiki pages
+- After a session with durable knowledge: ingest it into the wiki
+- After a source file is added: run ingest to capture its content
+- Periodically: run lint to catch broken links or contradictions
+
+## Steps
+
+### 1. Look up existing knowledge before starting work
+
+\`\`\`
+kirograph_wiki_search(query: "<topic or keyword>")
+\`\`\`
+
+Read any relevant pages:
+
+\`\`\`
+kirograph_wiki_page(slug: "<slug from search results>")
+\`\`\`
+
+### 2. Ingest new knowledge (two-tool flow)
+
+**a. Get the ingest prompt:**
+
+\`\`\`
+kirograph_wiki_ingest(source: "<text, notes, or paste from docs>", sourceName: "<descriptive name>")
+\`\`\`
+
+The tool returns a structured prompt containing the wiki SCHEMA, the current MANIFEST, and your source text.
+
+**b. Generate the WIKI_DIFF:**
+
+Pass the returned prompt to yourself. Produce a \`WIKI_DIFF_START ... WIKI_DIFF_END\` block following the schema. Each entry should have a JSON header with \`action\`, \`slug\`, \`title\`, and \`section\` (optional), followed by markdown content.
+
+**c. Apply the diff:**
+
+\`\`\`
+kirograph_wiki_apply_diff(diff: "<the WIKI_DIFF block you generated>")
+\`\`\`
+
+Review the response for any pending conflicts and resolve them.
+
+### 3. List all pages
+
+\`\`\`
+kirograph_wiki_list()
+\`\`\`
+
+### 4. Health check (periodic)
+
+\`\`\`
+kirograph_wiki_lint()
+\`\`\`
+
+Issues to look for:
+- \`broken_link\`: a \`[[slug]]\` reference that points to a non-existent page → fix the slug or create the page
+- \`orphan\`: a page with no Related section and no incoming links → add Related or merge into another page
+- \`stale_source\`: a source with no date metadata → add a date to the source header
+- \`contradiction\`: two pages make semantically opposite claims → resolve via ingest or manual edit
+
+## WIKI_DIFF format reference
+
+\`\`\`
+WIKI_DIFF_START
+{"action": "create", "slug": "auth-flow", "title": "Authentication Flow"}
+# Authentication Flow
+
+The login flow validates credentials via JWT...
+
+## Related
+- [[user-model]]
+WIKI_DIFF_END
+\`\`\`
+
+Supported actions: \`create\`, \`upsert\` (merge into existing), \`append\` (add to specific section).
+
+For append, include \`"section": "Known Issues"\` in the header.
+
+## Conflict handling
+
+If a diff contradicts an existing page, the tool reports it as a conflict:
+- With \`wikiAutoResolveConflicts: true\`: the newer source wins automatically
+- Without: the conflict is listed in the response — read both sides and ingest a resolution
+
+## CLI commands
+
+\`\`\`bash
+kirograph wiki search "<query>"
+kirograph wiki page <slug>
+kirograph wiki list
+kirograph wiki lint
+kirograph wiki status
+kirograph wiki reindex
+\`\`\`
+`);
+    console.log(`  ✓ Wiki workflow steering file written`);
+  }
+
   const written = ['review', 'debug', 'onboard', 'refactor'];
   if (opts?.enableArchitecture) written.push('architecture');
   if (opts?.enableSecurity) written.push('security');
   if (opts?.enablePatterns) written.push('patterns');
+  if (opts?.enableWiki) written.push('wiki');
   console.log(`  ✓ Workflow steering files written (${written.join(', ')})`);
 }

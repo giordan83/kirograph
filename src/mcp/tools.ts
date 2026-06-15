@@ -493,6 +493,77 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // ── Wiki tools (require enableWiki=true) ────────────────────────────────────
+  {
+    name: 'kirograph_wiki_ingest',
+    description: 'Returns an ingest prompt (SCHEMA + MANIFEST + source content) for the LLM to produce a WIKI_DIFF. Call kirograph_wiki_apply_diff with the result.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', description: 'Source content to ingest (markdown, notes, ADR text, etc.)' },
+        sourceName: { type: 'string', description: 'Name or path of the source (e.g. "ADR-001.md")', default: 'source' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['source'],
+    },
+  },
+  {
+    name: 'kirograph_wiki_apply_diff',
+    description: 'Apply a WIKI_DIFF string (produced by the LLM after kirograph_wiki_ingest) to the wiki filesystem and SQLite index.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        diff: { type: 'string', description: 'WIKI_DIFF string with WIKI_DIFF_START/END blocks' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['diff'],
+    },
+  },
+  {
+    name: 'kirograph_wiki_search',
+    description: 'Full-text search over wiki pages. Returns page slugs, titles, and previews ranked by relevance.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+        limit: { type: 'number', description: 'Max results (default: 5)', default: 5 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'kirograph_wiki_page',
+    description: 'Retrieve the full markdown content of a wiki page by slug.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', description: 'Page slug (e.g. "AuthService", "arch/auth-model")' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'kirograph_wiki_lint',
+    description: 'Health check the wiki for broken links, orphan pages, stale sources, and potential contradictions between pages.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_wiki_list',
+    description: 'List all wiki pages with slug, title, source count, and last updated date.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
   // ── Docs tools (require enableDocs=true) ────────────────────────────────────
   {
     name: 'kirograph_docs_toc',
@@ -3922,6 +3993,170 @@ export class ToolHandler {
           }
         }
 
+        return lines.join('\n');
+      }
+
+      // ── Wiki tools ────────────────────────────────────────────────────────────
+
+      case 'kirograph_wiki_ingest': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph', {
+          autoResolveConflicts: (config as any).wikiAutoResolveConflicts ?? false,
+        });
+        wiki.initialize();
+
+        const source = args.source as string ?? '';
+        const sourceName = args.sourceName as string ?? 'source';
+        if (!source) return 'source is required';
+
+        if (config.wikiSynthesisMode === 'local') {
+          wiki.queueSource(source, sourceName);
+          const count = wiki.getQueueCount();
+          return `Source "${sourceName}" queued for local wiki synthesis (${count} in queue). The agentStop hook will run "kirograph wiki synthesize" automatically.`;
+        }
+
+        const prompt = wiki.getIngestPrompt(source, sourceName);
+        return `WIKI_INGEST_PROMPT\n${prompt}\n\nProduce WIKI_DIFF blocks following SCHEMA.md, then call kirograph_wiki_apply_diff with the diff string.`;
+      }
+
+      case 'kirograph_wiki_apply_diff': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph', {
+          autoResolveConflicts: (config as any).wikiAutoResolveConflicts ?? false,
+        });
+        wiki.initialize();
+
+        const diff = args.diff as string ?? '';
+        if (!diff) return 'diff is required';
+
+        const result = wiki.applyDiff(diff);
+        const lines: string[] = ['✓ Wiki diff applied'];
+        if (result.created.length) lines.push(`  Created: ${result.created.join(', ')}`);
+        if (result.updated.length) lines.push(`  Updated: ${result.updated.join(', ')}`);
+        if (result.conflictsResolved.length) lines.push(`  Conflicts auto-resolved: ${result.conflictsResolved.join(', ')}`);
+        if (result.conflictsPending.length) {
+          lines.push(`  ⚡ Conflicts pending (${result.conflictsPending.length}):`);
+          for (const c of result.conflictsPending) {
+            lines.push(`    ${c.page} §${c.section}: "${c.existing}" vs "${c.incoming}" (source: ${c.source})`);
+          }
+        }
+        return lines.join('\n');
+      }
+
+      case 'kirograph_wiki_search': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const query = args.query as string ?? '';
+        if (!query) return 'query is required';
+        const limit = Math.min(Number(args.limit ?? 5), 20);
+
+        const results = wiki.search(query, limit);
+        if (results.length === 0) return `No wiki pages found for "${query}".`;
+
+        const lines = [`Wiki Search: ${query}`, ''];
+        for (const { page, score } of results) {
+          lines.push(`[${page.slug}] ${page.title}  (score: ${score.toFixed(3)})`);
+          // Show first non-heading line as preview
+          const preview = page.content.split('\n').find(l => l.trim() && !l.startsWith('#'));
+          if (preview) lines.push(`  ${preview.trim().slice(0, 120)}`);
+          lines.push('');
+        }
+        return lines.join('\n').trim();
+      }
+
+      case 'kirograph_wiki_page': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const slug = args.slug as string ?? '';
+        if (!slug) return 'slug is required';
+
+        const page = wiki.getPage(slug);
+        if (!page) return `Wiki page "${slug}" not found. Use kirograph_wiki_list to see available pages.`;
+
+        return page.content;
+      }
+
+      case 'kirograph_wiki_lint': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const issues = wiki.lint();
+        if (issues.length === 0) return '✓ Wiki lint passed — no issues found.';
+
+        const lines = [`Wiki Lint — ${issues.length} issue(s)`, ''];
+        for (const issue of issues) {
+          const icon = issue.kind === 'contradiction' ? '⚡' : issue.kind === 'orphan' ? '○' : issue.kind === 'broken_link' ? '🔗' : '⚠';
+          lines.push(`${icon} [${issue.kind}] ${issue.slug}`);
+          lines.push(`  ${issue.detail}`);
+          lines.push('');
+        }
+        return lines.join('\n').trim();
+      }
+
+      case 'kirograph_wiki_list': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const pages = wiki.listPages();
+        if (pages.length === 0) return 'Wiki is empty. Use kirograph_wiki_ingest to add pages.';
+
+        const stats = wiki.getStats();
+        const lines = [
+          `Wiki — ${stats.pageCount} page(s), ${stats.totalSources} total sources`,
+          '',
+        ];
+        for (const page of pages) {
+          const date = new Date(page.updatedAt).toISOString().slice(0, 10);
+          lines.push(`  ${page.slug.padEnd(32)} ${page.title}  (${page.sourceCount} src, ${date})`);
+        }
         return lines.join('\n');
       }
 

@@ -59,5 +59,11 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_pattern_coverage',
   'kirograph_pattern_save_baseline',
   'kirograph_pattern_diff',
+  'kirograph_wiki_ingest',
+  'kirograph_wiki_apply_diff',
+  'kirograph_wiki_search',
+  'kirograph_wiki_page',
+  'kirograph_wiki_lint',
+  'kirograph_wiki_list',
 ];
 
