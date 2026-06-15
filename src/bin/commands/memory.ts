@@ -75,6 +75,16 @@ export function register(program: Command): void {
           for (const r of results) {
             const age = formatAge(r.observation.createdAt);
             console.log(`  ${violet}[${r.observation.kind}]${reset} ${r.observation.content}`);
+            if (r.relations && r.relations.length > 0) {
+              const annotations = r.relations
+                .filter(rel => rel.judgmentStatus !== 'ignored')
+                .map(rel => {
+                  const icon = rel.relation === 'conflicts_with' ? '⚡' : rel.relation === 'supersedes' ? '↩' : '~';
+                  return `${icon} ${rel.relation}`;
+                })
+                .join('  ');
+              if (annotations) console.log(`  ${dim}${annotations}${reset}`);
+            }
             console.log(`  ${dim}${age} · score: ${r.score.toFixed(3)}${reset}\n`);
           }
         }
@@ -263,6 +273,7 @@ export function register(program: Command): void {
       console.log(`  Observations:   ${bold}${stats.observations}${reset}`);
       console.log(`  Symbol links:   ${bold}${stats.links}${reset}`);
       console.log(`  Embeddings:     ${bold}${stats.vectors}${reset} / ${stats.embeddableCount}`);
+      console.log(`  Relations:      ${bold}${stats.relations}${reset} (${stats.pendingConflicts} pending)`);
       console.log(`  Model mismatch: ${stats.modelMismatch ? violet + '⚠ yes — run kirograph mem reembed' + reset : dim + 'no' + reset}`);
       console.log(`  Compression:    ${config.cavemanMode !== 'off' ? violet + config.cavemanMode + reset : dim + 'off (storing raw)' + reset}`);
       console.log('');

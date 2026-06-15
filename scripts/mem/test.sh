@@ -189,7 +189,7 @@ echo "$CAPTURE_OUT" | grep -qi "Captured\|observation\|No structured\|pattern\|d
   && ok "mem capture: osservazioni estratte" || fail "mem capture: nessuna estrazione"
 
 # Conta quante osservazioni ha estratto
-CAPTURED_COUNT=$(echo "$CAPTURE_OUT" | grep -cE "^\s+\[" || true)
+CAPTURED_COUNT=$(echo "$CAPTURE_OUT" | sed 's/\x1b\[[0-9;]*m//g' | { grep -E "^\s+\[" || true; } | wc -l | tr -d ' ')
 [ "$CAPTURED_COUNT" -gt 0 ] && ok "Estratte $CAPTURED_COUNT osservazioni" || warn "Conteggio osservazioni non rilevato"
 
 # ── 11. mem save-prompt ───────────────────────────────────────────────────────
@@ -328,7 +328,7 @@ echo ""
 echo "$REVIEW_OUT" | grep -qi "review\|overdue\|No overdue\|observation" \
   && ok "mem review: output prodotto" || fail "mem review: output inatteso"
 
-OVERDUE_COUNT=$(echo "$REVIEW_OUT" | grep -cE "overdue by" || echo "0")
+OVERDUE_COUNT=$(echo "$REVIEW_OUT" | { grep -iE "overdue by" || true; } | wc -l | tr -d ' ')
 if [ "$OVERDUE_COUNT" -gt 0 ]; then
   ok "$OVERDUE_COUNT osservazione/i scaduta/e trovata/e"
 else
@@ -349,7 +349,7 @@ if [ -n "$ID5" ] && [ "$OVERDUE_COUNT" -gt 0 ]; then
 
   # Verifica che non appaia più
   REVIEW2_OUT=$($KG mem review 2>&1)
-  OVERDUE2=$(echo "$REVIEW2_OUT" | grep -c "$ID5" || echo "0")
+  OVERDUE2=$(echo "$REVIEW2_OUT" | { grep -F "$ID5" || true; } | wc -l | tr -d ' ')
   [ "$OVERDUE2" -eq 0 ] && ok "Osservazione rimossa dalla review queue" || warn "Osservazione ancora in review queue"
 else
   warn "ID5 non disponibile o nessuna osservazione scaduta — mark-reviewed saltato"
@@ -416,7 +416,7 @@ echo -e "  ${BOLD}[21] kirograph mem export / import${RESET}"
 
 cmd "mem export --format jsonl"
 EXPORT_OUT=$($KG mem export --format jsonl 2>&1)
-EXPORT_LINES=$(echo "$EXPORT_OUT" | grep -c "content" || echo "0")
+EXPORT_LINES=$(echo "$EXPORT_OUT" | { grep "content" || true; } | wc -l | tr -d ' ')
 [ "$EXPORT_LINES" -gt 0 ] && ok "mem export: $EXPORT_LINES righe JSONL" || warn "mem export: nessuna riga (controllare se osservazioni storable)"
 
 cmd "mem export --format md"
