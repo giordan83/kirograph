@@ -461,6 +461,106 @@ echo ""
 echo "$PRUNE_OUT" | grep -qi "Pruned" \
   && ok "mem prune: completato" || fail "mem prune: output inatteso"
 
+# ── 26. kirograph install — steering e hook verifica ─────────────────────────
+sep
+echo -e "  ${BOLD}[24] kirograph install — steering memory${RESET}"
+echo -e "  ${DIM}Verifica che install scriva i file di steering e hook corretti per memory${RESET}"
+
+cmd "install --target kiro --yes"
+$KG install --target kiro --yes 2>&1 | grep -E "✓|✗|ℹ|hook|steering|MCP|agent|Workspace|Installing" | sed 's/^/     /'
+
+echo ""
+
+# Hook di memoria
+[ -f ".kiro/hooks/kirograph-mem-capture.kiro.hook" ] \
+  && ok "Hook mem-capture: presente" \
+  || fail "kirograph-mem-capture.kiro.hook non trovato"
+
+HOOK_MEM=$(cat .kiro/hooks/kirograph-mem-capture.kiro.hook 2>/dev/null)
+echo "$HOOK_MEM" | grep -q '"agentStop"' \
+  && ok "Hook mem-capture: trigger agentStop" \
+  || fail "Hook mem-capture: trigger agentStop non trovato"
+echo "$HOOK_MEM" | grep -q '"askAgent"' \
+  && ok "Hook mem-capture: type askAgent" \
+  || fail "Hook mem-capture: type askAgent non trovato"
+echo "$HOOK_MEM" | grep -q 'kirograph_mem_store' \
+  && ok "Hook mem-capture: prompt cita kirograph_mem_store" \
+  || fail "Hook mem-capture: prompt senza kirograph_mem_store"
+
+# Steering principale (kirograph.md) — sezione memory
+[ -f ".kiro/steering/kirograph.md" ] \
+  && ok "Steering: kirograph.md presente" \
+  || fail ".kiro/steering/kirograph.md non trovato"
+
+STEERING=$(cat .kiro/steering/kirograph.md 2>/dev/null)
+echo "$STEERING" | grep -q '## Memory' \
+  && ok "Steering kirograph.md: sezione ## Memory presente" \
+  || fail "Steering kirograph.md: sezione ## Memory mancante"
+echo "$STEERING" | grep -q 'kirograph_mem_search' \
+  && ok "Steering kirograph.md: cita kirograph_mem_search" \
+  || fail "Steering kirograph.md: kirograph_mem_search mancante"
+echo "$STEERING" | grep -q 'kirograph_mem_conflicts_scan' \
+  && ok "Steering kirograph.md: cita kirograph_mem_conflicts_scan" \
+  || fail "Steering kirograph.md: kirograph_mem_conflicts_scan mancante"
+echo "$STEERING" | grep -q 'kirograph_mem_compare' \
+  && ok "Steering kirograph.md: cita kirograph_mem_compare" \
+  || fail "Steering kirograph.md: kirograph_mem_compare mancante"
+echo "$STEERING" | grep -q 'kirograph_mem_review' \
+  && ok "Steering kirograph.md: cita kirograph_mem_review" \
+  || fail "Steering kirograph.md: kirograph_mem_review mancante"
+echo "$STEERING" | grep -q 'topicKey' \
+  && ok "Steering kirograph.md: spiega topicKey" \
+  || fail "Steering kirograph.md: topicKey non spiegato"
+echo "$STEERING" | grep -q 'reviewAfter' \
+  && ok "Steering kirograph.md: spiega reviewAfter" \
+  || fail "Steering kirograph.md: reviewAfter non spiegato"
+echo "$STEERING" | grep -q 'kirograph-mem-workflow' \
+  && ok "Steering kirograph.md: punta a kirograph-mem-workflow.md" \
+  || fail "Steering kirograph.md: riferimento a kirograph-mem-workflow mancante"
+
+# Routing table nella steering
+echo "$STEERING" | grep -q 'memory.*kirograph-mem-workflow\|kirograph-mem-workflow.*memory' \
+  && ok "Steering kirograph.md: routing table ha voce memory" \
+  || fail "Steering kirograph.md: voce memory mancante nella routing table"
+
+# Skill file kirograph-mem-workflow.md
+[ -f ".kiro/steering/kirograph-mem-workflow.md" ] \
+  && ok "Steering: kirograph-mem-workflow.md presente" \
+  || fail ".kiro/steering/kirograph-mem-workflow.md non trovato"
+
+SKILL=$(cat .kiro/steering/kirograph-mem-workflow.md 2>/dev/null)
+echo "$SKILL" | grep -q 'inclusion: manual' \
+  && ok "kirograph-mem-workflow.md: inclusion: manual" \
+  || fail "kirograph-mem-workflow.md: inclusion: manual mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_search' \
+  && ok "kirograph-mem-workflow.md: step 1 recall (mem_search)" \
+  || fail "kirograph-mem-workflow.md: mem_search mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_store' \
+  && ok "kirograph-mem-workflow.md: step 2 store" \
+  || fail "kirograph-mem-workflow.md: mem_store mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_capture' \
+  && ok "kirograph-mem-workflow.md: step 3 capture" \
+  || fail "kirograph-mem-workflow.md: mem_capture mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_conflicts_scan' \
+  && ok "kirograph-mem-workflow.md: step 4 conflict scan" \
+  || fail "kirograph-mem-workflow.md: mem_conflicts_scan mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_compare' \
+  && ok "kirograph-mem-workflow.md: step 5 compare" \
+  || fail "kirograph-mem-workflow.md: mem_compare mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_judge' \
+  && ok "kirograph-mem-workflow.md: step 6 judge" \
+  || fail "kirograph-mem-workflow.md: mem_judge mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_review' \
+  && ok "kirograph-mem-workflow.md: step 7 review" \
+  || fail "kirograph-mem-workflow.md: mem_review mancante"
+echo "$SKILL" | grep -q 'kirograph_mem_mark_reviewed' \
+  && ok "kirograph-mem-workflow.md: step 7 mark_reviewed" \
+  || fail "kirograph-mem-workflow.md: mem_mark_reviewed mancante"
+
+echo ""
+info "Anteprima .kiro/steering/kirograph-mem-workflow.md:"
+head -20 .kiro/steering/kirograph-mem-workflow.md | sed 's/^/     /'
+
 # ── Fine ──────────────────────────────────────────────────────────────────────
 sep
 echo ""
@@ -484,6 +584,7 @@ echo -e "  ${DIM}·${RESET} lint (+ --fix)"
 echo -e "  ${DIM}·${RESET} export / import (jsonl + md)"
 echo -e "  ${DIM}·${RESET} prune"
 echo -e "  ${DIM}·${RESET} deduplicazione SHA-256"
+echo -e "  ${DIM}·${RESET} install: steering + hook memory verificati"
 echo ""
 echo -e "  ${GREEN}${BOLD}Test completato.${RESET}"
 echo ""

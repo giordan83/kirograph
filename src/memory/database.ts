@@ -282,7 +282,7 @@ export class MemoryDatabase {
     // Sanitize for FTS5
     const safe = query
       .replace(/\b(AND|OR|NOT)\b/g, ' ')
-      .replace(/['"*()?\-+^~:{}\\\.\/,]/g, ' ')
+      .replace(/['"*()?\-+^~:{}\\\.\/,\[\]]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     if (!safe) return [];
