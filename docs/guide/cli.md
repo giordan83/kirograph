@@ -11,6 +11,13 @@ kirograph init [path]             # Initialize .kirograph/ in a project
 kirograph init --index            # Initialize and index immediately
 kirograph uninit [path]           # Prompts to remove integration files and .kirograph/ data
 kirograph uninit --force          # Remove everything without confirmation
+
+# Global Kiro hook library (~/.kirograph/hooks/)
+kirograph hook save [path]        # Save workspace .kiro/hooks/ to global store
+kirograph hook save --all         # Save all without prompting
+kirograph hook import [path]      # Import global hooks into workspace
+kirograph hook import --all       # Import all without prompting
+kirograph hook list               # List saved global hooks
 ```
 
 ## Indexing

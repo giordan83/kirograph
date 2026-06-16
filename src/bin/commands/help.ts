@@ -24,13 +24,16 @@ const GROUPS: Group[] = [
     icon: '🔧', title: 'Setup',
     commands: [
       { name: 'install',       desc: 'Wire up MCP/instructions for an agent workspace', opts: ['--target <t>  kiro | cursor | claude | windsurf | ...'] },
-      { name: 'init',          args: '[path]', desc: 'Initialize KiroGraph in a project', opts: ['-i, --index  Index immediately after init'] },
+      { name: 'init',          args: '[path]', desc: 'Initialize KiroGraph in a project', opts: ['-i, --index  Index immediately after init', 'Prompts to import global hooks when available'] },
       { name: 'uninit',        args: '[path]', desc: 'Remove KiroGraph from a project',   opts: ['--force      Skip confirmation', '--target <t>  Target to clean up (or "all")'] },
+      { name: 'hook',          desc: 'Manage global Kiro hooks in ~/.kirograph/hooks/', opts: ['save [path]    Save workspace hooks to global store', 'import [path]  Import global hooks into workspace', 'list           List saved global hooks', '--all          Save or import all without prompting (save/import)'] },
     ],
     examples: [
       ['kirograph install', 'Wire up Kiro MCP + hooks + steering'],
       ['kirograph install --target cursor', 'Wire up Cursor MCP + rules + hooks'],
       ['kirograph init --index', 'Init and immediately index'],
+      ['kirograph hook save', 'Save workspace hooks to your global library'],
+      ['kirograph hook import', 'Import global hooks into this project'],
     ],
   },
   {
@@ -407,6 +410,8 @@ export function printColoredHelp(): void {
         ['kirograph install --target claude',              'Wire up Claude Code MCP + project memory'],
         ['kirograph install --target codex',               'Install Codex project instructions and print MCP config'],
         ['kirograph init --index',                         'Init and immediately index the project'],
+        ['kirograph hook save',                            'Save workspace hooks to ~/.kirograph/hooks/'],
+        ['kirograph hook import',                          'Import global hooks into .kiro/hooks/'],
         ['kirograph sync',                                 'Incremental sync of changed files'],
       ],
     },

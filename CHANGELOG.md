@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`kirograph hook` command group**: manage a personal global hook library in `~/.kirograph/hooks/`.
+  - `kirograph hook save [path]` — copy selected (or all with `--all`) workspace hooks from `.kiro/hooks/` to the global store; always overwrites existing entries with the same filename.
+  - `kirograph hook import [path]` — copy global hooks into the workspace `.kiro/hooks/` directory.
+  - `kirograph hook list` — list saved global hooks (shows hook name and description from the `.kiro.hook` JSON).
+- **`kirograph init`**: after initialization, interactively offers to import global hooks (none / all / select specific) when the global store is non-empty.
+
 ## [0.23.0] - 2026-06-12: TurboVec — Rust/SIMD vector engine via napi-rs
 
 ### Added
