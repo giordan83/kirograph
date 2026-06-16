@@ -36,6 +36,10 @@ function pageSlice<T>(items: T[], page: number): T[] {
   return items.slice(start, start + PAGE_SIZE);
 }
 
+function optionRowCount(totalPages: number, pageItemCount: number): number {
+  return totalPages > 1 ? PAGE_SIZE : pageItemCount;
+}
+
 function descLineCount(desc: string | undefined): number {
   if (!desc) return 0;
   const termWidth = process.stdout.columns || 80;
@@ -116,8 +120,9 @@ export function singleChoice(
         ? `${dim}Page ${page + 1}/${totalPages} · ←/→ change page · Enter select${reset}`
         : `${dim}↑/↓ navigate · Enter select${reset}`;
 
+      const rowCount = optionRowCount(totalPages, pageOptions.length);
       const trailingLines = desc ? descLines : prevDescLines;
-      const blockLines = 3 + pageOptions.length + trailingLines;
+      const blockLines = 3 + rowCount + trailingLines;
 
       if (!first) {
         process.stdout.write(`\x1b[${renderedLines}A`);
@@ -127,13 +132,18 @@ export function singleChoice(
       process.stdout.write(`${CLEAR_LINE}  ${violet}${message}${reset}\n`);
       process.stdout.write(`${CLEAR_LINE}  ${footer}\n`);
 
-      for (let i = 0; i < pageOptions.length; i++) {
-        const active = i === selected;
-        const cursor = active ? `${green}${bold}❯${reset}` : ' ';
-        const text = active
-          ? `${bold}${pageOptions[i]!.label}${reset}`
-          : `${dim}${pageOptions[i]!.label}${reset}`;
-        process.stdout.write(`${CLEAR_LINE}  ${cursor} ${text}\n`);
+      for (let i = 0; i < rowCount; i++) {
+        const opt = pageOptions[i];
+        if (opt) {
+          const active = i === selected;
+          const cursor = active ? `${green}${bold}❯${reset}` : ' ';
+          const text = active
+            ? `${bold}${opt.label}${reset}`
+            : `${dim}${opt.label}${reset}`;
+          process.stdout.write(`${CLEAR_LINE}  ${cursor} ${text}\n`);
+        } else {
+          process.stdout.write(`${CLEAR_LINE}\n`);
+        }
       }
 
       if (desc) {
@@ -224,7 +234,8 @@ export function multiSelect(
       const footer =
         `${dim}${selectedValues.size} selected${pageHint} · Space toggle${enterHint}${reset}`;
 
-      const blockLines = 3 + pageOptions.length + (totalPages > 1 ? 1 : 0);
+      const rowCount = optionRowCount(totalPages, pageOptions.length);
+      const blockLines = 3 + rowCount + (totalPages > 1 ? 1 : 0);
 
       if (!first) {
         process.stdout.write(`\x1b[${renderedLines}A`);
@@ -234,16 +245,20 @@ export function multiSelect(
       process.stdout.write(`${CLEAR_LINE}  ${violet}${message}${reset}\n`);
       process.stdout.write(`${CLEAR_LINE}  ${footer}\n`);
 
-      for (let i = 0; i < pageOptions.length; i++) {
-        const opt = pageOptions[i]!;
-        const active = i === cursor;
-        const checked = selectedValues.has(opt.value);
-        const mark = checked ? `${green}[x]${reset}` : `${dim}[ ]${reset}`;
-        const pointer = active ? `${green}${bold}❯${reset}` : ' ';
-        const text = active
-          ? `${bold}${opt.label}${reset}`
-          : `${dim}${opt.label}${reset}`;
-        process.stdout.write(`${CLEAR_LINE}  ${pointer} ${mark} ${text}\n`);
+      for (let i = 0; i < rowCount; i++) {
+        const opt = pageOptions[i];
+        if (opt) {
+          const active = i === cursor;
+          const checked = selectedValues.has(opt.value);
+          const mark = checked ? `${green}[x]${reset}` : `${dim}[ ]${reset}`;
+          const pointer = active ? `${green}${bold}❯${reset}` : ' ';
+          const text = active
+            ? `${bold}${opt.label}${reset}`
+            : `${dim}${opt.label}${reset}`;
+          process.stdout.write(`${CLEAR_LINE}  ${pointer} ${mark} ${text}\n`);
+        } else {
+          process.stdout.write(`${CLEAR_LINE}\n`);
+        }
       }
 
       if (totalPages > 1) {
