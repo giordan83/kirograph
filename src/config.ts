@@ -142,6 +142,14 @@ export interface KiroGraphConfig {
   securityDatabases: string[];
   /** Enable AST-level structural pattern matching (SAST) during indexing. Default: false. */
   enablePatterns: boolean;
+  /** Enable code health tools (hotspots, dead code, change tracking). Default: true. */
+  enableCodeHealth: boolean;
+  /** Enable advanced analysis tools (type hierarchies, flows, communities, refactor). Default: true. */
+  enableAdvancedAnalysis: boolean;
+  /** Enable agent utility tools (file caching, budget tracking). Default: true. */
+  enableAgentUtils: boolean;
+  /** Derived from shellCompressionLevel — true when compression is enabled. Controls kirograph_exec. */
+  enableShellExec: boolean;
   /** Path to a directory of user-supplied YAML rule files. Merged with bundled library (user rules win on id conflict). Default: undefined. */
   patternLibraryPath: string | undefined;
   /** Minimum severity level for storing pattern matches during index-time analysis. Default: 'low'. */
@@ -191,9 +199,10 @@ const KNOWN_FIELDS = new Set<string>([
   'dataContextLimit', 'dataMaxFileSize', 'dataMaxRows', 'dataQueryLimit', 'dataMaxResponseTokens',
   'enableSecurity', 'securityDatabases', 'securityAutoEnrich', 'securityEnrichMaxAgeDays', 'securityLicensePolicy',
   'enablePatterns', 'patternLibraryPath', 'patternSeverityThreshold',
+  'enableCodeHealth', 'enableAdvancedAnalysis', 'enableAgentUtils',
   'contextBudget',
-  // Legacy aliases (still accepted, mapped during validation)
-  'enableCompression', 'compressionLevel',
+  // Legacy aliases / derived fields (accepted but ignored or recomputed)
+  'enableCompression', 'compressionLevel', 'enableShellExec',
 ]);
 
 const LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
@@ -222,8 +231,8 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     include: [],
     exclude: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**', '*.min.js', '**/.kirograph/**'],
     maxFileSize: 1_048_576,
-    extractDocstrings: true,
-    trackCallSites: true,
+    extractDocstrings: false,
+    trackCallSites: false,
     enableEmbeddings: false,
     embeddingModel: 'nomic-ai/nomic-embed-text-v1.5',
     embeddingDim: 768,
@@ -287,6 +296,10 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     enablePatterns: false,
     patternLibraryPath: undefined,
     patternSeverityThreshold: 'low',
+    enableCodeHealth: true,
+    enableAdvancedAnalysis: true,
+    enableAgentUtils: true,
+    enableShellExec: true,
   };
 }
 
@@ -594,6 +607,17 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     patternSeverityThreshold = defaults.patternSeverityThreshold;
   }
 
+  // ── Tool group flags ──────────────────────────────────────────────────────
+  const enableCodeHealth = typeof raw.enableCodeHealth === 'boolean'
+    ? raw.enableCodeHealth
+    : defaults.enableCodeHealth;
+  const enableAdvancedAnalysis = typeof raw.enableAdvancedAnalysis === 'boolean'
+    ? raw.enableAdvancedAnalysis
+    : defaults.enableAdvancedAnalysis;
+  const enableAgentUtils = typeof raw.enableAgentUtils === 'boolean'
+    ? raw.enableAgentUtils
+    : defaults.enableAgentUtils;
+
   // Dependency constraint: enableSecurity requires enableArchitecture
   let finalEnableArchitecture = enableArchitecture;
   if (enableSecurity && !enableArchitecture) {
@@ -690,6 +714,10 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     enablePatterns,
     patternLibraryPath,
     patternSeverityThreshold,
+    enableCodeHealth,
+    enableAdvancedAnalysis,
+    enableAgentUtils,
+    enableShellExec: shellCompressionLevel !== 'off',
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
     ...(contextBudget !== undefined ? { contextBudget } : {}),
   };

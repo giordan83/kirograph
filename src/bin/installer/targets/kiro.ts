@@ -2,20 +2,21 @@ import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import { writeCliAgent } from '../cli-agent';
 import { writeHooks } from '../hooks';
-import { writeMcpConfig } from '../mcp';
+import { writeMcpConfigFinal } from '../mcp';
 import { writeSteering } from '../steering';
 
 export function installKiroEarly(projectRoot: string): void {
   const kiroDir = path.join(projectRoot, '.kiro');
-  writeMcpConfig(kiroDir);
   writeHooks(kiroDir);
 }
 
-export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean, enableWatchmen?: boolean, watchmenSynthesisMode?: 'local' | 'agent', enableWiki?: boolean, wikiSynthesisMode?: 'local' | 'agent', wikiLocalModel?: string): void {
+export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean, enableWatchmen?: boolean, watchmenSynthesisMode?: 'local' | 'agent', enableWiki?: boolean, wikiSynthesisMode?: 'local' | 'agent', wikiLocalModel?: string, enableCodeHealth?: boolean, enableAdvancedAnalysis?: boolean, enableAgentUtils?: boolean, trackCallSites?: boolean): void {
   const kiroDir = path.join(projectRoot, '.kiro');
   const enableCompression = shellCompressionLevel !== 'off';
+  const enableShellExec = shellCompressionLevel !== 'off';
+  writeMcpConfigFinal(kiroDir, projectRoot, { enableArchitecture, enableMemory, enableDocs, enableData, enableSecurity, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, enableShellExec, trackCallSites });
   writeHooks(kiroDir, { enableCompression, enableMemory, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode });
-  writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWiki });
+  writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, trackCallSites });
   writeCliAgent(kiroDir, { enableSecurity, enableArchitecture, enablePatterns });
 }
 

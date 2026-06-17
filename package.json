@@ -46,10 +46,10 @@
     "parquetjs-lite": "^0.8.7",
     "picomatch": "^4.0.3",
     "tree-sitter-wasms": "^0.1.11",
-    "web-tree-sitter": "^0.25.3",
-    "xlsx": "^0.18.5"
+    "web-tree-sitter": "^0.25.3"
   },
   "optionalDependencies": {
+    "xlsx": "^0.18.5",
     "@ast-grep/lang-bash": "^0.0.8",
     "@ast-grep/lang-c": "^0.0.6",
     "@ast-grep/lang-cpp": "^0.0.6",

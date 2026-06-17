@@ -41,6 +41,18 @@ export function writeMcpServersConfig(configPath: string, serverConfig: object):
   return true;
 }
 
+/**
+ * Always write (overwrite) the MCP server config entry, regardless of whether it already exists.
+ * Used when the final state is known upfront and idempotency would cause stale data.
+ */
+export function overwriteMcpServersConfig(configPath: string, serverConfig: object): void {
+  ensureDir(path.dirname(configPath));
+  const existing = readJson(configPath);
+  existing.mcpServers = existing.mcpServers ?? {};
+  existing.mcpServers[KIROGRAPH_SERVER_NAME] = serverConfig;
+  writeJson(configPath, existing);
+}
+
 export function removeMcpServersConfig(configPath: string): boolean {
   if (!fs.existsSync(configPath)) return false;
   const existing = readJson(configPath);

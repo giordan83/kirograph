@@ -1,3 +1,104 @@
+/**
+ * Feature flag → tool names. Used by the MCP server to filter tools/list
+ * and by the installer to trim the autoApprove list.
+ * Only tools NOT present in any feature set are always-on core tools.
+ */
+export const FEATURE_TOOL_SETS: Record<string, string[]> = {
+  enableArchitecture: [
+    'kirograph_architecture',
+    'kirograph_coupling',
+    'kirograph_package',
+  ],
+  enableMemory: [
+    'kirograph_mem_search',
+    'kirograph_mem_store',
+    'kirograph_mem_timeline',
+    'kirograph_mem_status',
+    'kirograph_mem_review',
+    'kirograph_mem_mark_reviewed',
+    'kirograph_mem_compare',
+    'kirograph_mem_judge',
+    'kirograph_mem_capture',
+    'kirograph_mem_save_prompt',
+    'kirograph_mem_suggest_topic_key',
+    'kirograph_mem_conflicts_scan',
+  ],
+  enableDocs: [
+    'kirograph_docs_toc',
+    'kirograph_docs_search',
+    'kirograph_docs_section',
+    'kirograph_docs_outline',
+    'kirograph_docs_refs',
+  ],
+  enableData: [
+    'kirograph_data_list',
+    'kirograph_data_describe',
+    'kirograph_data_query',
+    'kirograph_data_aggregate',
+    'kirograph_data_search',
+    'kirograph_data_join',
+    'kirograph_data_correlations',
+    'kirograph_data_quality',
+  ],
+  enableSecurity: [
+    'kirograph_security',
+    'kirograph_vulns',
+    'kirograph_vuln_add',
+    'kirograph_vuln_suppress',
+    'kirograph_sbom',
+    'kirograph_vex',
+    'kirograph_reachability',
+    'kirograph_staleness',
+    'kirograph_licenses',
+    'kirograph_attack_surface',
+    'kirograph_secrets',
+    'kirograph_security_flows',
+    'kirograph_supply_chain',
+    'kirograph_dep_confusion',
+    'kirograph_remediation',
+  ],
+  enablePatterns: [
+    'kirograph_pattern_coverage',
+    'kirograph_pattern_save_baseline',
+    'kirograph_pattern_diff',
+  ],
+  enableWiki: [
+    'kirograph_wiki_ingest',
+    'kirograph_wiki_apply_diff',
+    'kirograph_wiki_search',
+    'kirograph_wiki_page',
+    'kirograph_wiki_lint',
+    'kirograph_wiki_list',
+  ],
+  enableCodeHealth: [
+    'kirograph_hotspots',
+    'kirograph_surprising',
+    'kirograph_diff',
+    'kirograph_dead_code',
+    'kirograph_circular_deps',
+  ],
+  enableAdvancedAnalysis: [
+    'kirograph_type_hierarchy',
+    'kirograph_flows',
+    'kirograph_communities',
+    'kirograph_refactor',
+  ],
+  enableAgentUtils: [
+    'kirograph_read',
+    'kirograph_gain',
+    'kirograph_budget',
+  ],
+  // Derived from shellCompressionLevel — disabled when compression is off
+  enableShellExec: [
+    'kirograph_exec',
+  ],
+  // Disabled when call-site tracking is off
+  trackCallSites: [
+    'kirograph_callers',
+    'kirograph_callees',
+  ],
+};
+
 export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_search',
   'kirograph_context',

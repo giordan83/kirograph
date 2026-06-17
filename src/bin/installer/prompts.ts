@@ -52,9 +52,9 @@ export async function askToggle(
   defaultEnabled = true,
 ): Promise<boolean> {
   return arrowSelect<boolean>(rl, label, [
-    { value: true,  label: 'yes',  description },
-    { value: false, label: 'no', description: 'Skip' },
-  ], defaultEnabled ? 0 : 1);
+    { value: false, label: 'no',  description: 'Skip' },
+    { value: true,  label: 'yes', description },
+  ], defaultEnabled ? 1 : 0);
 }
 
 /**
