@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.27.1]
+
+### Added
+
+- **`kirograph hook` command group**: manage a personal global hook library in `~/.kirograph/hooks/`.
+  - `kirograph hook save [path]` — copy selected (or all with `--all`) workspace hooks from `.kiro/hooks/` to the global store; always overwrites existing entries with the same filename.
+  - `kirograph hook import [path]` — copy global hooks into the workspace `.kiro/hooks/` directory.
+  - `kirograph hook list` — list saved global hooks (shows hook name and description from the hook JSON).
+  - `kirograph hook remove` — remove hooks from the global store; interactive menu defaults to `Select specific hooks`, with `All` and `Cancel` options; supports `--all` flag.
+  - Interactive `save` / `import` / `remove` use arrow-key menus; summaries print hook display names only.
+- **`kirograph install`** (Kiro target): when `~/.kirograph/hooks/` is non-empty, the interactive installer adds a **Hooks** section (after Agent Behavior, before Memory) asking whether to import global hooks (`None`, `All`, or `Select specific hooks`). The prompt runs on every interactive install; skipped with `--yes`. Selected hooks are copied after `installLate` so bundled KiroGraph hooks are written first. Use `kirograph hook import` for a standalone import outside install.
+
+### Fixed
+
+- **`kirograph hook list` / `import` / `remove`**: commands now recognize v2 hook files (`.json` format used by Kiro IDE 1.x) in addition to legacy `.kiro.hook` files. The name is read from `hooks[0].name` for v2 files and from the top-level `name` field for v1 files.
+
+---
+
+
 ## [0.27.0] - 2026-06-18: Kiro IDE v1.0.0 hooks — version-aware installer
 
 ### Added
@@ -76,6 +95,7 @@
 - **`enableShellExec` unknown config warning**: field added to `KNOWN_FIELDS` as a legacy alias; removed from `.kirograph/config.json` where it was incorrectly persisted as a stored value.
 
 ---
+
 
 ## [0.25.0] - 2026-06-15: Wiki — LLM-maintained structured knowledge base
 

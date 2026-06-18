@@ -19,6 +19,7 @@ export function register(program: Command): void {
         await KiroGraph.init(target);
         console.log(`  ${green}✓${reset} Initialized ${violet}${bold}.kirograph/${reset} in ${dim}${target}${reset}`);
       }
+
       if (opts.index) {
         const cg = await KiroGraph.open(target);
         console.log(`\n  ${dim}Indexing...${reset}`);

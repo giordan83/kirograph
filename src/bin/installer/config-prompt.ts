@@ -6,6 +6,12 @@ import * as readline from 'readline';
 import { KiroGraphConfig } from '../../config';
 type CavemanMode = 'lite' | 'full' | 'ultra';
 import { ask, askToggle, arrowSelect, printSection, printSeparator, dim, reset, violet } from './prompts';
+import { promptImportGlobalHookSelection } from '../../hooks/import-prompt';
+
+export interface PromptConfigOptions {
+  projectRoot?: string;
+  offerHookImport?: boolean;
+}
 export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableWatchmen' | 'watchmenThreshold' | 'watchmenSynthesisMode' | 'watchmenLocalModel' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity' | 'enablePatterns' | 'enableWiki' | 'wikiSynthesisMode' | 'wikiLocalModel' | 'enableCodeHealth' | 'enableAdvancedAnalysis' | 'enableAgentUtils'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
@@ -45,7 +51,10 @@ const PRESET_MODELS = [
   },
 ] as const;
 
-export async function promptConfigOptions(rl: readline.Interface): Promise<ConfigPatch> {
+export async function promptConfigOptions(
+  rl: readline.Interface,
+  opts: PromptConfigOptions = {},
+): Promise<{ patch: ConfigPatch; hooksToImport: string[] | null }> {
   // ── Semantic Search ─────────────────────────────────────────────────────────
   printSection('🔍', 'Semantic Search');
 
@@ -290,6 +299,12 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     console.log('  ℹ  kirograph_exec disabled (shell compression is off)');
   }
 
+  let hooksToImport: string[] | null = null;
+  if (opts.offerHookImport && opts.projectRoot) {
+    printSection('🪝', 'Hooks');
+    hooksToImport = await promptImportGlobalHookSelection();
+  }
+
   // ── Memory ──────────────────────────────────────────────────────────────────
   printSection('🧠', 'Memory');
 
@@ -435,5 +450,5 @@ export async function promptConfigOptions(rl: readline.Interface): Promise<Confi
     }
   }
 
-  return patch;
+  return { patch, hooksToImport };
 }

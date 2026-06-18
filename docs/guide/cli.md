@@ -11,7 +11,18 @@ kirograph init [path]             # Initialize .kirograph/ in a project
 kirograph init --index            # Initialize and index immediately
 kirograph uninit [path]           # Prompts to remove integration files and .kirograph/ data
 kirograph uninit --force          # Remove everything without confirmation
+
+# Global Kiro hook library (~/.kirograph/hooks/)
+kirograph hook save [path]        # Save workspace .kiro/hooks/ to global store
+kirograph hook save --all         # Save all without prompting
+kirograph hook import [path]      # Import global hooks into workspace
+kirograph hook import --all       # Import all without prompting
+kirograph hook list               # List saved global hooks
 ```
+
+**Kiro install — global hook import:** during interactive `kirograph install --target kiro` (no `--yes`), if `~/.kirograph/hooks/` is non-empty, the installer adds a **Hooks** step (after Agent Behavior, before Memory) asking whether to import global hooks (`None`, `All`, or `Select specific hooks`). Selected hooks are copied after bundled KiroGraph hooks are written. Use `kirograph hook import` for a standalone import outside install.
+
+**`kirograph hook` menus:** interactive `save` / `import` use `All` / `Select specific hooks` / `Cancel`. Summaries print hook display names only; `hook list` shows display name and description.
 
 ## Indexing
 

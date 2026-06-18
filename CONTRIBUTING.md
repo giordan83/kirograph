@@ -77,6 +77,7 @@ src/
 ├── extraction/      # tree-sitter AST extraction
 ├── frameworks/      # Framework detection (React, Django, etc.)
 ├── graph/           # Graph traversal algorithms
+├── hooks/           # Global Kiro hook library management (save/import/list)
 ├── mcp/             # MCP server and tool handlers
 ├── memory/          # Persistent cross-session memory
 ├── resolution/      # Symbol resolution across files

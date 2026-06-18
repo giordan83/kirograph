@@ -60,6 +60,7 @@ import { register as registerSupplyChain } from './commands/supply-chain';
 import { register as registerDepConfusion } from './commands/dep-confusion';
 import { register as registerRemediation } from './commands/remediation';
 import { register as registerPattern } from './commands/pattern';
+import { register as registerHook } from './commands/hook';
 import { register as registerWiki } from './commands/wiki';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
@@ -166,6 +167,7 @@ registerSupplyChain(program);
 registerDepConfusion(program);
 registerRemediation(program);
 registerPattern(program);
+registerHook(program);
 registerWiki(program);
 
 // Register the help command for `kirograph help`
