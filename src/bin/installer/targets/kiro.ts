@@ -1,21 +1,22 @@
 import * as path from 'path';
 import { CavemanMode } from '../caveman';
 import { writeCliAgent } from '../cli-agent';
-import { writeHooks } from '../hooks';
-import { writeMcpConfig } from '../mcp';
+import { writeHooks, KiroHookFormat } from '../hooks';
+import { writeMcpConfigFinal } from '../mcp';
 import { writeSteering } from '../steering';
 
-export function installKiroEarly(projectRoot: string): void {
+export function installKiroEarly(projectRoot: string, kiroHookFormat: KiroHookFormat = 'v2'): void {
   const kiroDir = path.join(projectRoot, '.kiro');
-  writeMcpConfig(kiroDir);
-  writeHooks(kiroDir);
+  writeHooks(kiroDir, { kiroHookFormat });
 }
 
-export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean, enableWatchmen?: boolean, watchmenSynthesisMode?: 'local' | 'agent', enableWiki?: boolean, wikiSynthesisMode?: 'local' | 'agent', wikiLocalModel?: string): void {
+export function installKiroLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean, enableWatchmen?: boolean, watchmenSynthesisMode?: 'local' | 'agent', enableWiki?: boolean, wikiSynthesisMode?: 'local' | 'agent', wikiLocalModel?: string, enableCodeHealth?: boolean, enableAdvancedAnalysis?: boolean, enableAgentUtils?: boolean, trackCallSites?: boolean, kiroHookFormat: KiroHookFormat = 'v2'): void {
   const kiroDir = path.join(projectRoot, '.kiro');
   const enableCompression = shellCompressionLevel !== 'off';
-  writeHooks(kiroDir, { enableCompression, enableMemory, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode });
-  writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWiki });
+  const enableShellExec = shellCompressionLevel !== 'off';
+  writeMcpConfigFinal(kiroDir, projectRoot, { enableArchitecture, enableMemory, enableDocs, enableData, enableSecurity, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, enableShellExec, trackCallSites });
+  writeHooks(kiroDir, { enableCompression, enableMemory, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, kiroHookFormat });
+  writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, trackCallSites });
   writeCliAgent(kiroDir, { enableSecurity, enableArchitecture, enablePatterns });
 }
 

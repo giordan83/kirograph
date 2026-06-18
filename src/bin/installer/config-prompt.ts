@@ -12,7 +12,7 @@ export interface PromptConfigOptions {
   projectRoot?: string;
   offerHookImport?: boolean;
 }
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableWatchmen' | 'watchmenThreshold' | 'watchmenSynthesisMode' | 'watchmenLocalModel' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity' | 'enablePatterns' | 'enableWiki' | 'wikiSynthesisMode' | 'wikiLocalModel'> & { embeddingModel?: string; embeddingDim?: number };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableWatchmen' | 'watchmenThreshold' | 'watchmenSynthesisMode' | 'watchmenLocalModel' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity' | 'enablePatterns' | 'enableWiki' | 'wikiSynthesisMode' | 'wikiLocalModel' | 'enableCodeHealth' | 'enableAdvancedAnalysis' | 'enableAgentUtils'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -64,7 +64,7 @@ export async function promptConfigOptions(
     'Enables natural-language code search via vector embeddings. A local model (~130MB) is downloaded on first use.',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', turboquantMemDocs: false, turboquantBits: 3, turbovecMemDocs: false, turbovecBits: 4, typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: true, trackCallSites: true, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableWatchmen: false, watchmenThreshold: 5, watchmenSynthesisMode: 'local', watchmenLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0, enableSecurity: false, enablePatterns: false, enableWiki: false, wikiSynthesisMode: 'agent', wikiLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX' };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', turboquantMemDocs: false, turboquantBits: 3, turbovecMemDocs: false, turbovecBits: 4, typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: false, trackCallSites: false, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableWatchmen: false, watchmenThreshold: 5, watchmenSynthesisMode: 'local', watchmenLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0, enableSecurity: false, enablePatterns: false, enableWiki: false, wikiSynthesisMode: 'agent', wikiLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableCodeHealth: false, enableAdvancedAnalysis: false, enableAgentUtils: false };
 
   if (enableEmbeddings) {
     // ── Model selection ────────────────────────────────────────────────────────
@@ -161,16 +161,41 @@ export async function promptConfigOptions(
   patch.extractDocstrings = await askToggle(rl,
     'Docstring extraction:',
     'Enriches symbol metadata and improves context quality. Slightly increases indexing time.',
+    false,
   );
 
   patch.trackCallSites = await askToggle(rl,
     'Call site tracking (caller/callee graph):',
     'Enables kirograph_callers and kirograph_callees MCP tools. Increases index size.',
+    false,
   );
 
   patch.enableArchitecture = await askToggle(rl,
     'Architecture analysis (packages + layers):',
     'Detects packages from manifests and architectural layers. Enables kirograph_architecture, kirograph_coupling, kirograph_package.',
+    false,
+  );
+
+  if (patch.enableArchitecture) {
+    patch.enableAdvancedAnalysis = await askToggle(rl,
+      'Advanced graph analysis (type hierarchies, flows, communities, refactor):',
+      'Enables kirograph_type_hierarchy, kirograph_flows, kirograph_communities, kirograph_refactor. Most useful alongside architecture analysis.',
+      false,
+    );
+  }
+
+  // ── Graph Tools ─────────────────────────────────────────────────────────────
+  printSection('📊', 'Graph Tools');
+
+  patch.enableCodeHealth = await askToggle(rl,
+    'Code health tools (hotspots, dead code, change tracking):',
+    'Enables kirograph_hotspots, kirograph_surprising, kirograph_diff, kirograph_dead_code, kirograph_circular_deps.',
+    false,
+  );
+
+  patch.enableAgentUtils = await askToggle(rl,
+    'Agent utilities (file caching, budget tracking):',
+    'Enables kirograph_read, kirograph_gain, kirograph_budget.',
     false,
   );
 
@@ -263,13 +288,16 @@ export async function promptConfigOptions(
   ]);
   patch.cavemanMode = cavemanChoice as CavemanMode | 'off';
 
-  const compressionChoice = await arrowSelect(rl, 'Shell compression (kirograph_exec default level):', [
-    { value: 'off',        label: 'off',        description: 'No compression hook or steering (tool still available)' },
+  const compressionChoice = await arrowSelect(rl, 'Shell compression (kirograph_exec):', [
+    { value: 'off',        label: 'off',        description: 'Disables kirograph_exec entirely' },
     { value: 'normal',     label: 'normal',     description: 'Balanced: removes noise, keeps structure (recommended)' },
     { value: 'aggressive', label: 'aggressive', description: 'More compact: groups by category, limits output' },
     { value: 'ultra',      label: 'ultra',      description: 'Maximum compression: counts and summaries only' },
   ]);
   patch.shellCompressionLevel = compressionChoice as KiroGraphConfig['shellCompressionLevel'];
+  if (compressionChoice === 'off') {
+    console.log('  ℹ  kirograph_exec disabled (shell compression is off)');
+  }
 
   let hooksToImport: string[] | null = null;
   if (opts.offerHookImport && opts.projectRoot) {

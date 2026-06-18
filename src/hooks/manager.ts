@@ -66,7 +66,7 @@ export function listHooks(dirPath: string): HookFileInfo[] {
   }
 
   return entries
-    .filter((name) => name.endsWith('.kiro.hook'))
+    .filter((name) => name.endsWith('.kiro.hook') || name.endsWith('.json'))
     .map((filename) => {
       const fullPath = path.join(dirPath, filename);
       const { displayName, description } = parseHookMetadata(fullPath);
@@ -97,6 +97,20 @@ export function copyHooks(
 }
 
 /**
+ * Remove hook files from a directory.
+ * Uses fail-fast semantics: throws immediately on first removal error.
+ * Returns the list of removed filenames.
+ */
+export function removeHooks(dirPath: string, filenames: string[]): string[] {
+  const removed: string[] = [];
+  for (const filename of filenames) {
+    fs.unlinkSync(path.join(dirPath, filename));
+    removed.push(filename);
+  }
+  return removed;
+}
+
+/**
  * Parse a hook file's JSON metadata (`name`, `description`).
  * Falls back to the filename when `name` is absent or unparseable.
  */
@@ -108,10 +122,14 @@ export function parseHookMetadata(filePath: string): {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const json = JSON.parse(content);
+    // v2 format: { version: 'v1', hooks: [{ name, ... }] }
+    // v1 format: { name, description, ... }
+    const isV2 = Array.isArray(json.hooks) && json.hooks.length > 0;
+    const rawName = isV2 ? json.hooks[0].name : json.name;
     const displayName =
-      typeof json.name === 'string' && json.name.length > 0 ? json.name : fallback;
+      typeof rawName === 'string' && rawName.length > 0 ? rawName : fallback;
     const description =
-      typeof json.description === 'string' && json.description.length > 0
+      !isV2 && typeof json.description === 'string' && json.description.length > 0
         ? json.description
         : undefined;
     return { displayName, description };

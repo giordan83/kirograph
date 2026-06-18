@@ -1,15 +1,101 @@
 # Changelog
 
-## [Unreleased]
+## [0.27.1]
 
 ### Added
 
 - **`kirograph hook` command group**: manage a personal global hook library in `~/.kirograph/hooks/`.
   - `kirograph hook save [path]` — copy selected (or all with `--all`) workspace hooks from `.kiro/hooks/` to the global store; always overwrites existing entries with the same filename.
   - `kirograph hook import [path]` — copy global hooks into the workspace `.kiro/hooks/` directory.
-  - `kirograph hook list` — list saved global hooks (shows hook name and description from the `.kiro.hook` JSON).
-  - Interactive `save` / `import` use arrow-key menus (`All` / `Select specific hooks` / `Cancel`); summaries print hook display names only.
+  - `kirograph hook list` — list saved global hooks (shows hook name and description from the hook JSON).
+  - `kirograph hook remove` — remove hooks from the global store; interactive menu defaults to `Select specific hooks`, with `All` and `Cancel` options; supports `--all` flag.
+  - Interactive `save` / `import` / `remove` use arrow-key menus; summaries print hook display names only.
 - **`kirograph install`** (Kiro target): when `~/.kirograph/hooks/` is non-empty, the interactive installer adds a **Hooks** section (after Agent Behavior, before Memory) asking whether to import global hooks (`None`, `All`, or `Select specific hooks`). The prompt runs on every interactive install; skipped with `--yes`. Selected hooks are copied after `installLate` so bundled KiroGraph hooks are written first. Use `kirograph hook import` for a standalone import outside install.
+
+### Fixed
+
+- **`kirograph hook list` / `import` / `remove`**: commands now recognize v2 hook files (`.json` format used by Kiro IDE 1.x) in addition to legacy `.kiro.hook` files. The name is read from `hooks[0].name` for v2 files and from the top-level `name` field for v1 files.
+
+---
+
+
+## [0.27.0] - 2026-06-18: Kiro IDE v1.0.0 hooks — version-aware installer
+
+### Added
+
+- **Kiro version prompt**: the installer now asks "Which version of Kiro IDE are you using?" as the very first question when targeting Kiro. Two options:
+  - *Beta Version 0.x.x* — emits legacy `.kiro.hook` files (v1 format: `when`/`then`)
+  - *Version 1.x.x* — emits `.json` hook files (v2 format: `trigger`/`action`)
+
+- **v2 hook format support**: hooks are now generated in the Kiro IDE v1.0.0 schema (`{ "version": "v1", "hooks": [{ name, trigger, matcher?, action }] }`). Trigger mapping from v1: `agentStop` → `Stop`, `preToolUse` → `PreToolUse`. Action mapping: `runCommand` → `{ type: "command" }`, `askAgent` → `{ type: "agent" }`. The v1 `toolTypes: ["shell"]` becomes v2 `matcher: "execute_bash"`.
+
+- **Format-exclusive generation**: only the selected format is written. The opposite format's files are cleaned up if they exist from a previous install.
+
+- **`KiroHookFormat` type** exported from `src/bin/installer/hooks.ts` (`'v1-legacy' | 'v2'`).
+
+### Changed
+
+- **`writeHooks` accepts `kiroHookFormat`**: all hook definitions are stored as dual `HookDef` objects carrying both `v1` and `v2` payloads; `writeHookForFormat` emits only the correct one.
+
+- **`TargetInstaller` interface** extended with optional `kiroHookFormat` parameter on `installEarly` and `installLate`.
+
+- **Legacy `.kiro.hook` files removed from repo**: workspace now contains only the v2 `.json` hooks.
+
+- **`uninit` cleanup list updated**: covers both `.json` and `.kiro.hook` filenames for all hook IDs.
+
+### Fixed
+
+- **Hooks inactive in new Kiro IDE**: v1 `.kiro.hook` files were silently ignored by Kiro IDE 1.x. The new format is now correctly recognized.
+
+---
+
+## [0.26.0] - 2026-06-17: Installer overhaul — real feature flags, minimal defaults
+
+### Added
+
+- **Real MCP feature flags**: tools are now absent from `tools/list` and `tools/call` entirely when their feature is disabled — not just unapproved. `FEATURE_TOOL_SETS` maps each config flag to the tool names it gates. `setEnabledTools()` is computed once at init and cached.
+
+- **New installer tool groups**: three new optional groups added to the install wizard, each defaulting to **no**:
+  - *Code health* (`enableCodeHealth`): `kirograph_hotspots`, `kirograph_surprising`, `kirograph_diff`, `kirograph_dead_code`, `kirograph_circular_deps`
+  - *Advanced analysis* (`enableAdvancedAnalysis`): `kirograph_type_hierarchy`, `kirograph_flows`, `kirograph_communities`, `kirograph_refactor` — offered only when Architecture is enabled
+  - *Agent utilities* (`enableAgentUtils`): `kirograph_read`, `kirograph_gain`, `kirograph_budget`
+
+- **`kirograph_exec` gated by shell compression**: tool is absent when `shellCompressionLevel` is `off`. `enableShellExec` is a derived field computed from `shellCompressionLevel !== 'off'` — never stored in config.
+
+- **`kirograph_callers` / `kirograph_callees` gated by `trackCallSites`**: call-site graph tools only appear when the feature is enabled.
+
+- **Atomic mcp.json write**: `writeMcpConfigFinal` overwrites the MCP entry with the correct `autoApprove` list in one operation from `installKiroLate`, eliminating the intermediate "all tools" state that Kiro detected on reconnect or reinstall.
+
+- **`--path` in mcp.json args**: written at install time so the server always loads the correct project config regardless of working directory.
+
+- **Eager config loading**: `start()` calls `tryInit()` before the transport starts, preventing the race where `tools/list` arrives before `initialize`.
+
+### Changed
+
+- **All toggle prompts default to no**: every installer question now shows `no` first (index 0) and `yes` second — activation is a deliberate choice.
+
+- **`extractDocstrings` defaults to `false`** (was `true`).
+
+- **`trackCallSites` defaults to `false`** (was `true`).
+
+- **"Install KiroGraph for Kiro?" confirmation removed**: the target was already chosen in the preceding prompt; the redundant confirmation step is gone.
+
+- **Steering file is now fully dynamic**: `buildSteeringContent` builds the quick decision guide rows, tool reference sections, workflows, and workflow steering file table conditionally based on enabled features. Disabled tools are absent — not mentioned at all.
+
+- **Workflow steering files conditionalized**: `kirograph-review.md`, `kirograph-debug.md`, `kirograph-onboard.md`, `kirograph-refactor.md`, and `kirograph-architecture.md` now only include steps and tips for tools that are actually enabled. Step numbering adjusts automatically.
+
+- **Security workflow table row** only appears in the steering file when `enableSecurity` is true.
+
+### Fixed
+
+- **Reconnect bug**: clicking Reconnect in Kiro IDE no longer jumps from 7 to 74 tools. Root causes fixed: wrong cwd (solved by `--path` arg), async race (solved by eager init), and intermediate mcp.json state (solved by atomic write).
+
+- **Reinstall bug**: uninstall + reinstall now shows the correct tool count immediately without requiring a reconnect.
+
+- **`enableShellExec` unknown config warning**: field added to `KNOWN_FIELDS` as a legacy alias; removed from `.kirograph/config.json` where it was incorrectly persisted as a stored value.
+
+---
+
 
 ## [0.25.0] - 2026-06-15: Wiki — LLM-maintained structured knowledge base
 

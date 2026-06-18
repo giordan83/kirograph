@@ -5,6 +5,7 @@ import {
   getWorkspaceHooksDir,
   listHooks,
   copyHooks,
+  removeHooks,
   ensureDir,
 } from '../../hooks/manager';
 import { singleChoice, multiSelect, isInteractive } from '../../hooks/prompt';
@@ -167,6 +168,72 @@ export function register(program: Command): Command {
         const copied = copyHooks(globalDir, workspaceDir, filesToImport);
         console.log(`  ${green}✓${reset} Imported ${copied.length} hook${copied.length === 1 ? '' : 's'}:`);
         for (const f of copied) {
+          console.log(`    ${hookSummaryLabel(hooks, f)}`);
+        }
+      } catch (err: unknown) {
+        console.error(`  ✖ ${(err as Error).message}`);
+        process.exit(1);
+      }
+    });
+
+  // ── hook remove ─────────────────────────────────────────────────────────────
+  hookCmd
+    .command('remove')
+    .description('Remove hooks from the global store')
+    .option('--all', 'Remove all hooks without prompting')
+    .action(async (opts: { all?: boolean }) => {
+      let globalDir: string;
+      try {
+        globalDir = getGlobalHooksDir();
+      } catch (err: unknown) {
+        console.error(`  ✖ ${(err as Error).message}`);
+        process.exit(1);
+        return;
+      }
+
+      const hooks = listHooks(globalDir);
+
+      if (hooks.length === 0) {
+        console.log(`  ${dim}No global hooks saved${reset}`);
+        return;
+      }
+
+      let filesToRemove: string[];
+
+      if (opts.all || !isInteractive()) {
+        filesToRemove = hooks.map((h) => h.filename);
+      } else {
+        const choice = await singleChoice('Remove global hooks:', [
+          { label: 'Select specific hooks', value: 'select' },
+          { label: 'All', value: 'all' },
+          { label: 'Cancel', value: 'cancel' },
+        ]);
+
+        if (choice === 'cancel') {
+          console.log(`  ${dim}No hooks removed${reset}`);
+          return;
+        }
+
+        if (choice === 'all') {
+          filesToRemove = hooks.map((h) => h.filename);
+        } else {
+          const selected = await multiSelect(
+            'Select hooks to remove:',
+            hooks.map(hookChoiceOption),
+            { emptySelection: 'focused' }
+          );
+          if (selected.length === 0) {
+            console.log(`  ${dim}No hooks removed${reset}`);
+            return;
+          }
+          filesToRemove = selected;
+        }
+      }
+
+      try {
+        const removed = removeHooks(globalDir, filesToRemove);
+        console.log(`  ${green}✓${reset} Removed ${removed.length} hook${removed.length === 1 ? '' : 's'} from global store:`);
+        for (const f of removed) {
           console.log(`    ${hookSummaryLabel(hooks, f)}`);
         }
       } catch (err: unknown) {

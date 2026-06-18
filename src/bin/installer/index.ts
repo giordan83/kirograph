@@ -16,7 +16,7 @@ import { loadConfig, updateConfig } from '../../config';
 import { printBanner } from '../banner';
 import { renderIndexProgress } from '../progress';
 import { dim, reset } from '../ui';
-import { ask, askToggle } from './prompts';
+import { ask, askToggle, arrowSelect } from './prompts';
 import { promptConfigOptions } from './config-prompt';
 import { openTypesenseDashboard } from './dashboard';
 import { ensureQdrantUI, openQdrantDashboard } from './qdrant-dashboard';
@@ -110,15 +110,18 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
 
     console.log(`  Workspace: ${cwd}\n`);
 
-    if (!opts.yes) {
-      const proceed = await askToggle(rl, `Install KiroGraph for ${installer.label}?`, 'Registers the MCP server and writes integration files for this workspace.');
-      if (!proceed) { console.log('  Cancelled.'); rl.close(); return; }
-    } else {
-      console.log(`  Installing KiroGraph for ${installer.label} (--yes)`);
-    }
     console.log();
 
-    installer.installEarly(cwd);
+    // Ask Kiro IDE version as the first question for the kiro target
+    let kiroHookFormat: 'v1-legacy' | 'v2' = 'v2';
+    if (target === 'kiro') {
+      kiroHookFormat = await arrowSelect<'v1-legacy' | 'v2'>(rl, 'Which version of Kiro IDE are you using?', [
+        { value: 'v1-legacy', label: 'Beta Version 0.x.x', description: 'Kiro IDE beta releases (uses .kiro.hook format)' },
+        { value: 'v2',        label: 'Version 1.x.x',      description: 'Kiro IDE stable releases (uses .json hook format)' },
+      ], 1);
+    }
+
+    installer.installEarly(cwd, kiroHookFormat);
 
     const alreadyInitialized = fs.existsSync(path.join(cwd, '.kirograph'));
     let cavemanMode: CavemanMode | 'off' = 'off';
@@ -134,6 +137,10 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
     let enableWiki = false;
     let wikiSynthesisMode: 'local' | 'agent' = 'agent';
     let wikiLocalModel = 'onnx-community/gemma-4-E4B-it-ONNX';
+    let enableCodeHealth = false;
+    let enableAdvancedAnalysis = false;
+    let enableAgentUtils = false;
+    let trackCallSites = false;
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
     let qdrantDashboard = false;
@@ -155,6 +162,10 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         enableWiki = config.enableWiki ?? false;
         wikiSynthesisMode = config.wikiSynthesisMode ?? 'agent';
         wikiLocalModel = config.wikiLocalModel ?? 'onnx-community/gemma-4-E4B-it-ONNX';
+        enableCodeHealth = config.enableCodeHealth ?? true;
+        enableAdvancedAnalysis = config.enableAdvancedAnalysis ?? false;
+        enableAgentUtils = config.enableAgentUtils ?? true;
+        trackCallSites = config.trackCallSites ?? false;
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
         console.log(`  • enableEmbeddings: ${config.enableEmbeddings}`);
@@ -205,6 +216,10 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         enableWiki = patch.enableWiki ?? false;
         wikiSynthesisMode = (patch as any).wikiSynthesisMode ?? 'agent';
         wikiLocalModel = (patch as any).wikiLocalModel ?? 'onnx-community/gemma-4-E4B-it-ONNX';
+        enableCodeHealth = patch.enableCodeHealth ?? false;
+        enableAdvancedAnalysis = patch.enableAdvancedAnalysis ?? false;
+        enableAgentUtils = patch.enableAgentUtils ?? false;
+        trackCallSites = patch.trackCallSites ?? false;
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
 
@@ -373,7 +388,7 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         }
       }
 
-      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, wikiLocalModel);
+      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, wikiLocalModel, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, trackCallSites, kiroHookFormat);
       if (target === 'kiro' && hooksToImport && hooksToImport.length > 0) {
         applyImportedGlobalHooks(cwd, hooksToImport);
       }

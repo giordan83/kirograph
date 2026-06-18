@@ -6,278 +6,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CAVEMAN_RULES, CavemanMode } from './caveman';
 
-const STEERING_CONTENT = `---
-inclusion: always
----
-
-# KiroGraph
-
-KiroGraph builds a semantic knowledge graph of your codebase. Use its MCP tools instead of grep/glob/file reads whenever \`.kirograph/\` exists in the project.
-
-## Quick decision guide
-
-| Question | Tool |
-|----------|------|
-| Where do I start on this task? | \`kirograph_context\` |
-| What is this symbol / show me its code | \`kirograph_node\` with \`includeCode: true\` |
-| Find a symbol by name | \`kirograph_search\` |
-| Who calls function X? | \`kirograph_callers\` |
-| What does function X call? | \`kirograph_callees\` |
-| What breaks if I change X? | \`kirograph_impact\` |
-| How are X and Y connected? | \`kirograph_path\` |
-| What extends / implements this type? | \`kirograph_type_hierarchy\` |
-| Which code is never called? | \`kirograph_dead_code\` |
-| Are there import cycles? | \`kirograph_circular_deps\` |
-| What files are indexed? | \`kirograph_files\` |
-| Is the index healthy? | \`kirograph_status\` |
-| What are the most critical symbols? | \`kirograph_hotspots\` |
-| Any unexpected cross-module coupling? | \`kirograph_surprising\` |
-| What changed since the last snapshot? | \`kirograph_diff\` |
-| What packages/layers exist? | \`kirograph_architecture\` |
-| How coupled is package X? | \`kirograph_coupling\` |
-| What does package X depend on? | \`kirograph_package\` |
-| Run a command with token savings | \`kirograph_exec\` |
-| Check token savings stats | \`kirograph_gain\` |
-| What data files are indexed? | \`kirograph_data_list\` |
-| What columns does this dataset have? | \`kirograph_data_describe\` |
-| Query rows with filters | \`kirograph_data_query\` |
-| Aggregate data (sum, avg, count) | \`kirograph_data_aggregate\` |
-| Are there vulnerable dependencies? | \`kirograph_security\` |
-| Which CVEs affect my project? | \`kirograph_vulns\` |
-| Is this vulnerability reachable? | \`kirograph_reachability\` |
-| What licenses do my dependencies use? | \`kirograph_licenses\` |
-| Are dependencies outdated? | \`kirograph_staleness\` |
-| Generate SBOM/VEX | \`kirograph_sbom\` / \`kirograph_vex\` |
-| Add a private CVE | \`kirograph_vuln_add\` |
-| Find structural code patterns? | \`kirograph_live_search\` |
-
----
-
-## Tool reference
-
-### \`kirograph_context\`: **start here for any code task**
-
-Returns entry points, related symbols, and code snippets for a natural-language task description. Usually enough to orient without any additional tool calls.
-
-\`\`\`
-kirograph_context(task: "fix the auth token expiry bug")
-kirograph_context(task: "add dark mode", maxNodes: 30)
-kirograph_context(task: "refactor payment service", includeCode: false)
-\`\`\`
-
-### \`kirograph_search\`: find symbols by name
-
-Exact match → FTS → LIKE fallback → vector (last resort). Use instead of grep.
-
-\`\`\`
-kirograph_search(query: "signIn")
-kirograph_search(query: "UserService", kind: "class")
-kirograph_search(query: "auth", limit: 20)
-\`\`\`
-
-Supported kinds: \`function\`, \`method\`, \`class\`, \`interface\`, \`type_alias\`, \`variable\`, \`route\`, \`component\`
-
-### \`kirograph_node\`: inspect a symbol
-
-Returns kind, file, signature, docstring. Add \`includeCode: true\` to get the full source.
-
-\`\`\`
-kirograph_node(symbol: "validateToken")
-kirograph_node(symbol: "AuthService", includeCode: true)
-\`\`\`
-
-### \`kirograph_callers\`: who calls this?
-
-BFS over incoming \`calls\` edges (depth 1).
-
-\`\`\`
-kirograph_callers(symbol: "processPayment", limit: 30)
-\`\`\`
-
-### \`kirograph_callees\`: what does this call?
-
-BFS over outgoing \`calls\` edges (depth 1).
-
-\`\`\`
-kirograph_callees(symbol: "handleRequest")
-\`\`\`
-
-### \`kirograph_impact\`: blast radius before a change
-
-Traverses all incoming edges up to \`depth\` hops. Call this before editing a symbol.
-
-\`\`\`
-kirograph_impact(symbol: "UserRepository", depth: 3)
-\`\`\`
-
-### \`kirograph_path\`: how are two symbols connected?
-
-BFS shortest path across all edge types.
-
-\`\`\`
-kirograph_path(from: "LoginController", to: "DatabasePool")
-\`\`\`
-
-### \`kirograph_type_hierarchy\`: class/interface inheritance
-
-\`\`\`
-kirograph_type_hierarchy(symbol: "BaseRepository", direction: "down")  // derived types
-kirograph_type_hierarchy(symbol: "PaymentService", direction: "up")    // base types
-kirograph_type_hierarchy(symbol: "IUserStore", direction: "both")      // all
-\`\`\`
-
-### \`kirograph_dead_code\`: unreferenced symbols
-
-Returns unexported symbols with zero incoming edges. Good first step when cleaning up.
-
-\`\`\`
-kirograph_dead_code(limit: 50)
-\`\`\`
-
-### \`kirograph_circular_deps\`: import cycles
-
-Runs Tarjan's SCC over import edges. No parameters needed.
-
-\`\`\`
-kirograph_circular_deps()
-\`\`\`
-
-### \`kirograph_files\`: indexed file structure
-
-\`\`\`
-kirograph_files(format: "tree")                          // default
-kirograph_files(format: "flat")                          // one path per line
-kirograph_files(format: "grouped")                       // by directory
-kirograph_files(filterPath: "src/auth", maxDepth: 2)
-kirograph_files(pattern: "**/*.test.ts")
-\`\`\`
-
-### \`kirograph_status\`: index health
-
-Returns file count, symbol count, edge count, embedding coverage, DB size. Call when something feels off.
-
-### \`kirograph_hotspots\`: most-connected symbols
-
-Returns the top-N symbols by total edge degree (in + out, excluding structural \`contains\` edges). Use to find core abstractions, identify high blast-radius symbols before a refactor, or understand what the codebase revolves around.
-
-\`\`\`
-kirograph_hotspots(limit: 20)
-\`\`\`
-
-### \`kirograph_surprising\`: unexpected cross-module coupling
-
-Finds direct edges between symbols in structurally distant files, scored by path distance × edge-kind weight. Use before a refactor to discover hidden dependencies that will break. High score = more unexpected.
-
-\`\`\`
-kirograph_surprising(limit: 20)
-\`\`\`
-
-### \`kirograph_diff\`: what changed since a snapshot?
-
-Compares the current graph against a saved snapshot. Shows added/removed symbols and edges. A snapshot must exist: the user saves one with \`kirograph snapshot save <label>\` before making changes.
-
-\`\`\`
-kirograph_diff()                              // vs latest snapshot
-kirograph_diff(snapshot: "pre-refactor")     // vs named snapshot
-\`\`\`
-
----
-
-## Architecture tools *(require \`enableArchitecture: true\` in config)*
-
-### \`kirograph_architecture\`: **start here for architectural questions**
-
-Returns the full package graph, detected layers (api/service/data/ui/shared), and their dependency edges.
-
-\`\`\`
-kirograph_architecture()                    // packages + layers
-kirograph_architecture(level: "packages")
-kirograph_architecture(level: "layers")
-kirograph_architecture(includeFiles: true)  // add file→package assignments
-\`\`\`
-
-### \`kirograph_coupling\`: stability metrics per package
-
-Returns Ca (afferent: depended on by), Ce (efferent: depends on), and instability (Ce/(Ca+Ce)).
-- High Ca + low instability = load-bearing, safe to depend on, risky to change interface.
-- High Ce + high instability = depends on many things, safe to refactor internals.
-
-\`\`\`
-kirograph_coupling()                        // all packages, sorted by instability
-kirograph_coupling(sortBy: "afferent")     // most depended-on first
-kirograph_coupling(sortBy: "efferent")     // most outgoing deps first
-\`\`\`
-
-### \`kirograph_package\`: drill into one package
-
-Returns metadata, coupling metrics, outgoing deps, incoming dependents, and file list.
-
-\`\`\`
-kirograph_package(package: "auth")
-kirograph_package(package: "src/services", includeFiles: false)
-\`\`\`
-
----
-
-## Workflows
-
-**Bug fix or feature:**
-1. \`kirograph_context\`: orient, find entry points.
-2. \`kirograph_node\` with \`includeCode: true\`: read the relevant symbol.
-3. \`kirograph_callers\` / \`kirograph_callees\`: trace the call flow.
-4. \`kirograph_impact\`: check blast radius before editing.
-
-**Refactor planning:**
-1. \`kirograph_hotspots\`: identify the most-connected symbols; changing these is risky.
-2. \`kirograph_surprising\`: surface hidden coupling that will break.
-3. \`kirograph_impact\` on specific targets: confirm blast radius.
-4. \`kirograph_diff\` after the refactor: verify the structural change matches intent.
-
-**Architectural review:**
-1. \`kirograph_architecture\`: get the package and layer map.
-2. \`kirograph_coupling\`: find the most stable (high Ca) and most volatile (high instability) packages.
-3. \`kirograph_package\`: drill into any package of interest.
-4. \`kirograph_circular_deps\`: check for import cycles.
-
-**Code cleanup:**
-1. \`kirograph_dead_code\`: find unreferenced unexported symbols.
-2. \`kirograph_circular_deps\`: find import cycles to untangle.
-3. \`kirograph_surprising\`: find unexpected coupling to decouple.
-
----
-
-## Workflow steering files
-
-KiroGraph installs task-specific steering files in \`.kiro/steering/\`. They are not always active — load them on demand.
-
-**In Kiro IDE:** type \`/kirograph-review\`, \`/kirograph-security\`, etc. to activate a workflow for the current session.
-
-**In Kiro CLI / other agents:** when the user asks for a specific workflow or you recognize the intent, read the file directly:
-
-\`\`\`
-Read file: .kiro/steering/kirograph-security.md
-Read file: .kiro/steering/kirograph-review.md
-\`\`\`
-
-| User intent | File to load |
-|-------------|-------------|
-| security audit, check vulnerabilities, CVE review | \`.kiro/steering/kirograph-security.md\` *(requires enableSecurity)* |
-| code review, review this PR | \`.kiro/steering/kirograph-review.md\` |
-| debug, trace this bug, root cause | \`.kiro/steering/kirograph-debug.md\` |
-| architecture, understand structure, package map | \`.kiro/steering/kirograph-architecture.md\` *(requires enableArchitecture)* |
-| onboard, understand this codebase | \`.kiro/steering/kirograph-onboard.md\` |
-| refactor, rename, safe refactoring | \`.kiro/steering/kirograph-refactor.md\` |
-| memory, recall decisions, conflict detection | \`.kiro/steering/kirograph-mem-workflow.md\` *(requires enableMemory)* |
-| wiki, update knowledge base, ingest docs | \`.kiro/steering/kirograph-wiki-workflow.md\` *(requires enableWiki)* |
-
-Each file contains numbered steps, exact tool calls, and an interpretation reference. Follow the steps in order.
-
----
-
-## If \`.kirograph/\` does NOT exist
-
-Ask the user: "This project doesn't have KiroGraph initialized. Run \`kirograph init -i\` to build a code knowledge graph for faster exploration?"
-`;
 
 // ── Compression section builder (level-aware) ─────────────────────────────────
 
@@ -351,14 +79,379 @@ export interface SteeringOptions {
   enableSecurity?: boolean;
   enablePatterns?: boolean;
   enableWiki?: boolean;
+  enableCodeHealth?: boolean;
+  enableAdvancedAnalysis?: boolean;
+  enableAgentUtils?: boolean;
+  trackCallSites?: boolean;
 }
 
 function buildSteeringContent(opts?: SteeringOptions): string {
   const cavemanMode = opts?.cavemanMode;
   const enableCompression = opts?.enableCompression !== false && opts?.shellCompressionLevel !== 'off';
   const shellCompressionLevel = opts?.shellCompressionLevel ?? 'normal';
+  const enableArchitecture = opts?.enableArchitecture ?? false;
+  const enableMemory = opts?.enableMemory ?? false;
+  const enableDocs = opts?.enableDocs ?? false;
+  const enableData = opts?.enableData ?? false;
+  const enableSecurity = opts?.enableSecurity ?? false;
+  const enablePatterns = opts?.enablePatterns ?? false;
+  const enableWiki = opts?.enableWiki ?? false;
+  const enableCodeHealth = opts?.enableCodeHealth ?? false;
+  const enableAdvancedAnalysis = opts?.enableAdvancedAnalysis ?? false;
+  const enableAgentUtils = opts?.enableAgentUtils ?? false;
+  const trackCallSites = opts?.trackCallSites ?? false;
 
-  let content = STEERING_CONTENT;
+  // Build guide rows
+  const guideRows: string[] = [
+    '| Where do I start on this task? | `kirograph_context` |',
+    '| What is this symbol / show me its code | `kirograph_node` with `includeCode: true` |',
+    '| Find a symbol by name | `kirograph_search` |',
+    ...(trackCallSites ? [
+      '| Who calls function X? | `kirograph_callers` |',
+      '| What does function X call? | `kirograph_callees` |',
+    ] : []),
+    '| What breaks if I change X? | `kirograph_impact` |',
+    '| How are X and Y connected? | `kirograph_path` |',
+    ...(enableAdvancedAnalysis ? ['| What extends / implements this type? | `kirograph_type_hierarchy` |'] : []),
+    ...(enableCodeHealth ? [
+      '| Which code is never called? | `kirograph_dead_code` |',
+      '| Are there import cycles? | `kirograph_circular_deps` |',
+    ] : []),
+    '| What files are indexed? | `kirograph_files` |',
+    '| Is the index healthy? | `kirograph_status` |',
+    ...(enableCodeHealth ? [
+      '| What are the most critical symbols? | `kirograph_hotspots` |',
+      '| Any unexpected cross-module coupling? | `kirograph_surprising` |',
+      '| What changed since the last snapshot? | `kirograph_diff` |',
+    ] : []),
+    ...(enableArchitecture ? [
+      '| What packages/layers exist? | `kirograph_architecture` |',
+      '| How coupled is package X? | `kirograph_coupling` |',
+      '| What does package X depend on? | `kirograph_package` |',
+    ] : []),
+    ...(enableCompression ? ['| Run a command with token savings | `kirograph_exec` |'] : []),
+    ...(enableAgentUtils ? ['| Check token savings stats | `kirograph_gain` |'] : []),
+    ...(enableData ? [
+      '| What data files are indexed? | `kirograph_data_list` |',
+      '| What columns does this dataset have? | `kirograph_data_describe` |',
+      '| Query rows with filters | `kirograph_data_query` |',
+      '| Aggregate data (sum, avg, count) | `kirograph_data_aggregate` |',
+    ] : []),
+    ...(enableSecurity ? [
+      '| Are there vulnerable dependencies? | `kirograph_security` |',
+      '| Which CVEs affect my project? | `kirograph_vulns` |',
+      '| Is this vulnerability reachable? | `kirograph_reachability` |',
+      '| What licenses do my dependencies use? | `kirograph_licenses` |',
+      '| Are dependencies outdated? | `kirograph_staleness` |',
+      '| Generate SBOM/VEX | `kirograph_sbom` / `kirograph_vex` |',
+      '| Add a private CVE | `kirograph_vuln_add` |',
+    ] : []),
+    ...(enablePatterns ? ['| Find structural code patterns? | `kirograph_live_search` |'] : []),
+  ];
+
+  // Build tool reference sections
+  let toolRef = `
+## Tool reference
+
+### \`kirograph_context\`: **start here for any code task**
+
+Returns entry points, related symbols, and code snippets for a natural-language task description. Usually enough to orient without any additional tool calls.
+
+\`\`\`
+kirograph_context(task: "fix the auth token expiry bug")
+kirograph_context(task: "add dark mode", maxNodes: 30)
+kirograph_context(task: "refactor payment service", includeCode: false)
+\`\`\`
+
+### \`kirograph_search\`: find symbols by name
+
+Exact match → FTS → LIKE fallback → vector (last resort). Use instead of grep.
+
+\`\`\`
+kirograph_search(query: "signIn")
+kirograph_search(query: "UserService", kind: "class")
+kirograph_search(query: "auth", limit: 20)
+\`\`\`
+
+Supported kinds: \`function\`, \`method\`, \`class\`, \`interface\`, \`type_alias\`, \`variable\`, \`route\`, \`component\`
+
+### \`kirograph_node\`: inspect a symbol
+
+Returns kind, file, signature, docstring. Add \`includeCode: true\` to get the full source.
+
+\`\`\`
+kirograph_node(symbol: "validateToken")
+kirograph_node(symbol: "AuthService", includeCode: true)
+\`\`\``;
+
+  if (trackCallSites) {
+    toolRef += `
+
+### \`kirograph_callers\`: who calls this?
+
+BFS over incoming \`calls\` edges (depth 1).
+
+\`\`\`
+kirograph_callers(symbol: "processPayment", limit: 30)
+\`\`\`
+
+### \`kirograph_callees\`: what does this call?
+
+BFS over outgoing \`calls\` edges (depth 1).
+
+\`\`\`
+kirograph_callees(symbol: "handleRequest")
+\`\`\``;
+  }
+
+  toolRef += `
+
+### \`kirograph_impact\`: blast radius before a change
+
+Traverses all incoming edges up to \`depth\` hops. Call this before editing a symbol.
+
+\`\`\`
+kirograph_impact(symbol: "UserRepository", depth: 3)
+\`\`\`
+
+### \`kirograph_path\`: how are two symbols connected?
+
+BFS shortest path across all edge types.
+
+\`\`\`
+kirograph_path(from: "LoginController", to: "DatabasePool")
+\`\`\``;
+
+  if (enableAdvancedAnalysis) {
+    toolRef += `
+
+### \`kirograph_type_hierarchy\`: class/interface inheritance
+
+\`\`\`
+kirograph_type_hierarchy(symbol: "BaseRepository", direction: "down")  // derived types
+kirograph_type_hierarchy(symbol: "PaymentService", direction: "up")    // base types
+kirograph_type_hierarchy(symbol: "IUserStore", direction: "both")      // all
+\`\`\``;
+  }
+
+  if (enableCodeHealth) {
+    toolRef += `
+
+### \`kirograph_dead_code\`: unreferenced symbols
+
+Returns unexported symbols with zero incoming edges. Good first step when cleaning up.
+
+\`\`\`
+kirograph_dead_code(limit: 50)
+\`\`\`
+
+### \`kirograph_circular_deps\`: import cycles
+
+Runs Tarjan's SCC over import edges. No parameters needed.
+
+\`\`\`
+kirograph_circular_deps()
+\`\`\``;
+  }
+
+  toolRef += `
+
+### \`kirograph_files\`: indexed file structure
+
+\`\`\`
+kirograph_files(format: "tree")                          // default
+kirograph_files(format: "flat")                          // one path per line
+kirograph_files(format: "grouped")                       // by directory
+kirograph_files(filterPath: "src/auth", maxDepth: 2)
+kirograph_files(pattern: "**/*.test.ts")
+\`\`\`
+
+### \`kirograph_status\`: index health
+
+Returns file count, symbol count, edge count, embedding coverage, DB size. Call when something feels off.`;
+
+  if (enableCodeHealth) {
+    toolRef += `
+
+### \`kirograph_hotspots\`: most-connected symbols
+
+Returns the top-N symbols by total edge degree (in + out, excluding structural \`contains\` edges). Use to find core abstractions, identify high blast-radius symbols before a refactor, or understand what the codebase revolves around.
+
+\`\`\`
+kirograph_hotspots(limit: 20)
+\`\`\`
+
+### \`kirograph_surprising\`: unexpected cross-module coupling
+
+Finds direct edges between symbols in structurally distant files, scored by path distance × edge-kind weight. Use before a refactor to discover hidden dependencies that will break. High score = more unexpected.
+
+\`\`\`
+kirograph_surprising(limit: 20)
+\`\`\`
+
+### \`kirograph_diff\`: what changed since a snapshot?
+
+Compares the current graph against a saved snapshot. Shows added/removed symbols and edges. A snapshot must exist: the user saves one with \`kirograph snapshot save <label>\` before making changes.
+
+\`\`\`
+kirograph_diff()                              // vs latest snapshot
+kirograph_diff(snapshot: "pre-refactor")     // vs named snapshot
+\`\`\``;
+  }
+
+  // Architecture tools block
+  if (enableArchitecture) {
+    toolRef += `
+
+---
+
+## Architecture tools *(require \`enableArchitecture: true\` in config)*
+
+### \`kirograph_architecture\`: **start here for architectural questions**
+
+Returns the full package graph, detected layers (api/service/data/ui/shared), and their dependency edges.
+
+\`\`\`
+kirograph_architecture()                    // packages + layers
+kirograph_architecture(level: "packages")
+kirograph_architecture(level: "layers")
+kirograph_architecture(includeFiles: true)  // add file→package assignments
+\`\`\`
+
+### \`kirograph_coupling\`: stability metrics per package
+
+Returns Ca (afferent: depended on by), Ce (efferent: depends on), and instability (Ce/(Ca+Ce)).
+- High Ca + low instability = load-bearing, safe to depend on, risky to change interface.
+- High Ce + high instability = depends on many things, safe to refactor internals.
+
+\`\`\`
+kirograph_coupling()                        // all packages, sorted by instability
+kirograph_coupling(sortBy: "afferent")     // most depended-on first
+kirograph_coupling(sortBy: "efferent")     // most outgoing deps first
+\`\`\`
+
+### \`kirograph_package\`: drill into one package
+
+Returns metadata, coupling metrics, outgoing deps, incoming dependents, and file list.
+
+\`\`\`
+kirograph_package(package: "auth")
+kirograph_package(package: "src/services", includeFiles: false)
+\`\`\``;
+  }
+
+  // Build bug fix workflow
+  let bugFixWorkflow = `**Bug fix or feature:**
+1. \`kirograph_context\`: orient, find entry points.
+2. \`kirograph_node\` with \`includeCode: true\`: read the relevant symbol.`;
+  if (trackCallSites) {
+    bugFixWorkflow += `
+3. \`kirograph_callers\` / \`kirograph_callees\`: trace the call flow.
+4. \`kirograph_impact\`: check blast radius before editing.`;
+  } else {
+    bugFixWorkflow += `
+3. \`kirograph_impact\`: check blast radius before editing.`;
+  }
+
+  // Build workflows section
+  let workflows = `
+
+---
+
+## Workflows
+
+${bugFixWorkflow}`;
+
+  if (enableCodeHealth) {
+    workflows += `
+
+**Refactor planning:**
+1. \`kirograph_hotspots\`: identify the most-connected symbols; changing these is risky.
+2. \`kirograph_surprising\`: surface hidden coupling that will break.
+3. \`kirograph_impact\` on specific targets: confirm blast radius.
+4. \`kirograph_diff\` after the refactor: verify the structural change matches intent.`;
+  }
+
+  if (enableArchitecture) {
+    workflows += `
+
+**Architectural review:**
+1. \`kirograph_architecture\`: get the package and layer map.
+2. \`kirograph_coupling\`: find the most stable (high Ca) and most volatile (high instability) packages.
+3. \`kirograph_package\`: drill into any package of interest.
+4. \`kirograph_circular_deps\`: check for import cycles.`;
+  }
+
+  if (enableCodeHealth) {
+    workflows += `
+
+**Code cleanup:**
+1. \`kirograph_dead_code\`: find unreferenced unexported symbols.
+2. \`kirograph_circular_deps\`: find import cycles to untangle.
+3. \`kirograph_surprising\`: find unexpected coupling to decouple.`;
+  }
+
+  // Build workflow steering rows
+  const workflowRows: string[] = [
+    ...(enableSecurity ? ['| security audit, check vulnerabilities, CVE review | `.kiro/steering/kirograph-security.md` |'] : []),
+    '| code review, review this PR | `.kiro/steering/kirograph-review.md` |',
+    '| debug, trace this bug, root cause | `.kiro/steering/kirograph-debug.md` |',
+    ...(enableArchitecture ? ['| architecture, understand structure, package map | `.kiro/steering/kirograph-architecture.md` |'] : []),
+    '| onboard, understand this codebase | `.kiro/steering/kirograph-onboard.md` |',
+    '| refactor, rename, safe refactoring | `.kiro/steering/kirograph-refactor.md` |',
+    ...(enableMemory ? ['| memory, recall decisions, conflict detection | `.kiro/steering/kirograph-mem-workflow.md` |'] : []),
+    ...(enableWiki ? ['| wiki, update knowledge base, ingest docs | `.kiro/steering/kirograph-wiki-workflow.md` |'] : []),
+  ];
+
+  const workflowSection = `
+
+---
+
+## Workflow steering files
+
+KiroGraph installs task-specific steering files in \`.kiro/steering/\`. They are not always active — load them on demand.
+
+**In Kiro IDE:** type \`/kirograph-review\`, \`/kirograph-security\`, etc. to activate a workflow for the current session.
+
+**In Kiro CLI / other agents:** when the user asks for a specific workflow or you recognize the intent, read the file directly:
+
+\`\`\`
+Read file: .kiro/steering/kirograph-security.md
+Read file: .kiro/steering/kirograph-review.md
+\`\`\`
+
+| User intent | File to load |
+|-------------|-------------|
+${workflowRows.join('\n')}
+
+Each file contains numbered steps, exact tool calls, and an interpretation reference. Follow the steps in order.
+
+---
+
+## If \`.kirograph/\` does NOT exist
+
+Ask the user: "This project doesn't have KiroGraph initialized. Run \`kirograph init -i\` to build a code knowledge graph for faster exploration?"`;
+
+  // Compose the full content
+  let content = `---
+inclusion: always
+---
+
+# KiroGraph
+
+KiroGraph builds a semantic knowledge graph of your codebase. Use its MCP tools instead of grep/glob/file reads whenever \`.kirograph/\` exists in the project.
+
+## Quick decision guide
+
+| Question | Tool |
+|----------|------|
+${guideRows.join('\n')}
+
+---
+${toolRef}
+${workflows}
+${workflowSection}
+`;
 
   // Insert compression section before the "If .kirograph/ does NOT exist" section
   if (enableCompression && shellCompressionLevel !== 'off') {
@@ -369,35 +462,13 @@ function buildSteeringContent(opts?: SteeringOptions): string {
     );
   }
 
-  // Remove compression tools from decision guide if disabled
-  if (!enableCompression) {
-    content = content.replace('| Run a command with token savings | `kirograph_exec` |\n', '');
-    content = content.replace('| Check token savings stats | `kirograph_gain` |\n', '');
-  }
-
-  // Remove security tools from decision guide if disabled
-  if (!opts?.enableSecurity) {
-    content = content.replace('| Are there vulnerable dependencies? | `kirograph_security` |\n', '');
-    content = content.replace('| Which CVEs affect my project? | `kirograph_vulns` |\n', '');
-    content = content.replace('| Is this vulnerability reachable? | `kirograph_reachability` |\n', '');
-    content = content.replace('| What licenses do my dependencies use? | `kirograph_licenses` |\n', '');
-    content = content.replace('| Are dependencies outdated? | `kirograph_staleness` |\n', '');
-    content = content.replace('| Generate SBOM/VEX | `kirograph_sbom` / `kirograph_vex` |\n', '');
-    content = content.replace('| Add a private CVE | `kirograph_vuln_add` |\n', '');
-  }
-
-  // Remove pattern tools from decision guide if disabled
-  if (!opts?.enablePatterns) {
-    content = content.replace('| Find structural code patterns? | `kirograph_live_search` |\n', '');
-  }
-
   const caveman = cavemanMode && cavemanMode !== 'off' ? CAVEMAN_RULES[cavemanMode] : null;
   if (caveman) {
     content = content.trimEnd() + '\n\n' + caveman + '\n';
   }
 
   // Memory section
-  if (opts?.enableMemory) {
+  if (enableMemory) {
     const memorySection = `
 ## Memory
 
@@ -432,7 +503,7 @@ For the full conflict-detection workflow, load: \`.kiro/steering/kirograph-mem-w
   }
 
   // Documentation section
-  if (opts?.enableDocs) {
+  if (enableDocs) {
     const docsSection = `
 ## Documentation
 
@@ -455,7 +526,7 @@ and gives you structured navigation instead of raw file content.
   }
 
   // Data section
-  if (opts?.enableData) {
+  if (enableData) {
     const dataSection = `
 ## Data
 
@@ -486,7 +557,7 @@ kirograph_data_aggregate(dataset: "data-orders", groupBy: ["region"], metrics: [
   }
 
   // Patterns section
-  if (opts?.enablePatterns) {
+  if (enablePatterns) {
     const patternsSection = `
 ## Pattern Matching
 
@@ -506,7 +577,7 @@ KiroGraph can search for structural code patterns using @ast-grep/napi.
   }
 
   // Wiki section
-  if (opts?.enableWiki) {
+  if (enableWiki) {
     const wikiSection = `
 ## Wiki
 
@@ -540,7 +611,7 @@ before starting work. Use it to save knowledge that should survive context reset
   }
 
   // Security section
-  if (opts?.enableSecurity) {
+  if (enableSecurity) {
     const securitySection = `
 ## Security
 
@@ -610,8 +681,44 @@ export function writeSteering(kiroDir: string, opts?: SteeringOptions | CavemanM
 }
 
 function writeWorkflowSteering(steeringDir: string, opts?: SteeringOptions): void {
-  const workflows: Record<string, string> = {
-    'kirograph-review.md': `---
+  const trackCallSites = opts?.trackCallSites ?? false;
+  const enableCodeHealth = opts?.enableCodeHealth ?? false;
+  const enableArchitecture = opts?.enableArchitecture ?? false;
+  const enableAdvancedAnalysis = opts?.enableAdvancedAnalysis ?? false;
+
+  // kirograph-review.md
+  const reviewSteps: string[] = [
+    `1. **Understand the change scope**
+   \`\`\`
+   kirograph_context(task: "<describe what changed>")
+   \`\`\``,
+    `2. **Analyze blast radius**
+   For each key symbol that was modified:
+   \`\`\`
+   kirograph_impact(symbol: "<changed symbol>", depth: 2)
+   \`\`\``,
+  ];
+  if (trackCallSites) {
+    reviewSteps.push(`3. **Check test coverage**
+   \`\`\`
+   kirograph_callers(symbol: "<changed symbol>")
+   \`\`\`
+   Look for test files among the callers. Flag untested changes.`);
+  }
+  if (enableCodeHealth) {
+    const n = reviewSteps.length + 1;
+    reviewSteps.push(`${n}. **Look for surprising coupling**
+   \`\`\`
+   kirograph_surprising(limit: 10)
+   \`\`\``);
+  }
+  const findingsN = reviewSteps.length + 1;
+  reviewSteps.push(`${findingsN}. **Produce findings** grouped by risk level (high/medium/low) with:
+   - What changed and why it matters
+   - Test coverage status
+   - Suggested improvements
+   - Overall merge recommendation`);
+  fs.writeFileSync(path.join(steeringDir, 'kirograph-review.md'), `---
 inclusion: manual
 ---
 
@@ -621,36 +728,44 @@ Follow these steps for a structured, risk-aware code review using the knowledge 
 
 ## Steps
 
-1. **Understand the change scope**
-   \`\`\`
-   kirograph_context(task: "<describe what changed>")
-   \`\`\`
+${reviewSteps.join('\n\n')}
+`);
 
-2. **Analyze blast radius**
-   For each key symbol that was modified:
+  // kirograph-debug.md
+  const debugSteps: string[] = [
+    `1. **Find related code**
    \`\`\`
-   kirograph_impact(symbol: "<changed symbol>", depth: 2)
+   kirograph_search(query: "<error message or symptom keywords>")
+   \`\`\``,
+    `2. **Get full context**
    \`\`\`
-
-3. **Check test coverage**
+   kirograph_context(task: "<describe the bug>")
+   \`\`\``,
+  ];
+  if (trackCallSites) {
+    debugSteps.push(`3. **Trace the call chain**
    \`\`\`
-   kirograph_callers(symbol: "<changed symbol>")
+   kirograph_callers(symbol: "<suspected function>")
+   kirograph_callees(symbol: "<suspected function>")
+   \`\`\``);
+  }
+  if (enableCodeHealth) {
+    const n = debugSteps.length + 1;
+    debugSteps.push(`${n}. **Check what changed recently**
    \`\`\`
-   Look for test files among the callers. Flag untested changes.
-
-4. **Look for surprising coupling**
+   kirograph_diff()
+   \`\`\``);
+  }
+  const blastN = debugSteps.length + 1;
+  debugSteps.push(`${blastN}. **Understand blast radius**
    \`\`\`
-   kirograph_surprising(limit: 10)
-   \`\`\`
-
-5. **Produce findings** grouped by risk level (high/medium/low) with:
-   - What changed and why it matters
-   - Test coverage status
-   - Suggested improvements
-   - Overall merge recommendation
-`,
-
-    'kirograph-debug.md': `---
+   kirograph_impact(symbol: "<root cause symbol>", depth: 3)
+   \`\`\``);
+  const debugTips: string[] = [];
+  if (trackCallSites) debugTips.push('- Check both callers and callees to understand the full context');
+  if (enableCodeHealth) debugTips.push('- Recent changes (via diff) are the most common source of new issues');
+  debugTips.push('- Use `kirograph_path` to trace how two symbols are connected');
+  fs.writeFileSync(path.join(steeringDir, 'kirograph-debug.md'), `---
 inclusion: manual
 ---
 
@@ -660,85 +775,51 @@ Follow these steps to systematically trace and debug issues using the knowledge 
 
 ## Steps
 
-1. **Find related code**
-   \`\`\`
-   kirograph_search(query: "<error message or symptom keywords>")
-   \`\`\`
-
-2. **Get full context**
-   \`\`\`
-   kirograph_context(task: "<describe the bug>")
-   \`\`\`
-
-3. **Trace the call chain**
-   \`\`\`
-   kirograph_callers(symbol: "<suspected function>")
-   kirograph_callees(symbol: "<suspected function>")
-   \`\`\`
-
-4. **Check what changed recently**
-   \`\`\`
-   kirograph_diff()
-   \`\`\`
-
-5. **Understand blast radius**
-   \`\`\`
-   kirograph_impact(symbol: "<root cause symbol>", depth: 3)
-   \`\`\`
+${debugSteps.join('\n\n')}
 
 ## Tips
-- Check both callers and callees to understand the full context
-- Recent changes (via diff) are the most common source of new issues
-- Use \`kirograph_path\` to trace how two symbols are connected
-`,
+${debugTips.join('\n')}
+`);
 
-    'kirograph-architecture.md': `---
-inclusion: manual
----
-
-# KiroGraph: Architecture Exploration Workflow
-
-Follow these steps to understand the high-level structure of the codebase.
-
-## Steps
-
-1. **Get project overview**
+  // kirograph-onboard.md
+  const onboardSteps: string[] = [
+    `1. **Project overview**
    \`\`\`
    kirograph_status()
+   \`\`\``,
+    `2. **File structure**
    \`\`\`
-
-2. **View architecture**
+   kirograph_files(format: "tree", maxDepth: 2)
+   \`\`\``,
+  ];
+  if (enableCodeHealth) {
+    onboardSteps.push(`3. **Key entry points**
+   \`\`\`
+   kirograph_hotspots(limit: 15)
+   \`\`\``);
+  }
+  if (enableArchitecture) {
+    const n = onboardSteps.length + 1;
+    onboardSteps.push(`${n}. **Architecture layers**
    \`\`\`
    kirograph_architecture()
+   \`\`\``);
+  }
+  const exploreN = onboardSteps.length + 1;
+  onboardSteps.push(`${exploreN}. **Explore a specific area**
    \`\`\`
-
-3. **Check coupling health**
+   kirograph_context(task: "<area you want to understand>")
+   \`\`\``);
+  const symbolN = onboardSteps.length + 1;
+  onboardSteps.push(`${symbolN}. **Understand a key symbol**
    \`\`\`
-   kirograph_coupling(sortBy: "instability")
-   \`\`\`
-
-4. **Find core abstractions**
-   \`\`\`
-   kirograph_hotspots(limit: 20)
-   \`\`\`
-
-5. **Detect hidden dependencies**
-   \`\`\`
-   kirograph_surprising(limit: 15)
-   \`\`\`
-
-6. **Check for cycles**
-   \`\`\`
-   kirograph_circular_deps()
-   \`\`\`
-
-## Interpretation
-- High Ca (afferent) = load-bearing, risky to change interface
-- High Ce (efferent) = depends on many things, safe to refactor internals
-- Surprising edges = hidden coupling that may break during refactoring
-`,
-
-    'kirograph-onboard.md': `---
+   kirograph_node(symbol: "<symbol name>", includeCode: true)
+   \`\`\``);
+  const onboardTips: string[] = ['- Start broad (status, files) then narrow down'];
+  if (enableCodeHealth) onboardTips[0] = '- Start broad (status, files, hotspots) then narrow down';
+  if (enableAdvancedAnalysis) onboardTips.push('- Use `kirograph_type_hierarchy` to understand inheritance patterns');
+  if (trackCallSites) onboardTips.push('- Use `kirograph_callees` on entry points to trace execution flow');
+  fs.writeFileSync(path.join(steeringDir, 'kirograph-onboard.md'), `---
 inclusion: manual
 ---
 
@@ -748,43 +829,51 @@ Follow these steps to quickly understand a new codebase.
 
 ## Steps
 
-1. **Project overview**
-   \`\`\`
-   kirograph_status()
-   \`\`\`
-
-2. **File structure**
-   \`\`\`
-   kirograph_files(format: "tree", maxDepth: 2)
-   \`\`\`
-
-3. **Key entry points**
-   \`\`\`
-   kirograph_hotspots(limit: 15)
-   \`\`\`
-
-4. **Architecture layers**
-   \`\`\`
-   kirograph_architecture()
-   \`\`\`
-
-5. **Explore a specific area**
-   \`\`\`
-   kirograph_context(task: "<area you want to understand>")
-   \`\`\`
-
-6. **Understand a key symbol**
-   \`\`\`
-   kirograph_node(symbol: "<symbol name>", includeCode: true)
-   \`\`\`
+${onboardSteps.join('\n\n')}
 
 ## Tips
-- Start broad (status, files, hotspots) then narrow down
-- Use \`kirograph_type_hierarchy\` to understand inheritance patterns
-- Use \`kirograph_callees\` on entry points to trace execution flow
-`,
+${onboardTips.join('\n')}
+`);
 
-    'kirograph-refactor.md': `---
+  // kirograph-refactor.md
+  const refactorSteps: string[] = [
+    `1. **Understand what you're changing**
+   \`\`\`
+   kirograph_node(symbol: "<target symbol>", includeCode: true)
+   \`\`\``,
+    `2. **Check blast radius**
+   \`\`\`
+   kirograph_impact(symbol: "<target symbol>", depth: 3)
+   \`\`\``,
+  ];
+  if (trackCallSites) {
+    refactorSteps.push(`3. **Find all callers (rename preview)**
+   \`\`\`
+   kirograph_callers(symbol: "<target symbol>", limit: 50)
+   \`\`\``);
+  }
+  if (enableCodeHealth) {
+    let n = refactorSteps.length + 1;
+    refactorSteps.push(`${n}. **Check for cycles that might complicate the refactor**
+   \`\`\`
+   kirograph_circular_deps()
+   \`\`\``);
+    n++;
+    refactorSteps.push(`${n}. **Find dead code to clean up**
+   \`\`\`
+   kirograph_dead_code(limit: 30)
+   \`\`\``);
+    n++;
+    refactorSteps.push(`${n}. **Verify after changes**
+   Run \`kirograph sync\` then:
+   \`\`\`
+   kirograph_diff()
+   \`\`\``);
+  }
+  const refactorChecks: string[] = ['- Always check `kirograph_impact` before major refactors'];
+  if (trackCallSites) refactorChecks.push('- Use `kirograph_callers` as a rename preview (all locations that reference the symbol)');
+  if (enableCodeHealth) refactorChecks.push('- After changes, use `kirograph_diff` to verify only intended symbols changed');
+  fs.writeFileSync(path.join(steeringDir, 'kirograph-refactor.md'), `---
 inclusion: manual
 ---
 
@@ -794,53 +883,61 @@ Follow these steps to plan and execute safe refactoring.
 
 ## Steps
 
-1. **Understand what you're changing**
-   \`\`\`
-   kirograph_node(symbol: "<target symbol>", includeCode: true)
-   \`\`\`
-
-2. **Check blast radius**
-   \`\`\`
-   kirograph_impact(symbol: "<target symbol>", depth: 3)
-   \`\`\`
-
-3. **Find all callers (rename preview)**
-   \`\`\`
-   kirograph_callers(symbol: "<target symbol>", limit: 50)
-   \`\`\`
-
-4. **Check for cycles that might complicate the refactor**
-   \`\`\`
-   kirograph_circular_deps()
-   \`\`\`
-
-5. **Find dead code to clean up**
-   \`\`\`
-   kirograph_dead_code(limit: 30)
-   \`\`\`
-
-6. **Verify after changes**
-   Run \`kirograph sync\` then:
-   \`\`\`
-   kirograph_diff()
-   \`\`\`
+${refactorSteps.join('\n\n')}
 
 ## Safety Checks
-- Always check \`kirograph_impact\` before major refactors
-- Use \`kirograph_callers\` as a rename preview (all locations that reference the symbol)
-- After changes, use \`kirograph_diff\` to verify only intended symbols changed
-`,
-  };
+${refactorChecks.join('\n')}
+`);
 
   // kirograph-architecture.md only when enableArchitecture is true
-  if (opts?.enableArchitecture) {
-    fs.writeFileSync(path.join(steeringDir, 'kirograph-architecture.md'), workflows['kirograph-architecture.md']!);
-  }
+  if (enableArchitecture) {
+    const archSteps: string[] = [
+      `1. **Get project overview**
+   \`\`\`
+   kirograph_status()
+   \`\`\``,
+      `2. **View architecture**
+   \`\`\`
+   kirograph_architecture()
+   \`\`\``,
+      `3. **Check coupling health**
+   \`\`\`
+   kirograph_coupling(sortBy: "instability")
+   \`\`\``,
+    ];
+    if (enableCodeHealth) {
+      let n = archSteps.length + 1;
+      archSteps.push(`${n}. **Find core abstractions**
+   \`\`\`
+   kirograph_hotspots(limit: 20)
+   \`\`\``);
+      n++;
+      archSteps.push(`${n}. **Detect hidden dependencies**
+   \`\`\`
+   kirograph_surprising(limit: 15)
+   \`\`\``);
+      n++;
+      archSteps.push(`${n}. **Check for cycles**
+   \`\`\`
+   kirograph_circular_deps()
+   \`\`\``);
+    }
+    fs.writeFileSync(path.join(steeringDir, 'kirograph-architecture.md'), `---
+inclusion: manual
+---
 
-  // Always write the non-conditional workflow files
-  for (const [filename, content] of Object.entries(workflows)) {
-    if (filename === 'kirograph-architecture.md') continue; // handled above
-    fs.writeFileSync(path.join(steeringDir, filename), content);
+# KiroGraph: Architecture Exploration Workflow
+
+Follow these steps to understand the high-level structure of the codebase.
+
+## Steps
+
+${archSteps.join('\n\n')}
+
+## Interpretation
+- High Ca (afferent) = load-bearing, risky to change interface
+- High Ce (efferent) = depends on many things, safe to refactor internals
+${enableCodeHealth ? '- Surprising edges = hidden coupling that may break during refactoring\n' : ''}`);
   }
 
   // Security workflow — only when enableSecurity is true
