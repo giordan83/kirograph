@@ -148,6 +148,8 @@ export interface KiroGraphConfig {
   enableAdvancedAnalysis: boolean;
   /** Enable agent utility tools (file caching, budget tracking). Default: true. */
   enableAgentUtils: boolean;
+  /** Enable general-purpose compression tool (kirograph_compress). Default: false. */
+  enableGeneralCompression: boolean;
   /** Derived from shellCompressionLevel — true when compression is enabled. Controls kirograph_exec. */
   enableShellExec: boolean;
   /** Path to a directory of user-supplied YAML rule files. Merged with bundled library (user rules win on id conflict). Default: undefined. */
@@ -199,7 +201,7 @@ const KNOWN_FIELDS = new Set<string>([
   'dataContextLimit', 'dataMaxFileSize', 'dataMaxRows', 'dataQueryLimit', 'dataMaxResponseTokens',
   'enableSecurity', 'securityDatabases', 'securityAutoEnrich', 'securityEnrichMaxAgeDays', 'securityLicensePolicy',
   'enablePatterns', 'patternLibraryPath', 'patternSeverityThreshold',
-  'enableCodeHealth', 'enableAdvancedAnalysis', 'enableAgentUtils',
+  'enableCodeHealth', 'enableAdvancedAnalysis', 'enableAgentUtils', 'enableGeneralCompression',
   'contextBudget',
   // Legacy aliases / derived fields (accepted but ignored or recomputed)
   'enableCompression', 'compressionLevel', 'enableShellExec',
@@ -299,6 +301,7 @@ export function createDefaultConfig(_projectRoot?: string): KiroGraphConfig {
     enableCodeHealth: true,
     enableAdvancedAnalysis: true,
     enableAgentUtils: true,
+    enableGeneralCompression: false,
     enableShellExec: true,
   };
 }
@@ -617,6 +620,9 @@ export function validateConfig(config: unknown): KiroGraphConfig {
   const enableAgentUtils = typeof raw.enableAgentUtils === 'boolean'
     ? raw.enableAgentUtils
     : defaults.enableAgentUtils;
+  const enableGeneralCompression = typeof raw.enableGeneralCompression === 'boolean'
+    ? raw.enableGeneralCompression
+    : defaults.enableGeneralCompression;
 
   // Dependency constraint: enableSecurity requires enableArchitecture
   let finalEnableArchitecture = enableArchitecture;
@@ -717,6 +723,7 @@ export function validateConfig(config: unknown): KiroGraphConfig {
     enableCodeHealth,
     enableAdvancedAnalysis,
     enableAgentUtils,
+    enableGeneralCompression,
     enableShellExec: shellCompressionLevel !== 'off',
     ...(architectureLayers !== undefined ? { architectureLayers } : {}),
     ...(contextBudget !== undefined ? { contextBudget } : {}),

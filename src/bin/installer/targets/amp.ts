@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
   KIROGRAPH_SERVER_NAME,
+  LateInstallOptions,
   readJson,
   writeJson,
 } from '../common';
@@ -25,15 +25,15 @@ export function installAmpEarly(projectRoot: string): void {
   console.log(`  ✓ Sourcegraph Amp MCP server registered in ${configPath}`);
 }
 
-export function installAmpLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installAmpLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'amp.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Amp instructions written to ${instructionsPath}`);
 
   const ampInstructionsPath = path.join(projectRoot, '.amp', 'instructions.md');
   ensureDir(path.dirname(ampInstructionsPath));
-  fs.writeFileSync(ampInstructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(ampInstructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Amp instructions written to ${ampInstructionsPath}`);
 }
 

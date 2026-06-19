@@ -7,13 +7,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
   writeJson,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -37,19 +37,19 @@ export function installContinueEarly(projectRoot: string): void {
   console.log(`  ✓ Continue MCP server registered in ${mcpPath}`);
 }
 
-export function installContinueLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installContinueLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'continue.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Continue instructions written to ${instructionsPath}`);
 
   // Write rules file in .continue/rules/
   const rulesDir = path.join(projectRoot, '.continue', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, RULES_FILE);
-  fs.writeFileSync(rulePath, buildAgentInstructions(opts));
+  fs.writeFileSync(rulePath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Continue rule written to ${rulePath}`);
 }
 

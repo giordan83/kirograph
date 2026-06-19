@@ -8,7 +8,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -17,6 +16,7 @@ import {
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
   KIROGRAPH_SERVER_NAME,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -42,12 +42,12 @@ export function installClineEarly(projectRoot: string): void {
   console.log(`  ✓ Cline MCP server registered in ${mcpPath}`);
 }
 
-export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installClineLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, true);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'cline.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Cline instructions written to ${instructionsPath}`);
 
   // Write rules file inside .clinerules/ directory
@@ -58,7 +58,7 @@ export function installClineLate(projectRoot: string, cavemanMode?: CavemanMode 
   }
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, CLINE_RULES_FILE);
-  fs.writeFileSync(rulePath, buildAgentInstructions(opts));
+  fs.writeFileSync(rulePath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Cline rule written to ${rulePath}`);
 
   // Write hook script

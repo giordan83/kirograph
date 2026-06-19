@@ -1,5 +1,5 @@
 import type { CavemanMode } from '../caveman';
-import type { InstallTarget } from '../common';
+import type { InstallTarget, LateInstallOptions } from '../common';
 import { installKiroEarly, installKiroLate, printKiroNextSteps } from './kiro';
 import { installClaudeEarly, installClaudeLate, printClaudeNextSteps, uninitClaude } from './claude';
 import { installCodexEarly, installCodexLate, printCodexNextSteps, uninitCodex } from './codex';
@@ -32,7 +32,7 @@ import { installQwenEarly, installQwenLate, printQwenNextSteps, uninitQwen } fro
 export interface TargetInstaller {
   label: string;
   installEarly(projectRoot: string, kiroHookFormat?: 'v1-legacy' | 'v2'): void;
-  installLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean, enableWatchmen?: boolean, watchmenSynthesisMode?: 'local' | 'agent', enableWiki?: boolean, wikiSynthesisMode?: 'local' | 'agent', wikiLocalModel?: string, enableCodeHealth?: boolean, enableAdvancedAnalysis?: boolean, enableAgentUtils?: boolean, trackCallSites?: boolean, kiroHookFormat?: 'v1-legacy' | 'v2'): void;
+  installLate(projectRoot: string, opts: LateInstallOptions): void;
   printNextSteps(projectRoot: string): void;
   uninit?(projectRoot: string): void;
 }

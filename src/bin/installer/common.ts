@@ -4,6 +4,29 @@ import { KIROGRAPH_TOOL_NAMES } from '../../mcp/tool-names';
 import type { InstructionOptions } from './instructions';
 import type { CavemanMode } from './caveman';
 
+/** Single options object passed to every target's installLate(). */
+export interface LateInstallOptions {
+  cavemanMode?: CavemanMode | 'off';
+  shellCompressionLevel?: string;
+  enableMemory?: boolean;
+  enableDocs?: boolean;
+  enableData?: boolean;
+  enableSecurity?: boolean;
+  enableArchitecture?: boolean;
+  enablePatterns?: boolean;
+  enableWatchmen?: boolean;
+  watchmenSynthesisMode?: 'local' | 'agent';
+  enableWiki?: boolean;
+  wikiSynthesisMode?: 'local' | 'agent';
+  wikiLocalModel?: string;
+  enableCodeHealth?: boolean;
+  enableAdvancedAnalysis?: boolean;
+  enableAgentUtils?: boolean;
+  enableGeneralCompression?: boolean;
+  trackCallSites?: boolean;
+  kiroHookFormat?: 'v1-legacy' | 'v2';
+}
+
 export type InstallTarget = 'kiro' | 'claude' | 'codex' | 'cursor' | 'antigravity' | 'opencode' | 'windsurf' | 'cline' | 'copilot' | 'copilot-cli' | 'junie' | 'gemini-cli' | 'continue' | 'roo' | 'warp' | 'aider' | 'trae' | 'augment' | 'kilo' | 'amp' | 'devin' | 'replit' | 'goose' | 'openhands' | 'tabnine' | 'mistral-vibe' | 'ibm-bob' | 'crush' | 'droid-factory' | 'forgecode' | 'iflow' | 'qwen' | 'rovo' | 'qoder';
 
 export const KIROGRAPH_SERVER_NAME = 'kirograph';
@@ -125,26 +148,22 @@ function escapeRegExp(s: string): string {
  * Build InstructionOptions from the installLate parameters.
  * Used by all targets to pass full feature config to buildAgentInstructions.
  */
-export function buildInstructionOpts(
-  cavemanMode?: CavemanMode | 'off',
-  shellCompressionLevel?: string,
-  enableMemory?: boolean,
-  hasHooks?: boolean,
-  enableDocs?: boolean,
-  enableData?: boolean,
-  enableSecurity?: boolean,
-  enableArchitecture?: boolean,
-  enablePatterns?: boolean,
-): InstructionOptions {
+export function buildInstructionOpts(opts: LateInstallOptions, hasHooks?: boolean): InstructionOptions {
   return {
-    cavemanMode,
-    shellCompressionLevel: (shellCompressionLevel as InstructionOptions['shellCompressionLevel']) ?? undefined,
-    enableArchitecture: enableArchitecture ?? false,
-    enableMemory: enableMemory ?? false,
-    enableDocs: enableDocs ?? false,
-    enableData: enableData ?? false,
-    enableSecurity: enableSecurity ?? false,
-    enablePatterns: enablePatterns ?? false,
+    cavemanMode: opts.cavemanMode,
+    shellCompressionLevel: (opts.shellCompressionLevel as InstructionOptions['shellCompressionLevel']) ?? undefined,
+    enableArchitecture: opts.enableArchitecture ?? false,
+    enableMemory: opts.enableMemory ?? false,
+    enableDocs: opts.enableDocs ?? false,
+    enableData: opts.enableData ?? false,
+    enableSecurity: opts.enableSecurity ?? false,
+    enablePatterns: opts.enablePatterns ?? false,
+    enableWiki: opts.enableWiki ?? false,
+    enableCodeHealth: opts.enableCodeHealth ?? false,
+    enableAdvancedAnalysis: opts.enableAdvancedAnalysis ?? false,
+    enableAgentUtils: opts.enableAgentUtils ?? false,
+    enableGeneralCompression: opts.enableGeneralCompression ?? false,
+    trackCallSites: opts.trackCallSites ?? false,
     hasHooks: hasHooks ?? false,
   };
 }

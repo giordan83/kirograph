@@ -74,6 +74,8 @@ KiroGraph stores its config in `.kirograph/config.json`. You can edit it directl
 | **Agent Behavior** | | | |
 | `cavemanMode` | string | `off` | Communication style: `off`, `lite`, `full`, `ultra` |
 | `shellCompressionLevel` | string | `normal` | Shell compression: `off`, `normal`, `aggressive`, `ultra` |
+| `enableAgentUtils` | boolean | `false` | Enable agent utility tools: `kirograph_read` (cached file reads + 7 modes), `kirograph_retrieve` (CCR), `kirograph_budget` (session budget tracking) |
+| `enableGeneralCompression` | boolean | `false` | Enable `kirograph_compress` — on-demand compression for arbitrary text. Two engines: rtk-style shell filters (with `command` hint) and caveman grammar (without). Independent from `shellCompressionLevel` and `cavemanMode`. |
 | `minLogLevel` | string | `warn` | Log level: `debug`, `info`, `warn`, `error` |
 
 Default exclude patterns: `node_modules/**`, `dist/**`, `build/**`, `.git/**`, `*.min.js`, `.kirograph/**`

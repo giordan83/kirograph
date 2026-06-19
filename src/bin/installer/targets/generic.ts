@@ -6,8 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
-import { ensureDir, buildInstructionOpts, printMcpCommand } from '../common';
+import { ensureDir, buildInstructionOpts, printMcpCommand, type LateInstallOptions } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
 export interface GenericTargetConfig {
@@ -20,10 +19,10 @@ export function makeGenericInstaller(config: GenericTargetConfig) {
     // No project-level MCP config for these targets.
   }
 
-  function installLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+  function installLate(projectRoot: string, opts: LateInstallOptions): void {
     const instructionsPath = path.join(projectRoot, '.kirograph', `${config.id}.md`);
     ensureDir(path.dirname(instructionsPath));
-    fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+    fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts)));
     console.log(`  ✓ ${config.label} instructions written to ${instructionsPath}`);
   }
 

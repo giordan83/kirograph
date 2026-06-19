@@ -20,7 +20,7 @@ import { ask, askToggle, arrowSelect } from './prompts';
 import { promptConfigOptions } from './config-prompt';
 import { openTypesenseDashboard } from './dashboard';
 import { ensureQdrantUI, openQdrantDashboard } from './qdrant-dashboard';
-import type { InstallTarget } from './common';
+import type { InstallTarget, LateInstallOptions } from './common';
 import { getTargetInstaller } from './targets';
 import type { CavemanMode } from './caveman';
 import { applyImportedGlobalHooks } from '../../hooks/import-prompt';
@@ -140,6 +140,7 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
     let enableCodeHealth = false;
     let enableAdvancedAnalysis = false;
     let enableAgentUtils = false;
+    let enableGeneralCompression = false;
     let trackCallSites = false;
     let shouldOfferIndex = false;
     let typesenseDashboard = false;
@@ -165,6 +166,7 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         enableCodeHealth = config.enableCodeHealth ?? true;
         enableAdvancedAnalysis = config.enableAdvancedAnalysis ?? false;
         enableAgentUtils = config.enableAgentUtils ?? true;
+        enableGeneralCompression = config.enableGeneralCompression ?? false;
         trackCallSites = config.trackCallSites ?? false;
         console.log(`  ✓ Reusing existing KiroGraph data in ${cwd}/.kirograph/`);
         console.log(`  • semanticEngine: ${config.semanticEngine}`);
@@ -219,6 +221,7 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         enableCodeHealth = patch.enableCodeHealth ?? false;
         enableAdvancedAnalysis = patch.enableAdvancedAnalysis ?? false;
         enableAgentUtils = patch.enableAgentUtils ?? false;
+        enableGeneralCompression = patch.enableGeneralCompression ?? false;
         trackCallSites = patch.trackCallSites ?? false;
         typesenseDashboard = patch.typesenseDashboard;
         qdrantDashboard = patch.qdrantDashboard;
@@ -388,7 +391,13 @@ export async function runInstaller(target: InstallTarget = 'kiro', opts: { yes?:
         }
       }
 
-      installer.installLate(cwd, cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, wikiLocalModel, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, trackCallSites, kiroHookFormat);
+      const lateOpts: LateInstallOptions = {
+        cavemanMode, shellCompressionLevel, enableMemory, enableDocs, enableData, enableSecurity,
+        enableArchitecture, enablePatterns, enableWatchmen, watchmenSynthesisMode, enableWiki,
+        wikiSynthesisMode, wikiLocalModel, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils,
+        enableGeneralCompression, trackCallSites, kiroHookFormat,
+      };
+      installer.installLate(cwd, lateOpts);
       if (target === 'kiro' && hooksToImport && hooksToImport.length > 0) {
         applyImportedGlobalHooks(cwd, hooksToImport);
       }

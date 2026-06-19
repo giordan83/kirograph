@@ -14,6 +14,7 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 | [cavemem](https://github.com/JuliusBrussee/cavemem) | JuliusBrussee | TypeScript | Persistent cross-agent memory | 457 ⭐ |
 | [rtk](https://github.com/rtk-ai/rtk) | rtk-ai | Rust | Shell output compression proxy | 54.8k ⭐ |
 | [lean-ctx](https://github.com/yvgude/lean-ctx) | yvgude | Rust | Cognitive context layer (cache + compress + memory) | 2.2k ⭐ |
+| [headroom](https://github.com/chopratejas/headroom) | chopratejas | Python | CCR pattern, dual-engine compression, KV cache prefix stability | — |
 | [Engram](https://github.com/Gentleman-Programming/engram) | Gentleman-Programming | Go | Persistent memory MCP server | — |
 | [watchmen](https://github.com/firstbatchxyz/watchmen) | firstbatchxyz | Python | Session-mining + AGENTS.md synthesis | — |
 | [turboquant-js](https://github.com/danilodevhub/turboquant-js) | danilodevhub | JavaScript | WHT + Lloyd-Max vector quantization | — |
@@ -23,6 +24,8 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 > **Note:** jCodeMunch, jDocMunch, and jDataMunch are three separate MCP servers by the same author (J. Gravelle), each focused on a different data type. They share a design philosophy (token-efficient retrieval via structured indexing) but run as independent servers.
 
 > **Note on lean-ctx:** lean-ctx is a context transport layer (file read caching, compression, budget governance) rather than a graph or analysis tool. It does not offer symbol-level analysis, vulnerability scanning, or memory — its columns in the matrices below are all `—`.
+
+> **Note on headroom:** headroom is a token compression toolkit focused on the CCR (Cached Content Retrieval) pattern, dual-engine compression (shell + prose), and KV cache prefix stability. KiroGraph adopts the CCR pattern (`kirograph_retrieve`), the dual-engine approach (`kirograph_compress`), and deterministic cache markers. headroom columns appear only in the Token Optimization matrix where the comparison is relevant.
 
 > **Note on LLM Wiki:** The wiki module is inspired by [Andrej Karpathy's LLM Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — a design sketch rather than a published package. KiroGraph implements the three-op pattern (ingest → apply → lint), WIKI_DIFF block format, FTS5 search, conflict resolution, and local model synthesis.
 
@@ -159,16 +162,21 @@ A comparison of KiroGraph with the open-source projects that inspired it or oper
 
 ### Token Optimization
 
-| Feature | KiroGraph | CodeGraph | code-review-graph | jCodeMunch | jDocMunch | jDataMunch | caveman | cavemem | rtk | lean-ctx | engram |
-|---------|:---------:|:---------:|:-----------------:|:----------:|:---------:|:----------:|:-------:|:-------:|:---:|:--------:|:------:|
-| Shell output compression | ✅ | — | — | — | — | — | — | — | ✅ | — | — |
-| Agent prose compression (caveman) | ✅ | — | — | — | — | — | ✅ | — | — | — | — |
-| Token analytics/tracking | ✅ | — | ✅ | — | — | — | — | — | — | — | — |
-| Estimated context savings | ✅ | — | ✅ | — | — | — | — | — | — | — | — |
-| Token benchmarking | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — |
-| Command family filters | ✅ (6 families) | — | — | — | — | — | — | — | ✅ (20+ families) | — | — |
-| Standalone CLI proxy | — | — | — | — | — | — | — | — | ✅ | — | — |
-| Token-efficient by design | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Feature | KiroGraph | CodeGraph | code-review-graph | jCodeMunch | jDocMunch | jDataMunch | caveman | cavemem | rtk | lean-ctx | headroom | engram |
+|---------|:---------:|:---------:|:-----------------:|:----------:|:---------:|:----------:|:-------:|:-------:|:---:|:--------:|:--------:|:------:|
+| Shell output compression | ✅ (kirograph_exec) | — | — | — | — | — | — | — | ✅ | — | ✅ | — |
+| Agent prose compression | ✅ (caveman mode) | — | — | — | — | — | ✅ | — | — | — | ✅ | — |
+| On-demand compression (any text) | ✅ (kirograph_compress) | — | — | — | — | — | — | — | — | — | ✅ | — |
+| File read caching | ✅ (kirograph_read) | — | — | — | — | — | — | — | — | ✅ | ✅ | — |
+| CCR (retrieve cached content) | ✅ (kirograph_retrieve) | — | — | — | — | — | — | — | — | — | ✅ | — |
+| KV cache prefix stability | ✅ (stable markers) | — | — | — | — | — | — | — | — | — | ✅ | — |
+| Multiple read modes (map/sig/diff) | ✅ (kirograph_read) | — | — | — | — | — | — | — | — | ✅ (10 modes) | — | — |
+| Token analytics/tracking | ✅ | — | ✅ | — | — | — | — | — | — | — | — | — |
+| Estimated context savings | ✅ | — | ✅ | — | — | — | — | — | — | — | — | — |
+| Token benchmarking | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — |
+| Command family filters | ✅ (6+ families) | — | — | — | — | — | — | — | ✅ (20+) | — | — | — |
+| Standalone CLI proxy | — | — | — | — | — | — | — | — | ✅ | — | — | — |
+| Token-efficient by design | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 
 ### Integration & Platform Support
 
@@ -253,11 +261,12 @@ For container scanning or OS-level coverage, combine KiroGraph-Sec with Trivy. F
 │                                                                                  │
 │  + Architecture analysis (code-review-graph) + Shell/Prose compression (rtk/    │
 │    caveman) + 9 semantic engines (incl. TurboQuant/TurboVec) + PDF parsing      │
-│  + Context layer (lean-ctx) + 34 platform targets + Token analytics             │
+│  + Context layer (lean-ctx) + CCR/on-demand compression (headroom)              │
+│  + 34 platform targets + Token analytics                                        │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-KiroGraph combines the capabilities of 12 separate projects into a single integrated package:
+KiroGraph combines the capabilities of 13 separate projects into a single integrated package:
 
 - **Code graph** layer inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) — tree-sitter parsing, symbol extraction, call graphs, impact analysis
 - **Community detection** inspired by [code-review-graph](https://github.com/tirth8205/code-review-graph) — coupling metrics (Ca/Ce/instability), execution flow tracing, refactoring tools
@@ -272,9 +281,8 @@ KiroGraph combines the capabilities of 12 separate projects into a single integr
 - **Embedding compression** inspired by [turboquant-js](https://github.com/danilodevhub/turboquant-js) — Walsh-Hadamard + Lloyd-Max quantization, 20–30× RAM savings
 - **SIMD vector search** inspired by [turbovec](https://github.com/RyanCodrai/turbovec) — NEON on ARM64, AVX-512BW on x86, auto-built by the installer via napi-rs
 - **Context layer** inspired by [lean-ctx](https://github.com/yvgude/lean-ctx) — file read caching, multiple read modes, context budget governance
+- **CCR + on-demand compression + KV cache stability** inspired by [headroom](https://github.com/chopratejas/headroom) — `kirograph_retrieve` (cached content retrieval), `kirograph_compress` (dual-engine: rtk shell + caveman prose), deterministic cache markers for KV cache prefix stability
 - **Conflict detection, topic key, stale review, passive capture, prompt saving** inspired by [Engram](https://github.com/Gentleman-Programming/engram) — typed relations between observations, judgment workflow, stable semantic addressing
-
-[Engram](https://github.com/Gentleman-Programming/engram) by [Gentleman-Programming](https://github.com/Gentleman-Programming): conflict detection (typed relations + judgment workflow), `topic_key` stable addressing, `review_after` stale observation scheduling, passive capture, and prompt saving patterns.
 - **Security** (KiroGraph-Sec) — dependency vulnerability scanning with call-graph reachability analysis and CycloneDX SBOM/VEX export; reachability leverages the existing call graph from the code indexing layer
 
 The [jCodeMunch-MCP](https://github.com/jgravelle/jcodemunch-mcp) family (jCodeMunch + jDocMunch + jDataMunch) represents the same "token-efficient retrieval" philosophy applied to three different data types: source code, documentation, and tabular data. KiroGraph unifies all three into a single MCP server with a shared graph database.
@@ -282,6 +290,8 @@ The [jCodeMunch-MCP](https://github.com/jgravelle/jcodemunch-mcp) family (jCodeM
 [code-review-graph](https://github.com/tirth8205/code-review-graph) is the closest competitor in scope, with its own graph + community detection + refactoring tools + multi-platform support. The main differences are language (Python vs TypeScript), primary target (Claude Code vs Kiro), and KiroGraph's additional documentation/data/memory/security layers.
 
 [lean-ctx](https://github.com/yvgude/lean-ctx) focuses on the context transport layer (caching, compression, governance). KiroGraph integrates these concepts alongside deep code intelligence — users get both efficient delivery and structural understanding in one tool.
+
+[headroom](https://github.com/chopratejas/headroom) introduces the CCR (Cached Content Retrieval) pattern and dual-engine on-demand compression. KiroGraph surfaces CCR as `kirograph_retrieve`, implements both engines as `kirograph_compress`, and extends the prefix-stability concept to all cache-hit markers so provider-side KV caches can warm on repeated context reads.
 
 ---
 

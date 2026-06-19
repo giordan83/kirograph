@@ -10,6 +10,11 @@ export interface InstructionOptions {
   enableSecurity?: boolean;
   enablePatterns?: boolean;
   enableWiki?: boolean;
+  enableCodeHealth?: boolean;
+  enableAdvancedAnalysis?: boolean;
+  enableAgentUtils?: boolean;
+  enableGeneralCompression?: boolean;
+  trackCallSites?: boolean;
   hasHooks?: boolean;
 }
 
@@ -56,6 +61,11 @@ export function buildAgentInstructions(cavemanModeOrOpts?: CavemanMode | 'off' |
   const enableSecurity = opts.enableSecurity ?? false;
   const enablePatterns = opts.enablePatterns ?? false;
   const enableWiki = opts.enableWiki ?? false;
+  const enableCodeHealth = opts.enableCodeHealth ?? false;
+  const enableAdvancedAnalysis = opts.enableAdvancedAnalysis ?? false;
+  const enableAgentUtils = opts.enableAgentUtils ?? false;
+  const enableGeneralCompression = opts.enableGeneralCompression ?? false;
+  const trackCallSites = opts.trackCallSites ?? false;
 
   let content = `# KiroGraph
 
@@ -66,35 +76,23 @@ KiroGraph builds a local semantic knowledge graph of this codebase. When the \`k
 | Question | Tool |
 |----------|------|
 | Where do I start on this task? | \`kirograph_context\` |
-| What is this symbol / show me its code | \`kirograph_node\` with \`includeCode: true\` |
+| What is this symbol / show me its code | \`kirograph_node\` with \`detail: "signatures"\` |
 | Find a symbol by name | \`kirograph_search\` |
-| Who calls function X? | \`kirograph_callers\` |
-| What does function X call? | \`kirograph_callees\` |
-| What breaks if I change X? | \`kirograph_impact\` |
+${trackCallSites ? '| Who calls function X? | `kirograph_callers` |\n| What does function X call? | `kirograph_callees` |\n' : ''}| What breaks if I change X? | \`kirograph_impact\` |
 | How are X and Y connected? | \`kirograph_path\` |
-| What extends / implements this type? | \`kirograph_type_hierarchy\` |
-| Which code is never called? | \`kirograph_dead_code\` |
-| Are there import cycles? | \`kirograph_circular_deps\` |
-| What files are indexed? | \`kirograph_files\` |
+${enableAdvancedAnalysis ? '| What extends / implements this type? | `kirograph_type_hierarchy` |\n' : ''}${enableCodeHealth ? '| Which code is never called? | `kirograph_dead_code` |\n| Are there import cycles? | `kirograph_circular_deps` |\n' : ''}| What files are indexed? | \`kirograph_files\` |
 | Is the index healthy? | \`kirograph_status\` |
-| What are the most critical symbols? | \`kirograph_hotspots\` |
-| Any unexpected cross-module coupling? | \`kirograph_surprising\` |
-| What changed since the last snapshot? | \`kirograph_diff\` |
-${enableArchitecture ? '| What packages/layers exist? | `kirograph_architecture` |\n| How coupled is package X? | `kirograph_coupling` |\n| What does package X depend on? | `kirograph_package` |\n' : ''}
-${enableCompression ? '| Run a command with token savings | `kirograph_exec` |\n| Check token savings stats | `kirograph_gain` |\n' : ''}${enableMemory ? '| Search past decisions/patterns | `kirograph_mem_search` |\n| Store an observation | `kirograph_mem_store` |\n' : ''}${enableDocs ? '| Find a doc section | `kirograph_docs_search` |\n| Get doc table of contents | `kirograph_docs_toc` |\n' : ''}${enableData ? '| What datasets are indexed? | `kirograph_data_list` |\n| Query rows with filters | `kirograph_data_query` |\n| Aggregate data server-side | `kirograph_data_aggregate` |\n' : ''}${enableSecurity ? '| Are there vulnerable dependencies? | `kirograph_security` |\n| Which CVEs affect my project? | `kirograph_vulns` |\n| Is this vulnerability reachable? | `kirograph_reachability` |\n| What licenses do my deps use? | `kirograph_licenses` |\n| Are dependencies outdated? | `kirograph_staleness` |\n' : ''}${enablePatterns ? '| Find structural code patterns? | `kirograph_live_search` |\n| Browse SAST rules | `kirograph pattern --list` |\n' : ''}${enableWiki ? '| Look up project knowledge | `kirograph_wiki_search` |\n| Update wiki with new knowledge | `kirograph_wiki_ingest` + `kirograph_wiki_apply_diff` |\n' : ''}
+${enableCodeHealth ? '| What are the most critical symbols? | `kirograph_hotspots` |\n| Any unexpected cross-module coupling? | `kirograph_surprising` |\n| What changed since the last snapshot? | `kirograph_diff` |\n' : ''}${enableArchitecture ? '| What packages/layers exist? | `kirograph_architecture` |\n| How coupled is package X? | `kirograph_coupling` |\n| What does package X depend on? | `kirograph_package` |\n' : ''}${enableCompression ? '| Run a command with token savings | `kirograph_exec` |\n' : ''}${enableAgentUtils ? '| Check token savings stats | `kirograph_gain` |\n| Read a file (cached) | `kirograph_read` |\n' : ''}${enableGeneralCompression ? '| Compress text or shell output before sending | `kirograph_compress` |\n' : ''}${enableMemory ? '| Search past decisions/patterns | `kirograph_mem_search` |\n| Store an observation | `kirograph_mem_store` |\n' : ''}${enableDocs ? '| Find a doc section | `kirograph_docs_search` |\n| Get doc table of contents | `kirograph_docs_toc` |\n' : ''}${enableData ? '| What datasets are indexed? | `kirograph_data_list` |\n| Query rows with filters | `kirograph_data_query` |\n| Aggregate data server-side | `kirograph_data_aggregate` |\n' : ''}${enableSecurity ? '| Are there vulnerable dependencies? | `kirograph_security` |\n| Which CVEs affect my project? | `kirograph_vulns` |\n| Is this vulnerability reachable? | `kirograph_reachability` |\n| What licenses do my deps use? | `kirograph_licenses` |\n| Are dependencies outdated? | `kirograph_staleness` |\n' : ''}${enablePatterns ? '| Find structural code patterns? | `kirograph_live_search` |\n| Browse SAST rules | `kirograph pattern --list` |\n' : ''}${enableWiki ? '| Look up project knowledge | `kirograph_wiki_search` |\n| Update wiki with new knowledge | `kirograph_wiki_ingest` + `kirograph_wiki_apply_diff` |\n' : ''}
 ## Tool selection
 
-- Start code tasks with \`kirograph_context\`.
+- Start code tasks with \`kirograph_context\`; use \`detail: "signatures"\` to reduce tokens when full source isn't needed yet.
 - Find symbols by name with \`kirograph_search\`.
-- Inspect a symbol with \`kirograph_node\`; set \`includeCode: true\` only when source is needed.
-- Trace call flow with \`kirograph_callers\` and \`kirograph_callees\`.
-- Check blast radius before edits with \`kirograph_impact\`.
+- Inspect a symbol with \`kirograph_node\`; use \`detail: "full"\` only when source is needed.
+${trackCallSites ? '- Trace call flow with `kirograph_callers` and `kirograph_callees`.\n' : ''}- Check blast radius before edits with \`kirograph_impact\`.
 - Use \`kirograph_path\` to explain how two symbols connect.
-- Use \`kirograph_type_hierarchy\` for inheritance/interface questions.
-- Use \`kirograph_files\` to inspect indexed file structure.
+${enableAdvancedAnalysis ? '- Use `kirograph_type_hierarchy` for inheritance/interface questions.\n' : ''}- Use \`kirograph_files\` to inspect indexed file structure.
 - Use \`kirograph_status\` if results seem stale or incomplete.
-- Use \`kirograph_architecture\`, \`kirograph_coupling\`, and \`kirograph_package\` for package/layer questions when architecture analysis is enabled.
-- Use \`kirograph_hotspots\`, \`kirograph_surprising\`, and \`kirograph_diff\` for refactor planning and review.
+${enableArchitecture ? '- Use `kirograph_architecture`, `kirograph_coupling`, and `kirograph_package` for package/layer questions.\n' : ''}${enableCodeHealth ? '- Use `kirograph_hotspots`, `kirograph_surprising`, and `kirograph_diff` for refactor planning and review.\n' : ''}
 
 ## Workflow
 

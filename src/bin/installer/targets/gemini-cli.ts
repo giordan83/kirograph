@@ -11,7 +11,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -22,6 +21,7 @@ import {
   KIROGRAPH_SERVER_NAME,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -44,16 +44,16 @@ export function installGeminiCliEarly(projectRoot: string): void {
   console.log(`  ✓ Gemini CLI MCP server registered in ${settingsPath}`);
 }
 
-export function installGeminiCliLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installGeminiCliLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, true);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'gemini-cli.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Gemini CLI instructions written to ${instructionsPath}`);
 
   const geminiPath = path.join(projectRoot, 'GEMINI.md');
-  const changed = upsertGeneratedBlock(geminiPath, GEMINI_CLI_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
+  const changed = upsertGeneratedBlock(geminiPath, GEMINI_CLI_BLOCK_ID, '## KiroGraph', buildAgentInstructions(instructionOpts));
   console.log(changed
     ? `  ✓ GEMINI.md updated with KiroGraph instructions`
     : `  ✓ GEMINI.md already up to date`);

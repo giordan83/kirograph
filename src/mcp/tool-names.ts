@@ -85,8 +85,12 @@ export const FEATURE_TOOL_SETS: Record<string, string[]> = {
   ],
   enableAgentUtils: [
     'kirograph_read',
+    'kirograph_retrieve',
     'kirograph_gain',
     'kirograph_budget',
+  ],
+  enableGeneralCompression: [
+    'kirograph_compress',
   ],
   // Derived from shellCompressionLevel — disabled when compression is off
   enableShellExec: [
@@ -121,6 +125,8 @@ export const KIROGRAPH_TOOL_NAMES = [
   'kirograph_exec',
   'kirograph_gain',
   'kirograph_read',
+  'kirograph_retrieve',
+  'kirograph_compress',
   'kirograph_budget',
   'kirograph_flows',
   'kirograph_communities',

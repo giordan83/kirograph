@@ -51,6 +51,8 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | <h4>Token Optimization</h4> | |
 | 🗜️ **Shell Compression (KiroGraph-RTK opt-in  module)** | Token-optimized command output (git, tests, linters, docker, AWS) — 60-90% savings |
 | 🪨 **Caveman Mode (KiroGraph-Caveman opt-in module)** 🪨 | Agent prose compression (lite → ultra) — fewer tokens on explanations without touching code |
+| 📦 **General-purpose Compression (`kirograph_compress`, opt-in)** | On-demand compression tool for arbitrary text. Two engines: rtk-style structural filters for shell output (command-hinted), caveman grammar for prose. Five levels (lite → ultra). Reports inline savings. Inspired by [headroom](https://github.com/chopratejas/headroom). |
+| 📥 **File Read Cache + CCR (`kirograph_read` / `kirograph_retrieve`, opt-in)** | `kirograph_read` caches files on first read — unchanged files return a ~13-token marker on subsequent reads. `kirograph_retrieve` (CCR) recovers the cached full content without a filesystem re-read. Prefix-stable markers enable KV cache hits on conversation context. Inspired by [lean-ctx](https://github.com/yvgude/lean-ctx) and [headroom](https://github.com/chopratejas/headroom). |
 | 📈 **Token Analytics (KiroGraph-Gain core module)** | Track cumulative savings from graph tools and shell compression over time |
 | <h4>Integration (KiroGraph-Integration core module)</h4> | |
 | 🔌 **Multi-tool Support** | Native Kiro + 32 experimental targets (Cursor, Copilot, Claude Code, Codex, Windsurf, Cline, and more) |
@@ -152,6 +154,7 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 - [rtk](https://github.com/rtk-ai/rtk) by [rtk-ai](https://github.com/rtk-ai): the shell compression module's command-family approach and token-optimized output patterns.
 - [code-review-graph](https://github.com/tirth8205/code-review-graph) by [Tirth Kanani](https://github.com/tirth8205): community detection, execution flow tracing, refactoring tools, and multi-platform auto-detection patterns.
 - [lean-ctx](https://github.com/yvgude/lean-ctx) by [Yves Gugger](https://github.com/yvgude): file read caching, multiple read modes, and context budget governance concepts.
+- [headroom](https://github.com/chopratejas/headroom) by [Tejas Chopra](https://github.com/chopratejas): the CCR (Cached Content Retrieval) pattern (`kirograph_retrieve`), dual-engine on-demand compression (`kirograph_compress`), and KV cache prefix stability via deterministic marker strings.
 - [turboquant-js](https://github.com/danilodevhub/turboquant-js) by [Danilo Dev](https://github.com/danilodevhub): the TurboQuant engine — TypeScript implementation of Google's Walsh-Hadamard + Lloyd-Max quantization algorithm used for embedding compression.
 - [turbovec](https://github.com/RyanCodrai/turbovec) by [Ryan Codrai](https://github.com/RyanCodrai): the TurboVec engine — Rust implementation of TurboQuant with SIMD acceleration, exposed to Node.js via a napi-rs native addon.
 - [pdf-inspector](https://github.com/firecrawl/pdf-inspector) by [Firecrawl](https://github.com/firecrawl): the PDF parser used in the data module — pure Rust, no OCR, no network, prebuilt binaries for linux-x64 and macOS ARM64.
@@ -163,7 +166,7 @@ KiroGraph is inspired by [CodeGraph](https://github.com/colbymchenry/codegraph) 
 
 ## How It Compares
 
-KiroGraph combines capabilities from 13 separate projects into one integrated MCP server:
+KiroGraph combines capabilities from 14 separate projects into one integrated MCP server:
 
 | Capability | Inspired by | What KiroGraph adds |
 |-----------|-------------|---------------------|
@@ -177,6 +180,7 @@ KiroGraph combines capabilities from 13 separate projects into one integrated MC
 | PDF parsing | [pdf-inspector](https://github.com/firecrawl/pdf-inspector) | Pure Rust, no OCR/network, prebuilt binaries, piped into data module |
 | Shell compression | [rtk](https://github.com/rtk-ai/rtk) | Integrated as MCP tool, no separate binary |
 | Prose compression | [caveman](https://github.com/JuliusBrussee/caveman) | Multi-level (lite/full/ultra) via steering |
+| On-demand compression + CCR | [headroom](https://github.com/chopratejas/headroom) | Dual-engine (rtk shell + caveman prose) via `kirograph_compress`; CCR pattern via `kirograph_retrieve`; KV-cache prefix stability |
 | Embedding compression | [turboquant-js](https://github.com/danilodevhub/turboquant-js) | 9 engine options, SIMD Rust variant, 20–30× RAM savings |
 | SIMD vector search | [turbovec](https://github.com/RyanCodrai/turbovec) | NEON on ARM64, AVX-512BW on x86, auto-built by installer |
 | Context layer | [lean-ctx](https://github.com/yvgude/lean-ctx) | File caching, read modes, budget governance |

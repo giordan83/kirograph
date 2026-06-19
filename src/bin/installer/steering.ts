@@ -82,6 +82,7 @@ export interface SteeringOptions {
   enableCodeHealth?: boolean;
   enableAdvancedAnalysis?: boolean;
   enableAgentUtils?: boolean;
+  enableGeneralCompression?: boolean;
   trackCallSites?: boolean;
 }
 
@@ -99,6 +100,7 @@ function buildSteeringContent(opts?: SteeringOptions): string {
   const enableCodeHealth = opts?.enableCodeHealth ?? false;
   const enableAdvancedAnalysis = opts?.enableAdvancedAnalysis ?? false;
   const enableAgentUtils = opts?.enableAgentUtils ?? false;
+  const enableGeneralCompression = opts?.enableGeneralCompression ?? false;
   const trackCallSites = opts?.trackCallSites ?? false;
 
   // Build guide rows
@@ -130,6 +132,7 @@ function buildSteeringContent(opts?: SteeringOptions): string {
       '| What does package X depend on? | `kirograph_package` |',
     ] : []),
     ...(enableCompression ? ['| Run a command with token savings | `kirograph_exec` |'] : []),
+    ...(enableGeneralCompression ? ['| Compress text or shell output before sending | `kirograph_compress` |'] : []),
     ...(enableAgentUtils ? ['| Check token savings stats | `kirograph_gain` |'] : []),
     ...(enableData ? [
       '| What data files are indexed? | `kirograph_data_list` |',
@@ -574,6 +577,44 @@ KiroGraph can search for structural code patterns using @ast-grep/napi.
 **When to use:** When you need to find code patterns that can't be expressed as symbol names or semantic queries — "all eval() calls", "all SQL string concatenation", "all readFile with request parameters".
 `;
     content = content.trimEnd() + '\n\n' + patternsSection.trim() + '\n';
+  }
+
+  // General compression section
+  if (enableGeneralCompression) {
+    const generalCompressionSection = `
+## General-purpose compression
+
+\`kirograph_compress\` is an on-demand tool for reducing token usage before content reaches the model.
+Call it whenever you receive large input that you need to reason over but not reproduce verbatim.
+
+**Two engines — auto-routed by the \`command\` parameter:**
+
+| Scenario | Call |
+|----------|------|
+| Paste of shell output (git log, npm install, test run, docker ps…) | \`kirograph_compress(text: "...", command: "git log")\` |
+| Prose text, RAG chunk, observation, or mixed content | \`kirograph_compress(text: "...")\` |
+
+- **With \`command\`:** rtk-style structural filters — pattern-matched to the command family (git, test, lint, docker, etc.), removes noise, deduplicates repeated lines, keeps structure.
+- **Without \`command\`:** caveman grammar — removes filler words, articles, hedging phrases, and (at ultra level) applies standard abbreviations. Preserves code blocks, paths, URLs, and identifiers unchanged.
+
+**Compression levels** (same enum for both engines):
+- \`lite\` / \`normal\` — light touch: remove noise and filler only
+- \`full\` / \`aggressive\` — default: also remove articles, hedging, group repeated output
+- \`ultra\` — maximum: abbreviations, causality arrows (→), conjunction compression (+)
+
+**When to use:**
+- You received a large file diff, log dump, or search result and only need the structure
+- You want to store an observation in memory and the text is verbose
+- A tool output is close to or over budget and you need to trim before reasoning
+
+**When NOT to use:**
+- Content that must be reproduced exactly (code to be written to disk, user quotes)
+- Short content (< 200 tokens) — overhead not worth it
+- Already-compressed output (kirograph_exec already applies rtk filters automatically)
+
+**Savings are reported inline:** \`[42% saved | 1800→1044 | rtk:git:aggressive]\`
+`;
+    content = content.trimEnd() + '\n\n' + generalCompressionSection.trim() + '\n';
   }
 
   // Wiki section

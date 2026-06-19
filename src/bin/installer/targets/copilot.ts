@@ -4,6 +4,7 @@ import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
+  LateInstallOptions,
   readJson,
   writeJson,
   KIROGRAPH_COMMAND,
@@ -57,17 +58,17 @@ export function installCopilotEarly(projectRoot: string): void {
     : `  ✓ Copilot MCP already configured in ${ghMcpPath}`);
 }
 
-export function installCopilotLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installCopilotLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'copilot.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Copilot instructions written to ${instructionsPath}`);
 
   const rulesPath = path.join(projectRoot, '.github', 'copilot-instructions.md');
   ensureDir(path.dirname(rulesPath));
-  const changed = upsertGeneratedBlock(rulesPath, COPILOT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
+  const changed = upsertGeneratedBlock(rulesPath, COPILOT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(instructionOpts));
   console.log(changed
     ? `  ✓ .github/copilot-instructions.md updated with KiroGraph instructions`
     : `  ✓ .github/copilot-instructions.md already up to date`);

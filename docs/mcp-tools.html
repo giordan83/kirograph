@@ -52,7 +52,7 @@
     </nav>
 
     <h2 id="mcp-tools" style="border-top: none; margin-top: 0; padding-top: 0;">MCP Tools</h2>
-    <p>All <strong>45</strong> tools are auto-approved and available to Kiro once installed. The MCP server is started by Kiro automatically when needed.</p>
+    <p>All <strong>49</strong> tools are auto-approved and available to Kiro once installed. The MCP server is started by Kiro automatically when needed.</p>
 
     <div class="search-box" style="margin-bottom: 1.5rem;">
       <input type="text" id="tool-search-input" placeholder="Search tools..." aria-label="Search tools" style="width: 100%; padding: 0.6rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.95rem; outline: none;" />
@@ -61,14 +61,15 @@
     <!-- kirograph_context -->
     <div class="tool-card" id="tool-context">
       <h3>kirograph_context</h3>
-      <p class="tool-desc">Comprehensive context for a task or feature, often sufficient alone without additional tool calls. Uses vector search on every call.</p>
+      <p class="tool-desc">PRIMARY TOOL: Build comprehensive context for a task or feature request. Returns entry points, related symbols, and key code — often enough to understand the codebase without additional tool calls.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>task</code></td><td>string</td><td><em>required</em></td><td>Task, bug, or feature description</td></tr>
             <tr><td><code>maxNodes</code></td><td>number</td><td>20</td><td>Max symbols to include</td></tr>
-            <tr><td><code>includeCode</code></td><td>boolean</td><td>true</td><td>Include code snippets</td></tr>
+            <tr><td><code>detail</code></td><td>string</td><td><code>full</code></td><td>Code verbosity: <code>full</code> (complete source), <code>signatures</code> (signature + docstring, ~70% fewer tokens), <code>summary</code> (locations only, no code)</td></tr>
+            <tr><td><code>includeCode</code></td><td>boolean</td><td>true</td><td>Include code snippets — deprecated, prefer <code>detail</code></td></tr>
             <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
           </tbody>
         </table>
@@ -149,7 +150,8 @@
           <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td><code>symbol</code></td><td>string</td><td><em>required</em></td><td>Symbol name</td></tr>
-            <tr><td><code>includeCode</code></td><td>boolean</td><td>false</td><td>Include source code</td></tr>
+            <tr><td><code>detail</code></td><td>string</td><td><code>summary</code></td><td>Code detail level: <code>summary</code> (name + location + qualified name), <code>signatures</code> (+ signature + docstring), <code>full</code> (+ complete source code)</td></tr>
+            <tr><td><code>includeCode</code></td><td>boolean</td><td>false</td><td>Include full source code — deprecated, prefer <code>detail: "full"</code></td></tr>
             <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
           </tbody>
         </table>
@@ -371,6 +373,77 @@
           <tbody>
             <tr><td><code>period</code></td><td>string</td><td><code>session</code></td><td><code>session</code>, <code>today</code>, <code>week</code>, or <code>all</code></td></tr>
             <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Agent Utilities ── -->
+    <h2 id="agent-utils-tools" style="margin-top: 3rem;">Agent Utilities <span class="badge">enableAgentUtils</span></h2>
+
+    <!-- kirograph_read -->
+    <div class="tool-card" id="tool-read">
+      <h3>kirograph_read <span class="badge">enableAgentUtils</span></h3>
+      <p class="tool-desc">Read a file with caching and multiple modes. First read returns full content; subsequent reads of unchanged files return a compact <code>[cached: file unchanged]</code> marker (~13 tokens). Inspired by <a href="https://github.com/yvgude/lean-ctx" target="_blank" rel="noopener">lean-ctx</a>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>path</code></td><td>string</td><td><em>required</em></td><td>File path (absolute or relative to project root)</td></tr>
+            <tr><td><code>mode</code></td><td>string</td><td><code>full</code></td><td><code>full</code>, <code>map</code> (structure overview), <code>signatures</code> (function signatures only), <code>diff</code> (changes since last read), <code>lines</code> (line range), <code>imports</code>, <code>exports</code></td></tr>
+            <tr><td><code>start</code></td><td>number</td><td>-</td><td>Start line (for <code>lines</code> mode)</td></tr>
+            <tr><td><code>end</code></td><td>number</td><td>-</td><td>End line (for <code>lines</code> mode)</td></tr>
+            <tr><td><code>noCache</code></td><td>boolean</td><td>false</td><td>Force fresh read, bypass cache</td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- kirograph_retrieve -->
+    <div class="tool-card" id="tool-retrieve">
+      <h3>kirograph_retrieve <span class="badge">enableAgentUtils</span></h3>
+      <p class="tool-desc">CCR — Cached Content Retrieval. Returns the full content stored in the session cache, or reads and caches the file if not yet seen. Use after <code>kirograph_read</code> returns a <code>[cached: file unchanged]</code> marker to recover the actual content without a redundant filesystem read. Inspired by <a href="https://github.com/chopratejas/headroom" target="_blank" rel="noopener">headroom</a>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>path</code></td><td>string</td><td><em>required</em></td><td>File path to retrieve (absolute or relative to project root)</td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- kirograph_budget -->
+    <div class="tool-card" id="tool-budget">
+      <h3>kirograph_budget <span class="badge">enableAgentUtils</span></h3>
+      <p class="tool-desc">Show current session context budget usage. Returns tokens consumed, remaining budget, and utilization percentage. Inspired by <a href="https://github.com/yvgude/lean-ctx" target="_blank" rel="noopener">lean-ctx</a>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>reset</code></td><td>boolean</td><td>false</td><td>Reset session budget counters</td></tr>
+            <tr><td><code>projectPath</code></td><td>string</td><td>cwd</td><td>Project root path</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── General-purpose Compression ── -->
+    <h2 id="compression-tools" style="margin-top: 3rem;">General-purpose Compression <span class="badge" style="background: rgba(120,80,200,0.15); color: #a78bfa; border: 1px solid rgba(120,80,200,0.3);">enableGeneralCompression</span></h2>
+
+    <!-- kirograph_compress -->
+    <div class="tool-card" id="tool-compress">
+      <h3>kirograph_compress <span class="badge" style="background: rgba(120,80,200,0.15); color: #a78bfa; border: 1px solid rgba(120,80,200,0.3);">enableGeneralCompression</span></h3>
+      <p class="tool-desc">On-demand compression for arbitrary text before it reaches the model. Routes to two engines based on whether <code>command</code> is provided. Reports savings inline: <code>[42% saved | 1800→1044 | rtk:git:aggressive]</code>. Inspired by <a href="https://github.com/chopratejas/headroom" target="_blank" rel="noopener">headroom</a>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>text</code></td><td>string</td><td><em>required</em></td><td>Text to compress</td></tr>
+            <tr><td><code>command</code></td><td>string</td><td>-</td><td>Shell command that produced this output (e.g. <code>git log</code>, <code>npm test</code>). Activates rtk-style structural filters. Omit for prose/text — uses caveman grammar.</td></tr>
+            <tr><td><code>level</code></td><td>string</td><td><code>full</code></td><td>Intensity: <code>lite</code> / <code>normal</code> (light), <code>full</code> / <code>aggressive</code> (medium, default), <code>ultra</code> (maximum)</td></tr>
           </tbody>
         </table>
       </div>
@@ -812,6 +885,12 @@
       <a href="#tool-diff" class="sidebar-link">kirograph_diff</a>
       <a href="#tool-exec" class="sidebar-link">kirograph_exec</a>
       <a href="#tool-gain" class="sidebar-link">kirograph_gain</a>
+      <a href="#agent-utils-tools" class="sidebar-link">— Agent Utilities —</a>
+      <a href="#tool-read" class="sidebar-link">kirograph_read</a>
+      <a href="#tool-retrieve" class="sidebar-link">kirograph_retrieve</a>
+      <a href="#tool-budget" class="sidebar-link">kirograph_budget</a>
+      <a href="#compression-tools" class="sidebar-link">— Compression —</a>
+      <a href="#tool-compress" class="sidebar-link">kirograph_compress</a>
       <a href="#tool-mem-search" class="sidebar-link">kirograph_mem_search</a>
       <a href="#tool-mem-store" class="sidebar-link">kirograph_mem_store</a>
       <a href="#tool-mem-timeline" class="sidebar-link">kirograph_mem_timeline</a>

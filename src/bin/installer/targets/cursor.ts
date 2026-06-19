@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -10,6 +9,7 @@ import {
   KIROGRAPH_MCP_ARGS,
   removeMcpServersConfig,
   writeMcpServersConfig,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -43,13 +43,13 @@ export function installCursorEarly(projectRoot: string): void {
     : `  ✓ Cursor MCP already configured in ${mcpPath}`);
 }
 
-export function installCursorLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const enableCompression = shellCompressionLevel !== undefined && shellCompressionLevel !== 'off';
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installCursorLate(projectRoot: string, opts: LateInstallOptions): void {
+  const enableCompression = opts.shellCompressionLevel !== undefined && opts.shellCompressionLevel !== 'off';
+  const instructionOpts = buildInstructionOpts(opts, true);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'cursor.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Cursor instructions written to ${instructionsPath}`);
 
   const rulesDir = path.join(projectRoot, '.cursor', 'rules');
@@ -62,7 +62,7 @@ export function installCursorLate(projectRoot: string, cavemanMode?: CavemanMode
     '---',
     '',
   ].join('\n');
-  fs.writeFileSync(rulePath, frontmatter + buildAgentInstructions(opts));
+  fs.writeFileSync(rulePath, frontmatter + buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Cursor rule written to ${rulePath}`);
 
   // Write hooks

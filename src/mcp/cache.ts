@@ -70,7 +70,7 @@ export class FileReadCache {
       existing.lastRead = Date.now();
       existing.readCount++;
       return {
-        content: `[cached: unchanged since ${this.formatTimestamp(existing.lastRead)}] (${existing.readCount} reads)`,
+        content: `[cached: file unchanged — use kirograph_retrieve to get full content, or noCache:true to force re-read]`,
         cached: true,
         changed: false,
       };

@@ -8,7 +8,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -19,6 +18,7 @@ import {
   KIROGRAPH_SERVER_NAME,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -38,18 +38,18 @@ export function installJunieEarly(projectRoot: string): void {
   console.log(`  ✓ Junie MCP server registered in ${mcpPath}`);
 }
 
-export function installJunieLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installJunieLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'junie.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Junie instructions written to ${instructionsPath}`);
 
   // Write to .junie/AGENTS.md (preferred guidelines location)
   const agentsPath = path.join(projectRoot, '.junie', 'AGENTS.md');
   ensureDir(path.dirname(agentsPath));
-  const changed = upsertGeneratedBlock(agentsPath, JUNIE_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
+  const changed = upsertGeneratedBlock(agentsPath, JUNIE_BLOCK_ID, '## KiroGraph', buildAgentInstructions(instructionOpts));
   console.log(changed
     ? `  ✓ .junie/AGENTS.md updated with KiroGraph instructions`
     : `  ✓ .junie/AGENTS.md already up to date`);

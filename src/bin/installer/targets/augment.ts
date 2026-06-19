@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   KIROGRAPH_COMMAND,
@@ -11,7 +10,7 @@ import {
   writeMcpServersConfig,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
-import { buildInstructionOpts } from '../common';
+import { buildInstructionOpts, LateInstallOptions } from '../common';
 
 const AUGMENT_BLOCK_ID = 'augment';
 
@@ -24,14 +23,14 @@ export function installAugmentEarly(projectRoot: string): void {
   console.log(`  ✓ Augment Code MCP server registered in ${mcpPath}`);
 }
 
-export function installAugmentLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installAugmentLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'augment.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Augment instructions written to ${instructionsPath}`);
 
   const guidelinesPath = path.join(projectRoot, 'augment-guidelines.md');
-  const changed = upsertGeneratedBlock(guidelinesPath, AUGMENT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  const changed = upsertGeneratedBlock(guidelinesPath, AUGMENT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(changed
     ? `  ✓ augment-guidelines.md updated with KiroGraph instructions`
     : `  ✓ augment-guidelines.md already up to date`);

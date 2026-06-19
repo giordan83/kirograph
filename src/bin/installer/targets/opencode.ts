@@ -8,8 +8,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
-import { ensureDir, buildInstructionOpts, readJson, writeJson } from '../common';
+import { ensureDir, buildInstructionOpts, readJson, writeJson, LateInstallOptions } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
 const OPENCODE_CONFIG = '.opencode.json';
@@ -51,12 +50,12 @@ export function installOpenCodeEarly(projectRoot: string): void {
   console.log(`  ✓ OpenCode MCP server registered in ${configPath}`);
 }
 
-export function installOpenCodeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installOpenCodeLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, true);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'opencode.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ OpenCode instructions written to ${instructionsPath}`);
 
   // Add instructions reference to .opencode.json

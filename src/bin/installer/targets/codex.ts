@@ -9,6 +9,7 @@ import {
   printMcpCommand,
   removeGeneratedBlock,
   upsertGeneratedBlock,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -58,16 +59,16 @@ export function installCodexEarly(projectRoot: string): void {
   console.log(`  ✓ Codex hooks written to ${hooksPath}`);
 }
 
-export function installCodexLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installCodexLate(projectRoot: string, opts: LateInstallOptions): void {
+  const resolvedOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'codex.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(resolvedOpts));
   console.log(`  ✓ Codex instructions written to ${instructionsPath}`);
 
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const changed = upsertGeneratedBlock(agentsPath, CODEX_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
+  const changed = upsertGeneratedBlock(agentsPath, CODEX_BLOCK_ID, '## KiroGraph', buildAgentInstructions(resolvedOpts));
   console.log(changed
     ? `  ✓ Codex project instructions updated in ${agentsPath}`
     : `  ✓ Codex project instructions already up to date`);

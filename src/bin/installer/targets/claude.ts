@@ -12,6 +12,7 @@ import {
   removeMcpServersConfig,
   removeImportLine,
   writeMcpServersConfig,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -38,12 +39,12 @@ export function installClaudeEarly(projectRoot: string): void {
     : `  ✓ Claude MCP already configured in ${mcpPath}`);
 }
 
-export function installClaudeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installClaudeLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'claude.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Claude instructions written to ${instructionsPath}`);
 
   const memoryPath = path.join(projectRoot, 'CLAUDE.md');

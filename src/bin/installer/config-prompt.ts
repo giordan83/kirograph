@@ -12,7 +12,7 @@ export interface PromptConfigOptions {
   projectRoot?: string;
   offerHookImport?: boolean;
 }
-export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableWatchmen' | 'watchmenThreshold' | 'watchmenSynthesisMode' | 'watchmenLocalModel' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity' | 'enablePatterns' | 'enableWiki' | 'wikiSynthesisMode' | 'wikiLocalModel' | 'enableCodeHealth' | 'enableAdvancedAnalysis' | 'enableAgentUtils'> & { embeddingModel?: string; embeddingDim?: number };
+export type ConfigPatch = Pick<KiroGraphConfig, 'enableEmbeddings' | 'useVecIndex' | 'semanticEngine' | 'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' | 'typesenseDashboard' | 'qdrantDashboard' | 'extractDocstrings' | 'trackCallSites' | 'enableArchitecture' | 'cavemanMode' | 'shellCompressionLevel' | 'enableMemory' | 'enableWatchmen' | 'watchmenThreshold' | 'watchmenSynthesisMode' | 'watchmenLocalModel' | 'enableDocs' | 'docsContextLimit' | 'enableData' | 'dataContextLimit' | 'enableSecurity' | 'enablePatterns' | 'enableWiki' | 'wikiSynthesisMode' | 'wikiLocalModel' | 'enableCodeHealth' | 'enableAdvancedAnalysis' | 'enableAgentUtils' | 'enableGeneralCompression'> & { embeddingModel?: string; embeddingDim?: number };
 export type SemanticEngine = KiroGraphConfig['semanticEngine'];
 
 export const DEFAULT_EMBEDDING_MODEL = 'nomic-ai/nomic-embed-text-v1.5';
@@ -64,7 +64,7 @@ export async function promptConfigOptions(
     'Enables natural-language code search via vector embeddings. A local model (~130MB) is downloaded on first use.',
   );
 
-  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', turboquantMemDocs: false, turboquantBits: 3, turbovecMemDocs: false, turbovecBits: 4, typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: false, trackCallSites: false, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableWatchmen: false, watchmenThreshold: 5, watchmenSynthesisMode: 'local', watchmenLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0, enableSecurity: false, enablePatterns: false, enableWiki: false, wikiSynthesisMode: 'agent', wikiLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableCodeHealth: false, enableAdvancedAnalysis: false, enableAgentUtils: false };
+  const patch: ConfigPatch = { enableEmbeddings, useVecIndex: false, semanticEngine: 'cosine', turboquantMemDocs: false, turboquantBits: 3, turbovecMemDocs: false, turbovecBits: 4, typesenseDashboard: false, qdrantDashboard: false, extractDocstrings: false, trackCallSites: false, enableArchitecture: false, cavemanMode: 'off', shellCompressionLevel: 'normal', enableMemory: false, enableWatchmen: false, watchmenThreshold: 5, watchmenSynthesisMode: 'local', watchmenLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableDocs: false, docsContextLimit: 0, enableData: false, dataContextLimit: 0, enableSecurity: false, enablePatterns: false, enableWiki: false, wikiSynthesisMode: 'agent', wikiLocalModel: 'onnx-community/gemma-4-E4B-it-ONNX', enableCodeHealth: false, enableAdvancedAnalysis: false, enableAgentUtils: false, enableGeneralCompression: false };
 
   if (enableEmbeddings) {
     // ── Model selection ────────────────────────────────────────────────────────
@@ -298,6 +298,17 @@ export async function promptConfigOptions(
   if (compressionChoice === 'off') {
     console.log('  ℹ  kirograph_exec disabled (shell compression is off)');
   }
+
+  patch.enableGeneralCompression = await askToggle(rl,
+    'General-purpose compression tool (kirograph_compress):',
+    'Enables kirograph_compress — an on-demand MCP tool that compresses arbitrary text before it reaches the model. ' +
+    'Two engines: rtk-style structural filters for shell output (git, npm, test logs) when a command hint is provided, ' +
+    'or caveman grammar rules for prose and observations otherwise. ' +
+    'Useful when the agent pastes large content, receives a fat RAG chunk, or wants to explicitly compress before storing. ' +
+    'Independent from automatic shell compression (kirograph_exec) and caveman mode — those apply in the background; ' +
+    'this gives the model an explicit, on-demand compression action.',
+    false,
+  );
 
   let hooksToImport: string[] | null = null;
   if (opts.offerHookImport && opts.projectRoot) {

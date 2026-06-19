@@ -4,13 +4,14 @@ All tools are auto-approved in Kiro once installed. Other MCP clients can use th
 
 ## `kirograph_context`
 
-Comprehensive context for a task or feature, often sufficient alone without additional tool calls.
+PRIMARY TOOL: Build comprehensive context for a task or feature request. Returns entry points, related symbols, and key code — often enough to understand the codebase without additional tool calls.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `task` | string | required | Task, bug, or feature description |
 | `maxNodes` | number | 20 | Max symbols to include |
-| `includeCode` | boolean | true | Include code snippets |
+| `detail` | string | `full` | Code verbosity: `full` (complete source), `signatures` (signature + docstring, ~70% fewer tokens), `summary` (locations only, no code) |
+| `includeCode` | boolean | true | Include code snippets — deprecated, prefer `detail` |
 | `projectPath` | string | cwd | Project root path |
 
 **How it works:** Extracts symbol tokens from the task description (CamelCase, snake_case, SCREAMING_SNAKE, dot.notation) → runs exact name lookup + FTS + **vector search** against the active semantic engine → resolves imports to their definitions → expands through the graph to related symbols → returns entry points, related nodes, edges, and code snippets. This is the only tool that uses the vector engine on every call.
@@ -66,15 +67,16 @@ Analyze what code would be affected by changing a symbol. Use before making chan
 
 ## `kirograph_node`
 
-Get details about a specific symbol, optionally including source code.
+Get details about a specific symbol, optionally including its source code.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `symbol` | string | required | Symbol name |
-| `includeCode` | boolean | false | Include source code |
+| `detail` | string | `summary` | Code detail level: `summary` (name + location + qualified name), `signatures` (+ signature + docstring), `full` (+ complete source code) |
+| `includeCode` | boolean | false | Include full source code — deprecated, prefer `detail: "full"` |
 | `projectPath` | string | cwd | Project root path |
 
-Returns: kind, name, qualified name, file location, signature, docstring, and optionally source code.
+Returns: kind, name, qualified name, file location, and (depending on `detail`) signature, docstring, and source code.
 
 ## `kirograph_type_hierarchy`
 
@@ -183,6 +185,69 @@ Show token savings statistics from compressed command outputs.
 |-----------|------|---------|-------------|
 | `period` | string | `session` | Time period: `session`, `today`, `week`, `all` |
 | `projectPath` | string | cwd | Project root path |
+
+---
+
+## Agent Utilities *(require `enableAgentUtils: true`)*
+
+### `kirograph_read`
+
+Read a file with caching and multiple modes. First read returns full content; subsequent reads of unchanged files return a compact `[cached: file unchanged]` marker (~13 tokens). Inspired by [lean-ctx](https://github.com/yvgude/lean-ctx).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | string | required | File path (absolute or relative to project root) |
+| `mode` | string | `full` | `full`, `map` (structure overview), `signatures` (function signatures only), `diff` (changes since last read), `lines` (line range), `imports`, `exports` |
+| `start` | number | - | Start line (for `lines` mode) |
+| `end` | number | - | End line (for `lines` mode) |
+| `noCache` | boolean | false | Force fresh read, bypass cache |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_retrieve`
+
+CCR — Cached Content Retrieval. Returns the full content stored in the session cache, or reads and caches the file if not yet seen. Use after `kirograph_read` returns a `[cached: file unchanged]` marker to recover the actual content without a redundant filesystem read. Inspired by [headroom](https://github.com/chopratejas/headroom).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | string | required | File path to retrieve |
+| `projectPath` | string | cwd | Project root path |
+
+### `kirograph_budget`
+
+Show current session context budget usage. Returns tokens consumed, remaining budget, and utilization percentage. Inspired by [lean-ctx](https://github.com/yvgude/lean-ctx).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `reset` | boolean | false | Reset session budget counters |
+| `projectPath` | string | cwd | Project root path |
+
+---
+
+## General-purpose Compression *(require `enableGeneralCompression: true`)*
+
+### `kirograph_compress`
+
+On-demand compression for arbitrary text before it reaches the model. Routes to two engines based on whether `command` is provided. Reports savings inline: `[42% tokens saved | 1800→1044 | rtk:git:aggressive]`. Inspired by [headroom](https://github.com/chopratejas/headroom).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `text` | string | required | Text to compress |
+| `command` | string | - | Shell command that produced this output (e.g. `git log`, `npm test`). Activates rtk-style structural filters. Omit for prose/text — uses caveman grammar. |
+| `level` | string | `full` | Intensity: `lite` / `normal` (light), `full` / `aggressive` (medium, default), `ultra` (maximum) |
+
+**Engine routing:**
+- **With `command`**: rtk-style structural filters — pattern-matched per command family (git, npm, jest, docker, AWS, …), removes noise lines, deduplicates repeated lines, groups results
+- **Without `command`**: caveman grammar — strips filler words, articles, hedging phrases; at `ultra` also abbreviates common phrases. Preserves code blocks, paths, URLs, and identifiers.
+
+**When to use:**
+- Text arrived outside of `kirograph_exec` (e.g. from a tool that runs commands directly)
+- Compressing an observation before storing it to memory
+- Explicitly comparing compressed vs original before a follow-up tool call
+
+**When not to use:**
+- Commands run via `kirograph_exec` — already compressed automatically
+- Agent prose — use `cavemanMode` in config instead (zero tool-call overhead)
+- Source code — may break identifiers or whitespace-sensitive syntax
 
 ---
 

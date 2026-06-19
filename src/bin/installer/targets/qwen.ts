@@ -7,7 +7,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -16,6 +15,7 @@ import {
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
   KIROGRAPH_SERVER_NAME,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -37,10 +37,10 @@ export function installQwenEarly(_projectRoot: string): void {
   console.log(`  ✓ Qwen Code MCP server registered in ${mcpPath}`);
 }
 
-export function installQwenLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installQwenLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'qwen.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Qwen Code instructions written to ${instructionsPath}`);
 }
 

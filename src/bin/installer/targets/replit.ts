@@ -6,6 +6,7 @@ import {
   printMcpCommand,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 import { buildInstructionOpts } from '../common';
@@ -17,14 +18,14 @@ export function installReplitEarly(_projectRoot: string): void {
   // We print instructions in next steps.
 }
 
-export function installReplitLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installReplitLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'replit.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Replit instructions written to ${instructionsPath}`);
 
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const changed = upsertGeneratedBlock(agentsPath, REPLIT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  const changed = upsertGeneratedBlock(agentsPath, REPLIT_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(changed
     ? `  ✓ AGENTS.md updated with KiroGraph instructions (Replit)`
     : `  ✓ AGENTS.md already up to date`);

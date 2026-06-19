@@ -8,10 +8,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
+  LateInstallOptions,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
   KIROGRAPH_SERVER_NAME,
@@ -37,19 +37,19 @@ export function installRooEarly(projectRoot: string): void {
   console.log(`  ✓ Roo Code MCP server registered in ${mcpPath}`);
 }
 
-export function installRooLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installRooLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'roo.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Roo Code instructions written to ${instructionsPath}`);
 
   // Write rules file inside .roo/rules/ directory (preferred method)
   const rulesDir = path.join(projectRoot, '.roo', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, ROO_RULES_FILE);
-  fs.writeFileSync(rulePath, buildAgentInstructions(opts));
+  fs.writeFileSync(rulePath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Roo Code rule written to ${rulePath}`);
 }
 

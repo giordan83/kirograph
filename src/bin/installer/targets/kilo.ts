@@ -7,7 +7,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -15,6 +14,7 @@ import {
   writeJson,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -35,19 +35,19 @@ export function installKiloEarly(projectRoot: string): void {
   console.log(`  ✓ Kilo Code MCP server registered in ${configPath}`);
 }
 
-export function installKiloLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installKiloLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'kilo.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Kilo Code instructions written to ${instructionsPath}`);
 
   // Write rules file inside .kilo/rules/
   const rulesDir = path.join(projectRoot, '.kilo', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, 'kirograph.md');
-  fs.writeFileSync(rulePath, buildAgentInstructions(opts));
+  fs.writeFileSync(rulePath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Kilo Code rule written to ${rulePath}`);
 
   // Add to instructions array in kilo.jsonc (or kilo.json)

@@ -7,7 +7,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   buildInstructionOpts,
@@ -18,6 +17,7 @@ import {
   KIROGRAPH_SERVER_NAME,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -37,17 +37,17 @@ export function installWarpEarly(projectRoot: string): void {
   console.log(`  ✓ Warp MCP server registered in ${mcpPath}`);
 }
 
-export function installWarpLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installWarpLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, false);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'warp.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Warp instructions written to ${instructionsPath}`);
 
   // Write to AGENTS.md (Warp reads this natively)
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const changed = upsertGeneratedBlock(agentsPath, WARP_BLOCK_ID, '## KiroGraph', buildAgentInstructions(opts));
+  const changed = upsertGeneratedBlock(agentsPath, WARP_BLOCK_ID, '## KiroGraph', buildAgentInstructions(instructionOpts));
   console.log(changed
     ? `  ✓ AGENTS.md updated with KiroGraph instructions (Warp)`
     : `  ✓ AGENTS.md already up to date`);

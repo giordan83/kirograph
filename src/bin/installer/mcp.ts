@@ -17,6 +17,7 @@ export interface McpFeatureFlags {
   enableCodeHealth?: boolean;
   enableAdvancedAnalysis?: boolean;
   enableAgentUtils?: boolean;
+  enableGeneralCompression?: boolean;
   enableShellExec?: boolean;
   trackCallSites?: boolean;
 }

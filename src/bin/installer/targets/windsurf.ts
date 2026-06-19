@@ -18,6 +18,7 @@ import {
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
   KIROGRAPH_SERVER_NAME,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
 
@@ -62,19 +63,19 @@ export function installWindsurfEarly(_projectRoot: string): void {
   console.log(`  ✓ Windsurf MCP server registered in ${mcpPath}`);
 }
 
-export function installWindsurfLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
-  const opts = buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, true, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns);
+export function installWindsurfLate(projectRoot: string, opts: LateInstallOptions): void {
+  const instructionOpts = buildInstructionOpts(opts, true);
 
   const instructionsPath = path.join(projectRoot, '.kirograph', 'windsurf.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(opts));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(instructionOpts));
   console.log(`  ✓ Windsurf instructions written to ${instructionsPath}`);
 
   // Write rules file inside .windsurf/rules/ with frontmatter
   const rulesDir = path.join(projectRoot, '.windsurf', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, WINDSURF_RULES_FILE);
-  fs.writeFileSync(rulePath, buildWindsurfRule(buildAgentInstructions(opts)));
+  fs.writeFileSync(rulePath, buildWindsurfRule(buildAgentInstructions(instructionOpts)));
   console.log(`  ✓ Windsurf rule written to ${rulePath}`);
 
   // Remove legacy .windsurfrules if it exists and was created by us

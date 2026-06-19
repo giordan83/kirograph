@@ -1,14 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   printMcpCommand,
   upsertGeneratedBlock,
   removeGeneratedBlock,
+  buildInstructionOpts,
+  LateInstallOptions,
 } from '../common';
 import { buildAgentInstructions } from '../instructions';
-import { buildInstructionOpts } from '../common';
 
 const GOOSE_BLOCK_ID = 'goose';
 
@@ -17,14 +17,14 @@ export function installGooseEarly(_projectRoot: string): void {
   // We print the command in next steps.
 }
 
-export function installGooseLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installGooseLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'goose.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Goose instructions written to ${instructionsPath}`);
 
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const changed = upsertGeneratedBlock(agentsPath, GOOSE_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  const changed = upsertGeneratedBlock(agentsPath, GOOSE_BLOCK_ID, '## KiroGraph', buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(changed
     ? `  ✓ AGENTS.md updated with KiroGraph instructions (Goose)`
     : `  ✓ AGENTS.md already up to date`);

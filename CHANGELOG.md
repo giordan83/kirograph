@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.27.2] - 2026-06-19: Headroom-inspired compression tooling + installer refactor
+
+### Added
+
+- **`kirograph_retrieve` (CCR — Cached Content Retrieval)**: new MCP tool that exposes the existing session-scoped `FileReadCache`. When `kirograph_read` returns a `[cached: file unchanged]` marker, call `kirograph_retrieve(path)` to get the full content back without a redundant filesystem read. The cache already held it — this surfaces the retrieval path. Gated by `enableAgentUtils`.
+
+- **`kirograph_compress`**: new on-demand MCP tool for compressing arbitrary text before it reaches the model. Routes to two engines based on whether `command` is provided:
+  - *With `command`*: rtk-style structural filters (git, npm, test, lint, docker, aws, github…) — pattern-matched to the command family, removes noise, deduplicates repeated lines.
+  - *Without `command`*: caveman grammar — strips filler words, articles, hedging phrases, and (at `ultra`) standard abbreviations. Preserves code blocks, paths, URLs, and identifiers.
+  - Unified `level` enum (`lite`/`normal`/`full`/`aggressive`/`ultra`) with internal mapping to each engine's native levels.
+  - Reports savings inline: `[42% tokens saved | 1800→1044 | rtk:git:aggressive]`.
+  - Gated by new `enableGeneralCompression` flag (see below).
+
+- **`detail` parameter on `kirograph_context`**: controls code verbosity for entry points. `"full"` (default) returns complete source snippets as before. `"signatures"` returns only the signature and docstring fields (~70% fewer tokens). `"summary"` omits all code. Existing `includeCode` boolean is preserved for backwards compatibility.
+
+- **`detail` parameter on `kirograph_node`**: replaces the boolean `includeCode` with a three-level enum. `"summary"` (default) returns name + location + qualified name. `"signatures"` adds signature and docstring. `"full"` adds complete source. `includeCode` still works but is deprecated.
+
+- **`enableGeneralCompression` config flag**: new opt-in flag (default `false`) gating `kirograph_compress`. Installer asks about it right after the shell compression (`kirograph_exec`) question, with a description explaining the distinction between automatic background compression and explicit on-demand compression. When enabled, the steering file gains a full `## General-purpose compression` section covering both engines, level descriptions, when-to-use / when-not-to-use guidance, and the inline savings format.
+
+- **`LateInstallOptions` interface** in `common.ts`: single options object carrying all installer flags (`cavemanMode`, `shellCompressionLevel`, `enableMemory`, `enableDocs`, `enableData`, `enableSecurity`, `enableArchitecture`, `enablePatterns`, `enableWatchmen`, `watchmenSynthesisMode`, `enableWiki`, `wikiSynthesisMode`, `wikiLocalModel`, `enableCodeHealth`, `enableAdvancedAnalysis`, `enableAgentUtils`, `enableGeneralCompression`, `trackCallSites`, `kiroHookFormat`).
+
+### Changed
+
+- **`kirograph_read` cache hit marker is now prefix-stable**: the dynamic `[cached: unchanged since 5m ago] (3 reads)` string is replaced with the fixed `[cached: file unchanged — use kirograph_retrieve to get full content, or noCache:true to force re-read]`. Repeated reads of an unchanged file now produce identical output, enabling provider-side KV cache hits on the conversation context that includes it.
+
+- **Memory age removed from `kirograph_context` output**: the `(5m ago)` timestamp previously appended to Related Memory observations is gone. Observation content is stable text; the dynamic age was the only thing preventing KV prefix cache hits on context responses. Age is still visible in `kirograph_mem_search` where it's actionable.
+
+- **`kirograph_compress` moved from `enableAgentUtils` to `enableGeneralCompression`**: the tool is no longer bundled with the read/gain/budget utilities. It has its own flag and its own installer question with a dedicated description.
+
+- **`TargetInstaller.installLate` now accepts `(projectRoot, opts: LateInstallOptions)`**: all 29 installer targets (kiro, claude, codex, cursor, windsurf, cline, antigravity, opencode, copilot, copilot-cli, junie, gemini-cli, continue, roo, warp, aider, trae, augment, kilo, amp, devin, replit, goose, openhands, tabnine, qwen, qoder, generic×6) migrated from the positional parameter signature to the options object. Adding a new flag in future costs two files (config.ts + instructions/steering), not 29.
+
+- **`buildInstructionOpts` signature updated**: now accepts `(opts: LateInstallOptions, hasHooks?: boolean)` instead of 9 positional parameters. Maps all new flags through to `InstructionOptions`.
+
+- **`InstructionOptions` extended** with `enableCodeHealth`, `enableAdvancedAnalysis`, `enableAgentUtils`, `enableGeneralCompression`, `trackCallSites`. These were previously kiro-only (steering file only); they now flow through `buildAgentInstructions` for all 29 targets.
+
+- **Guide table rows in `buildAgentInstructions` properly gated**: rows that were previously always-on now respect feature flags:
+  - `kirograph_callers` / `kirograph_callees` — gated by `trackCallSites`
+  - `kirograph_dead_code` / `kirograph_circular_deps` / `kirograph_hotspots` / `kirograph_surprising` / `kirograph_diff` — gated by `enableCodeHealth`
+  - `kirograph_type_hierarchy` — gated by `enableAdvancedAnalysis`
+  - `kirograph_gain` / `kirograph_read` — gated by `enableAgentUtils`
+  - `kirograph_compress` — gated by `enableGeneralCompression`
+
+---
+
 ## [0.27.1]
 
 ### Added

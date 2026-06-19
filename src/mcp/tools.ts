@@ -105,7 +105,13 @@ export const tools: ToolDefinition[] = [
       properties: {
         task: { type: 'string', description: 'Description of the task, bug, or feature to build context for' },
         maxNodes: { type: 'number', description: 'Max symbols to include (default: 20)', default: 20 },
-        includeCode: { type: 'boolean', description: 'Include code snippets (default: true)', default: true },
+        includeCode: { type: 'boolean', description: 'Include code snippets (default: true). Deprecated — prefer detail.', default: true },
+        detail: {
+          type: 'string',
+          description: 'Code detail level: "full" (complete source, default), "signatures" (signature + docstring only, ~70% fewer tokens), "summary" (symbol list with locations, no code)',
+          enum: ['full', 'signatures', 'summary'],
+          default: 'full',
+        },
         projectPath: { type: 'string', description: 'Project root path (optional, defaults to current project)' },
       },
       required: ['task'],
@@ -157,7 +163,13 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'Symbol name to look up' },
-        includeCode: { type: 'boolean', description: 'Include source code (default: false)', default: false },
+        includeCode: { type: 'boolean', description: 'Include full source code (default: false). Deprecated — prefer detail.', default: false },
+        detail: {
+          type: 'string',
+          description: 'Code detail level: "summary" (name + location + qualified name, default), "signatures" (+ signature + docstring), "full" (+ complete source code)',
+          enum: ['summary', 'signatures', 'full'],
+          default: 'summary',
+        },
         projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['symbol'],
@@ -380,6 +392,36 @@ export const tools: ToolDefinition[] = [
         projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['path'],
+    },
+  },
+  {
+    name: 'kirograph_retrieve',
+    description: 'Retrieve cached file content by path (CCR — Cached Content Retrieval). Returns the full content stored in the session cache, or reads and caches the file if not yet seen. Use after kirograph_read returns a "[cached: file unchanged]" marker to get the actual content without a redundant filesystem read.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path to retrieve (absolute or relative to project root)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'kirograph_compress',
+    description: 'Compress text before sending to the model. Two engines: rtk-style shell filters (when command is provided) for structured output like git/npm/test logs, or caveman grammar rules (no command) for prose/observations. Returns compressed text and token savings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to compress' },
+        command: { type: 'string', description: 'Shell command that produced this output (e.g. "git log", "npm test"). Activates rtk-style structural filters. Omit for prose/text (uses caveman grammar).' },
+        level: {
+          type: 'string',
+          description: 'Compression intensity: "lite" / "normal" (light), "full" / "aggressive" (default), "ultra" (maximum)',
+          enum: ['lite', 'normal', 'full', 'aggressive', 'ultra'],
+          default: 'full',
+        },
+      },
+      required: ['text'],
     },
   },
   {
@@ -1344,6 +1386,68 @@ export class ToolHandler {
       return result.content;
     }
 
+    if (toolName === 'kirograph_retrieve') {
+      const filePath = args.path as string;
+      if (!filePath) return 'Error: path is required.';
+
+      const projectRoot = (args.projectPath as string) || process.cwd();
+      const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(projectRoot, filePath);
+
+      const { getFileReadCache } = await import('./cache');
+      const cache = getFileReadCache();
+
+      // Return cached content if we have it; otherwise read and cache
+      const cached = cache.getPreviousContent(resolvedPath);
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
+        return `Error: File not found: ${resolvedPath}`;
+      }
+
+      // Not in cache yet — do a fresh read and populate it
+      const result = cache.read(resolvedPath, true);
+      return result.content;
+    }
+
+    if (toolName === 'kirograph_compress') {
+      const text = args.text as string;
+      if (!text) return 'Error: text is required.';
+
+      const rawLevel = (args.level as string) ?? 'full';
+      const command = args.command as string | undefined;
+      const { estimateTokens: est } = await import('../compression/index');
+      const originalTokens = est(text);
+
+      let compressed: string;
+      let strategy: string;
+
+      if (command) {
+        // Shell output — use rtk-style structural filters
+        const shellLevel = rawLevel === 'ultra' ? 'ultra' : rawLevel === 'lite' || rawLevel === 'normal' ? 'normal' : 'aggressive';
+        const { compress } = await import('../compression/index');
+        const result = compress(command, text, { level: shellLevel as any });
+        compressed = result.output;
+        strategy = `rtk:${result.commandFamily}:${shellLevel}`;
+      } else {
+        // Prose / observations — use caveman grammar
+        const cavemanLevel = rawLevel === 'normal' || rawLevel === 'lite' ? 'lite' : rawLevel === 'aggressive' ? 'full' : rawLevel as any;
+        const { compressObservation } = await import('../memory/compress');
+        const result = compressObservation(text, cavemanLevel);
+        compressed = result.compressed;
+        strategy = `caveman:${cavemanLevel}`;
+      }
+
+      const compressedTokens = est(compressed);
+      const savings = originalTokens > 0 ? Math.round(((originalTokens - compressedTokens) / originalTokens) * 100) : 0;
+      const footer = savings > 5
+        ? `\n\n[${savings}% tokens saved | ${originalTokens}→${compressedTokens} | ${strategy}]`
+        : '';
+
+      return compressed + footer;
+    }
+
     if (toolName === 'kirograph_budget') {
       const projectRoot = (args.projectPath as string) || process.cwd();
       const reset = (args.reset as boolean) ?? false;
@@ -1393,9 +1497,10 @@ export class ToolHandler {
       }
 
       case 'kirograph_context': {
+        const detail = (args.detail as string) ?? ((args.includeCode === false) ? 'summary' : 'full');
         const ctx = await cg.buildContext(args.task as string, {
           maxNodes: (args.maxNodes as number) ?? 20,
-          includeCode: (args.includeCode as boolean) ?? true,
+          includeCode: detail === 'full',
         });
         const lines: string[] = [ctx.summary, ''];
         if (ctx.entryPoints.length === 0) {
@@ -1404,8 +1509,11 @@ export class ToolHandler {
           lines.push('## Entry Points');
           for (const n of ctx.entryPoints) {
             lines.push(`- ${mapKind(n.kind)} \`${n.name}\` — ${n.filePath}:${n.startLine}`);
-            if (ctx.codeSnippets.has(n.id)) {
+            if (detail === 'full' && ctx.codeSnippets.has(n.id)) {
               lines.push('```', ctx.codeSnippets.get(n.id)!, '```');
+            } else if (detail === 'signatures') {
+              if ((n as any).signature) lines.push(`  Signature: ${(n as any).signature}`);
+              if ((n as any).docstring) lines.push(`  Docs: ${(n as any).docstring}`);
             }
           }
           if (ctx.relatedNodes.length > 0) {
@@ -1448,8 +1556,7 @@ export class ToolHandler {
             if (memResults.length > 0) {
               lines.push('', '## Related Memory');
               for (const r of memResults.slice(0, contextLimit)) {
-                const age = formatAge(r.observation.createdAt);
-                lines.push(`- [${r.observation.kind}] ${r.observation.content} (${age})`);
+                lines.push(`- [${r.observation.kind}] ${r.observation.content}`);
               }
             }
           }
@@ -1719,14 +1826,17 @@ export class ToolHandler {
         const results = cg.searchNodes(args.symbol as string, undefined, 5);
         if (results.length === 0) return `Symbol "${args.symbol}" not found in index.`;
         const node = results[0].node;
+        const nodeDetail = (args.detail as string) ?? (args.includeCode ? 'full' : 'summary');
         const lines = [
           `${mapKind(node.kind)} \`${node.name}\``,
           `File: ${node.filePath}:${node.startLine}-${node.endLine}`,
           `Qualified: ${node.qualifiedName}`,
-          node.signature ? `Signature: ${node.signature}` : '',
-          node.docstring ? `Docs: ${node.docstring}` : '',
-        ].filter(Boolean);
-        if (args.includeCode) {
+        ];
+        if (nodeDetail === 'signatures' || nodeDetail === 'full') {
+          if (node.signature) lines.push(`Signature: ${node.signature}`);
+          if (node.docstring) lines.push(`Docs: ${node.docstring}`);
+        }
+        if (nodeDetail === 'full') {
           const src = cg.getNodeSource(node);
           if (src) lines.push('', '```', src, '```');
         }

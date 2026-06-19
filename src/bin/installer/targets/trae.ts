@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CavemanMode } from '../caveman';
 import {
   ensureDir,
   KIROGRAPH_COMMAND,
   KIROGRAPH_MCP_ARGS,
+  LateInstallOptions,
   removeMcpServersConfig,
   writeMcpServersConfig,
 } from '../common';
@@ -22,17 +22,17 @@ export function installTraeEarly(projectRoot: string): void {
     : `  ✓ Trae MCP already configured in ${mcpPath}`);
 }
 
-export function installTraeLate(projectRoot: string, cavemanMode?: CavemanMode | 'off', shellCompressionLevel?: string, enableMemory?: boolean, enableDocs?: boolean, enableData?: boolean, enableSecurity?: boolean, enableArchitecture?: boolean, enablePatterns?: boolean): void {
+export function installTraeLate(projectRoot: string, opts: LateInstallOptions): void {
   const instructionsPath = path.join(projectRoot, '.kirograph', 'trae.md');
   ensureDir(path.dirname(instructionsPath));
-  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(instructionsPath, buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Trae instructions written to ${instructionsPath}`);
 
   const rulesDir = path.join(projectRoot, '.trae', 'rules');
   ensureDir(rulesDir);
   const rulePath = path.join(rulesDir, 'kirograph.md');
   const frontmatter = '---\nalwaysApply: true\n---\n\n';
-  fs.writeFileSync(rulePath, frontmatter + buildAgentInstructions(buildInstructionOpts(cavemanMode, shellCompressionLevel, enableMemory, undefined, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns)));
+  fs.writeFileSync(rulePath, frontmatter + buildAgentInstructions(buildInstructionOpts(opts, false)));
   console.log(`  ✓ Trae rule written to ${rulePath}`);
 }
 
