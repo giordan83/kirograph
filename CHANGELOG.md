@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.27.2] - 2026-06-19: Headroom-inspired compression tooling + installer refactor
+## [0.27.2] - 2026-06-19: Headroom-inspired compression tooling + installer refactor + CLI/MCP parity
 
 ### Added
 
@@ -20,6 +20,27 @@
 - **`enableGeneralCompression` config flag**: new opt-in flag (default `false`) gating `kirograph_compress`. Installer asks about it right after the shell compression (`kirograph_exec`) question, with a description explaining the distinction between automatic background compression and explicit on-demand compression. When enabled, the steering file gains a full `## General-purpose compression` section covering both engines, level descriptions, when-to-use / when-not-to-use guidance, and the inline savings format.
 
 - **`LateInstallOptions` interface** in `common.ts`: single options object carrying all installer flags (`cavemanMode`, `shellCompressionLevel`, `enableMemory`, `enableDocs`, `enableData`, `enableSecurity`, `enableArchitecture`, `enablePatterns`, `enableWatchmen`, `watchmenSynthesisMode`, `enableWiki`, `wikiSynthesisMode`, `wikiLocalModel`, `enableCodeHealth`, `enableAdvancedAnalysis`, `enableAgentUtils`, `enableGeneralCompression`, `trackCallSites`, `kiroHookFormat`).
+
+- **17 new MCP tools** closing CLI/MCP parity gaps:
+
+  - **Snapshot** (`enableCodeHealth`): `kirograph_snapshot_save` — saves a named graph snapshot; `kirograph_snapshot_list` — lists all saved snapshots with timestamps and symbol/edge counts.
+
+  - **Wiki** (`enableWiki`): `kirograph_wiki_init` — creates `SCHEMA.md` and `MANIFEST.md` in `.kirograph/wiki/`; `kirograph_wiki_reindex` — rebuilds the SQLite index from `.kirograph/wiki/*.md`; `kirograph_wiki_status` — shows page count, source count, and oldest/newest page dates; `kirograph_wiki_synthesize` — runs local-model synthesis over the pending source queue (requires `wikiSynthesisMode: "local"`).
+
+  - **Memory** (`enableMemory`): `kirograph_mem_prune` — removes observations older than a given duration (e.g. `"90d"`); `kirograph_mem_lint` — health check for stale links, model mismatch, and orphaned sessions, with optional `fix` to remove stale links; `kirograph_mem_conflicts_list` — lists pending conflict relations; `kirograph_mem_conflicts_ignore` — dismisses a pending relation by ID.
+
+  - **Watchmen** (`enableWatchmen`): `kirograph_watchmen_status` — shows pending observation count, threshold, and target files; `kirograph_watchmen_synthesize` — runs local-model synthesis immediately (requires `watchmenSynthesisMode: "local"`); `kirograph_watchmen_reset` — stores a summary observation to reset the counter without running synthesis.
+
+  - **Data** (`enableData`): `kirograph_data_drift` — detects schema drift (added/removed columns, type changes, row delta) between the last two index runs; `kirograph_data_history` — shows the history of schema snapshots for a dataset.
+
+  - **Affected tests** (always-on core): `kirograph_affected` — finds test files affected by a set of changed source files by traversing the dependency graph.
+
+- **5 new CLI commands** closing MCP-only gaps:
+  - `kirograph callers <symbol>` — lists symbols that call a function.
+  - `kirograph callees <symbol>` — lists symbols called by a function.
+  - `kirograph impact <symbol>` — shows symbols that depend on a given symbol (impact radius).
+  - `kirograph type-hierarchy <symbol>` — traverses base/derived types of a class or interface (`--direction up|down|both`).
+  - `kirograph circular-deps` — finds circular dependency cycles in the codebase.
 
 ### Changed
 
@@ -41,6 +62,8 @@
   - `kirograph_type_hierarchy` — gated by `enableAdvancedAnalysis`
   - `kirograph_gain` / `kirograph_read` — gated by `enableAgentUtils`
   - `kirograph_compress` — gated by `enableGeneralCompression`
+
+- **`enableWatchmen` added to `McpFeatureFlags`** and passed to `writeMcpConfigFinal` in `kiro.ts`: the three watchmen tools are now correctly included/excluded from the Kiro `autoApprove` list based on the flag. Previously `enableWatchmen` existed in the config and installer but was silently absent from the MCP feature-flag plumbing.
 
 ---
 

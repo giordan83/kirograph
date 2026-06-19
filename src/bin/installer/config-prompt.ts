@@ -115,8 +115,8 @@ export async function promptConfigOptions(
     patch.semanticEngine = semanticEngine;
     patch.useVecIndex = semanticEngine === 'sqlite-vec';
 
-    // TurboQuant for memory & docs: offer when cosine or turboquant is the code-node engine
-    if (semanticEngine === 'cosine' || semanticEngine === 'turboquant') {
+    // TurboQuant for memory & docs: offer only when turboquant is the code-node engine
+    if (semanticEngine === 'turboquant') {
       patch.turboquantMemDocs = await askToggle(rl,
         'TurboQuant for memory & docs search (optional):',
         'Replaces the default linear cosine scan in memory observations and doc sections with a compressed ANN index — no native deps required. Most useful when you accumulate many observations or large doc sets (1 000+ entries).',

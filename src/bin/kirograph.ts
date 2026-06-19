@@ -62,6 +62,11 @@ import { register as registerRemediation } from './commands/remediation';
 import { register as registerPattern } from './commands/pattern';
 import { register as registerHook } from './commands/hook';
 import { register as registerWiki } from './commands/wiki';
+import { register as registerCallers } from './commands/callers';
+import { register as registerCallees } from './commands/callees';
+import { register as registerImpact } from './commands/impact';
+import { register as registerTypeHierarchy } from './commands/type-hierarchy';
+import { register as registerCircularDeps } from './commands/circular-deps';
 
 // ── Global error handler for WASM runtime crashes ─────────────────────────────
 //
@@ -169,6 +174,11 @@ registerRemediation(program);
 registerPattern(program);
 registerHook(program);
 registerWiki(program);
+registerCallers(program);
+registerCallees(program);
+registerImpact(program);
+registerTypeHierarchy(program);
+registerCircularDeps(program);
 
 // Register the help command for `kirograph help`
 program

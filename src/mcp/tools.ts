@@ -320,6 +320,27 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'kirograph_snapshot_save',
+    description: 'Save a snapshot of the current graph state. Snapshots can be compared with kirograph_diff to track structural changes over time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Label for the snapshot (default: timestamp-based label)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_snapshot_list',
+    description: 'List all saved graph snapshots with their labels, timestamps, and symbol/edge counts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
     name: 'kirograph_type_hierarchy',
     description: 'Traverse the type hierarchy of a class or interface (base types and derived types).',
     inputSchema: {
@@ -642,6 +663,51 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: 'kirograph_mem_prune',
+    description: 'Remove old memory observations older than a given duration (e.g. "90d", "6m"). Frees storage from stale entries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        olderThan: { type: 'string', description: 'Duration threshold — e.g. "90d" (90 days) or "6m" (6 months). Default: "90d"', default: '90d' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_mem_lint',
+    description: 'Health check on memory: find stale links, model mismatch, orphaned sessions. Returns counts and a flag for model mismatch.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fix: { type: 'boolean', description: 'Auto-remove stale links (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_mem_conflicts_list',
+    description: 'List pending conflict relations between memory observations that need resolution.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_mem_conflicts_ignore',
+    description: 'Ignore (dismiss) a pending conflict relation — marks it as not relevant.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        relationId: { type: 'string', description: 'Relation ID to ignore (from kirograph_mem_conflicts_list)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['relationId'],
+    },
+  },
   // ── Wiki tools (require enableWiki=true) ────────────────────────────────────
   {
     name: 'kirograph_wiki_ingest',
@@ -706,6 +772,46 @@ export const tools: ToolDefinition[] = [
   {
     name: 'kirograph_wiki_list',
     description: 'List all wiki pages with slug, title, source count, and last updated date.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_wiki_synthesize',
+    description: 'Run local-model wiki synthesis: process the pending source queue (requires wikiSynthesisMode: "local").',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_wiki_init',
+    description: 'Initialize the wiki: create SCHEMA.md and MANIFEST.md in .kirograph/wiki/.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_wiki_reindex',
+    description: 'Rebuild the SQLite index from .kirograph/wiki/*.md files on disk.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_wiki_status',
+    description: 'Show wiki subsystem stats: page count, total sources, oldest/newest page dates.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -881,6 +987,82 @@ export const tools: ToolDefinition[] = [
         projectPath: { type: 'string', description: 'Project root path (optional)' },
       },
       required: ['dataset'],
+    },
+  },
+  {
+    name: 'kirograph_data_drift',
+    description: 'Show schema drift between the last two index runs for a dataset. Detects added/removed columns, type changes, and row count deltas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dataset: { type: 'string', description: 'Dataset ID (from kirograph_data_list)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['dataset'],
+    },
+  },
+  {
+    name: 'kirograph_data_history',
+    description: 'Show the history of schema snapshots for a dataset — timestamps, row counts, column counts, and schema hashes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dataset: { type: 'string', description: 'Dataset ID (from kirograph_data_list)' },
+        limit: { type: 'number', description: 'Max snapshots to return (default: 10)', default: 10 },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['dataset'],
+    },
+  },
+  // ── Watchmen tools (require enableMemory=true + enableWatchmen=true) ──────────
+  {
+    name: 'kirograph_watchmen_status',
+    description: 'Show watchmen status: pending observation count, synthesis threshold, and which brief files would be written on next synthesis.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_watchmen_synthesize',
+    description: 'Run watchmen synthesis immediately using the local model (requires watchmenSynthesisMode: "local"). Processes pending observations into a workspace brief.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        force: { type: 'boolean', description: 'Run even if below threshold (default: false)', default: false },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  {
+    name: 'kirograph_watchmen_reset',
+    description: 'Reset the watchmen synthesis counter by storing a summary observation, without running full synthesis.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+    },
+  },
+  // ── Affected tests ────────────────────────────────────────────────────────────
+  {
+    name: 'kirograph_affected',
+    description: 'Find test files affected by a set of changed source files, by traversing the dependency graph.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of changed source file paths (relative to project root)',
+        },
+        depth: { type: 'number', description: 'Max dependency traversal depth (default: 5)', default: 5 },
+        testPattern: { type: 'string', description: 'Custom glob to identify test files (optional)' },
+        projectPath: { type: 'string', description: 'Project root path (optional)' },
+      },
+      required: ['files'],
     },
   },
   // ── Security tools (require enableSecurity=true) ────────────────────────────
@@ -2349,6 +2531,24 @@ export class ToolHandler {
         return lines.join('\n');
       }
 
+      case 'kirograph_snapshot_save': {
+        const sm = cg.createSnapshotManager();
+        const snapshot = sm.save(args.label as string | undefined);
+        return `Snapshot saved: "${snapshot.label}" — ${snapshot.nodeCount} symbols, ${snapshot.edgeCount} edges`;
+      }
+
+      case 'kirograph_snapshot_list': {
+        const sm = cg.createSnapshotManager();
+        const snapshots = sm.list();
+        if (snapshots.length === 0) return 'No snapshots yet. Use kirograph_snapshot_save to save one first.';
+        const lines = [`Saved snapshots (${snapshots.length}):\n`];
+        for (const s of snapshots) {
+          const date = new Date(s.timestamp).toISOString().slice(0, 19).replace('T', ' ');
+          lines.push(`- ${s.label}  (${date}, ${s.nodeCount} symbols, ${s.edgeCount} edges)`);
+        }
+        return lines.join('\n');
+      }
+
       case 'kirograph_flows': {
         const { getExecutionFlows, traceFlow, detectEntryPoints } = await import('../graph/flows');
         const db = cg.getDatabase();
@@ -2733,6 +2933,89 @@ export class ToolHandler {
         return `Found ${candidates.length} potential conflict(s):\n` + candidates.map((c, i) =>
           `${i + 1}. [${c.observationA.kind}] "${c.observationA.content.slice(0, 80)}" ↔ [${c.observationB.kind}] "${c.observationB.content.slice(0, 80)}" (similarity: ${c.similarity.toFixed(2)})`
         ).join('\n') + '\n\nUse kirograph_mem_compare to establish relations.';
+      }
+
+      case 'kirograph_mem_prune': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled.';
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase(); db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+        const olderThan = (args.olderThan as string) ?? '90d';
+        const durationMs = (() => {
+          const m = olderThan.match(/^(\d+)(d|m|w|h)$/);
+          if (!m) return 90 * 86400000;
+          const v = parseInt(m[1]);
+          switch (m[2]) {
+            case 'h': return v * 3600000;
+            case 'd': return v * 86400000;
+            case 'w': return v * 7 * 86400000;
+            case 'm': return v * 30 * 86400000;
+            default: return 90 * 86400000;
+          }
+        })();
+        const deleted = mem.prune(durationMs);
+        return `Pruned ${deleted} observation(s) older than ${olderThan}.`;
+      }
+
+      case 'kirograph_mem_lint': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled.';
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase(); db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+        const result = mem.lint();
+        const lines = ['Memory Lint Results:'];
+        lines.push(`  Stale links:    ${result.staleLinks}`);
+        lines.push(`  Model mismatch: ${result.modelMismatch ? 'yes' : 'no'}`);
+        lines.push(`  Stale sessions: ${result.staleSessions} (auto-closed)`);
+        if (args.fix && result.staleLinks > 0) {
+          const removed = mem.removeStaleLinks();
+          lines.push(`\n✓ Removed ${removed} stale link(s)`);
+        } else if (result.staleLinks > 0) {
+          lines.push(`\nPass fix: true to remove stale links.`);
+        }
+        if (result.modelMismatch) {
+          lines.push(`\nRun 'kirograph mem reembed' to fix model mismatch.`);
+        }
+        return lines.join('\n');
+      }
+
+      case 'kirograph_mem_conflicts_list': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled.';
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase(); db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+        const limit = clampLimit(args.limit as number | undefined, 20);
+        const pending = mem.getPendingRelations(limit);
+        if (pending.length === 0) return 'No pending conflict relations.';
+        return `Pending relations (${pending.length}):\n\n` + pending.map(r =>
+          `[${r.id}] ${r.relation}\n  A: ${r.observationA}\n  B: ${r.observationB}${r.reason ? `\n  Reason: ${r.reason}` : ''}`
+        ).join('\n\n') + '\n\nUse kirograph_mem_conflicts_ignore to dismiss, or kirograph_mem_judge to finalize.';
+      }
+
+      case 'kirograph_mem_conflicts_ignore': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled.';
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase(); db.applyMemorySchema();
+        const mem = new MemoryManager(config, db.getRawDb());
+        mem.initialize();
+        const relationId = args.relationId as string;
+        mem.ignoreRelation(relationId);
+        return `Relation "${relationId}" ignored.`;
       }
 
       // ── Docs tools ────────────────────────────────────────────────────────────
@@ -3155,6 +3438,165 @@ export class ToolHandler {
           `${q.column} (risk: ${(q.riskScore * 100).toFixed(0)}%): ${q.issues.join('; ')}`
         );
         return `Quality report for "${args.dataset}" (${quality.length} columns with issues):\n\n${lines.join('\n')}`;
+      }
+
+      case 'kirograph_data_drift': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableData) return 'Data indexing is not enabled. Set enableData: true in .kirograph/config.json and run kirograph index.';
+
+        const { DataQueries } = await import('../data/queries');
+        const db = cg.getDatabase();
+        db.applyDataSchema();
+        const dq = new DataQueries(db.getRawDb());
+
+        const drift = dq.detectDrift(args.dataset as string);
+        if (drift === null) return `Dataset "${args.dataset}" not found.`;
+        if (!drift.hasDrift) {
+          const rowDelta = drift.rowCountDelta !== 0
+            ? ` (rows: ${drift.rowCountDelta > 0 ? '+' : ''}${drift.rowCountDelta})`
+            : '';
+          return `No schema drift detected for "${args.dataset}".${rowDelta}`;
+        }
+        const driftLines = [`Schema drift detected for "${args.dataset}":`];
+        if (drift.addedColumns?.length) driftLines.push(`  Added columns: ${drift.addedColumns.join(', ')}`);
+        if (drift.removedColumns?.length) driftLines.push(`  Removed columns: ${drift.removedColumns.join(', ')}`);
+        if ((drift as any).typeChanges?.length) {
+          for (const tc of (drift as any).typeChanges) {
+            driftLines.push(`  Type change: ${tc.column} ${tc.from} → ${tc.to}`);
+          }
+        }
+        if (drift.rowCountDelta !== 0) driftLines.push(`  Row count delta: ${drift.rowCountDelta > 0 ? '+' : ''}${drift.rowCountDelta}`);
+        return driftLines.join('\n');
+      }
+
+      case 'kirograph_data_history': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableData) return 'Data indexing is not enabled. Set enableData: true in .kirograph/config.json and run kirograph index.';
+
+        const { DataQueries } = await import('../data/queries');
+        const db = cg.getDatabase();
+        db.applyDataSchema();
+        const dq = new DataQueries(db.getRawDb());
+
+        const limit = Math.min(Number(args.limit ?? 10), 50);
+        const history = dq.getHistory(args.dataset as string, limit);
+        if (history === null) return `Dataset "${args.dataset}" not found.`;
+        if (history.length === 0) return `No history snapshots for "${args.dataset}".`;
+
+        const histLines = [`Schema history for "${args.dataset}" (${history.length} snapshot(s)):\n`];
+        for (const snap of history) {
+          const date = new Date(snap.snapshotAt).toISOString().replace('T', ' ').slice(0, 19);
+          const colNames = snap.columns.map((c: any) => c.name).join(', ');
+          histLines.push(`${date}  rows: ${snap.rowCount.toLocaleString()}  cols: ${snap.columnCount}  schema: ${colNames}`);
+        }
+        return histLines.join('\n');
+      }
+
+      // ── Watchmen tools (require enableMemory + enableWatchmen) ────────────────
+
+      case 'kirograph_watchmen_status': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled. Set enableMemory: true in .kirograph/config.json';
+        if (!config.enableWatchmen) return 'Watchmen is not enabled. Set enableWatchmen: true in .kirograph/config.json';
+
+        const { WatchmenChecker } = await import('../watchmen/index');
+        const { MemoryDatabase } = await import('../memory/database');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const memDb = new MemoryDatabase(db.getRawDb());
+        memDb.initialize();
+
+        const checker = new WatchmenChecker(config.watchmenThreshold);
+        const { ready, pendingCount } = checker.shouldSynthesize(memDb);
+        const { targetFiles } = checker.buildReadyResponse('', pendingCount, projectRoot);
+
+        const statusLines = [
+          `Watchmen Status:`,
+          `  Pending observations: ${pendingCount} / ${config.watchmenThreshold} threshold`,
+          `  Ready to synthesize:  ${ready ? 'yes' : 'no'}`,
+          `  Target files:`,
+        ];
+        for (const f of targetFiles) statusLines.push(`    · ${f}`);
+        return statusLines.join('\n');
+      }
+
+      case 'kirograph_watchmen_synthesize': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory || !config.enableWatchmen) return 'Watchmen is not enabled (enableMemory + enableWatchmen required).';
+        if (config.watchmenSynthesisMode !== 'local') return 'watchmenSynthesisMode is not "local" — use the agent hook instead.';
+
+        const { WatchmenChecker } = await import('../watchmen/index');
+        const { MemoryDatabase } = await import('../memory/database');
+        const { runLocalSynthesis } = await import('../watchmen/synthesize');
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const memDb = new MemoryDatabase(db.getRawDb());
+        memDb.initialize();
+
+        const checker = new WatchmenChecker(config.watchmenThreshold);
+        const { ready, pendingCount } = checker.shouldSynthesize(memDb);
+
+        if (!ready && !args.force) {
+          return `Watchmen: ${pendingCount}/${config.watchmenThreshold} observations — threshold not reached. Pass force: true to run anyway.`;
+        }
+
+        const observations = memDb.getObservationsSinceLastSummary(50);
+        if (observations.length === 0) return 'No observations to synthesize.';
+
+        const readyResult = checker.buildReadyResponse('', pendingCount, projectRoot);
+        const result = await runLocalSynthesis(observations, readyResult, config.watchmenLocalModel, projectRoot, true);
+
+        const mgr = new MemoryManager(config, db.getRawDb(), projectRoot);
+        mgr.initialize();
+        await mgr.store({ content: result.summaryObservation, kind: 'summary', source: 'agent' });
+
+        const synthLines = [`Watchmen synthesis complete.`];
+        if (result.filesWritten.length) synthLines.push(`Brief written to: ${result.filesWritten.join(', ')}`);
+        if (result.skillsWritten.length) synthLines.push(`Skills written: ${result.skillsWritten.join(', ')}`);
+        if (result.skillsPruned.length) synthLines.push(`Pruned stale: ${result.skillsPruned.join(', ')}`);
+        return synthLines.join('\n');
+      }
+
+      case 'kirograph_watchmen_reset': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableMemory) return 'Memory is not enabled.';
+        if (!config.enableWatchmen) return 'Watchmen is not enabled.';
+
+        const { MemoryManager } = await import('../memory/index');
+        const db = cg.getDatabase();
+        db.applyMemorySchema();
+        const mgr = new MemoryManager(config, db.getRawDb(), projectRoot);
+        mgr.initialize();
+
+        const id = await mgr.store({ content: `Watchmen counter reset via MCP at ${new Date().toISOString()}.`, kind: 'summary', source: 'manual' });
+        return id ? 'Watchmen counter reset — pending observations set back to 0.' : 'Already at zero — nothing to reset.';
+      }
+
+      // ── Affected tests ────────────────────────────────────────────────────────
+
+      case 'kirograph_affected': {
+        const files = (args.files as string[]) ?? [];
+        if (files.length === 0) return 'No files provided. Pass file paths in the "files" array.';
+
+        const affected = cg.getAffectedTests(files, {
+          depth: (args.depth as number) ?? 5,
+          testPattern: args.testPattern as string | undefined,
+        });
+
+        if (affected.length === 0) return `No affected test files found for the provided ${files.length} changed file(s).`;
+        return `Affected test files (${affected.length}) for ${files.length} changed file(s):\n\n` +
+          affected.map(f => `- ${f}`).join('\n');
       }
 
       // ── Security tools (require enableSecurity=true) ──────────────────────────
@@ -4512,6 +4954,89 @@ export class ToolHandler {
           lines.push(`  ${page.slug.padEnd(32)} ${page.title}  (${page.sourceCount} src, ${date})`);
         }
         return lines.join('\n');
+      }
+
+      case 'kirograph_wiki_synthesize': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+        if (config.wikiSynthesisMode !== 'local') return 'wikiSynthesisMode is not "local". This tool is for local-model synthesis only.';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph', {
+          autoResolveConflicts: (config as any).wikiAutoResolveConflicts ?? false,
+        });
+        wiki.initialize();
+
+        const queueCount = wiki.getQueueCount();
+        if (queueCount === 0) return 'Wiki queue is empty — nothing to synthesize.';
+
+        const result = await wiki.synthesize(config.wikiLocalModel, true);
+        const synthLines = [`Wiki synthesis complete — processed ${result.processed} source(s).`];
+        if (result.created.length) synthLines.push(`Created: ${result.created.join(', ')}`);
+        if (result.updated.length) synthLines.push(`Updated: ${result.updated.join(', ')}`);
+        if (result.errors.length) synthLines.push(`Errors: ${result.errors.join('; ')}`);
+        return synthLines.join('\n');
+      }
+
+      case 'kirograph_wiki_init': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph', {
+          autoResolveConflicts: (config as any).wikiAutoResolveConflicts ?? false,
+        });
+        wiki.initWiki();
+        return 'Wiki initialized. SCHEMA.md and MANIFEST.md created in .kirograph/wiki/.';
+      }
+
+      case 'kirograph_wiki_reindex': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const count = wiki.reindex();
+        return `Reindexed ${count} wiki page(s) from .kirograph/wiki/*.md.`;
+      }
+
+      case 'kirograph_wiki_status': {
+        const { loadConfig } = await import('../config');
+        const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
+        const config = await loadConfig(projectRoot);
+        if (!config.enableWiki) return 'Wiki is not enabled. Set enableWiki: true in .kirograph/config.json';
+
+        const { KiroGraphWiki } = await import('../wiki/index');
+        const db = cg.getDatabase();
+        db.applyWikiSchema();
+        const wiki = new KiroGraphWiki(db.getRawDb(), projectRoot + '/.kirograph');
+        wiki.initialize();
+
+        const stats = wiki.getStats();
+        const oldest = stats.oldestPage ? new Date(stats.oldestPage).toISOString().slice(0, 10) : 'n/a';
+        const newest = stats.newestPage ? new Date(stats.newestPage).toISOString().slice(0, 10) : 'n/a';
+        return [
+          'Wiki Status:',
+          `  Pages:         ${stats.pageCount}`,
+          `  Total sources: ${stats.totalSources}`,
+          `  Oldest page:   ${oldest}`,
+          `  Newest page:   ${newest}`,
+          `  Wiki dir:      .kirograph/wiki/`,
+        ].join('\n');
       }
 
       default:

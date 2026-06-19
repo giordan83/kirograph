@@ -9,6 +9,7 @@ import { FEATURE_TOOL_SETS } from '../../mcp/tool-names';
 export interface McpFeatureFlags {
   enableArchitecture?: boolean;
   enableMemory?: boolean;
+  enableWatchmen?: boolean;
   enableDocs?: boolean;
   enableData?: boolean;
   enableSecurity?: boolean;

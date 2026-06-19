@@ -19,7 +19,7 @@ export function installKiroLate(projectRoot: string, opts: LateInstallOptions): 
   const kiroDir = path.join(projectRoot, '.kiro');
   const enableCompression = shellCompressionLevel !== 'off';
   const enableShellExec = shellCompressionLevel !== 'off';
-  writeMcpConfigFinal(kiroDir, projectRoot, { enableArchitecture, enableMemory, enableDocs, enableData, enableSecurity, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, enableGeneralCompression, enableShellExec, trackCallSites });
+  writeMcpConfigFinal(kiroDir, projectRoot, { enableArchitecture, enableMemory, enableWatchmen, enableDocs, enableData, enableSecurity, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, enableGeneralCompression, enableShellExec, trackCallSites });
   writeHooks(kiroDir, { enableCompression, enableMemory, enableWatchmen, watchmenSynthesisMode, enableWiki, wikiSynthesisMode, kiroHookFormat });
   writeSteering(kiroDir, { cavemanMode, enableCompression, shellCompressionLevel: shellCompressionLevel as any, enableMemory, enableDocs, enableData, enableSecurity, enableArchitecture, enablePatterns, enableWiki, enableCodeHealth, enableAdvancedAnalysis, enableAgentUtils, enableGeneralCompression, trackCallSites });
   writeCliAgent(kiroDir, { enableSecurity, enableArchitecture, enablePatterns });
