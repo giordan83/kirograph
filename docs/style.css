@@ -337,6 +337,19 @@ strong { color: var(--text-bright); font-weight: 600; }
   letter-spacing: 0.02em;
 }
 
+.card-tok {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(120, 120, 120, 0.1);
+  color: var(--text-muted);
+  border: 1px solid rgba(120, 120, 120, 0.2);
+  letter-spacing: 0.02em;
+}
+
 .card-body {
   flex: 1;
 }

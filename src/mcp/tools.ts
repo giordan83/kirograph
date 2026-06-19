@@ -92,27 +92,27 @@ export const tools: ToolDefinition[] = [
           enum: ['function', 'method', 'class', 'interface', 'type_alias', 'variable', 'route', 'component'],
         },
         limit: { type: 'number', description: 'Max results 1-100 (default: 10)', default: 10 },
-        projectPath: { type: 'string', description: 'Project root path (optional, defaults to current project)' },
+        projectPath: { type: 'string' },
       },
       required: ['query'],
     },
   },
   {
     name: 'kirograph_context',
-    description: 'PRIMARY TOOL: Build comprehensive context for a task or feature request. Returns entry points, related symbols, and key code — often enough to understand the codebase without additional tool calls.',
+    description: 'Build comprehensive context for a task or feature request.',
     inputSchema: {
       type: 'object',
       properties: {
-        task: { type: 'string', description: 'Description of the task, bug, or feature to build context for' },
-        maxNodes: { type: 'number', description: 'Max symbols to include (default: 20)', default: 20 },
-        includeCode: { type: 'boolean', description: 'Include code snippets (default: true). Deprecated — prefer detail.', default: true },
+        task: { type: 'string', description: 'Task description or feature name' },
+        maxNodes: { type: 'number', description: 'Max symbols to include', default: 20 },
+        includeCode: { type: 'boolean', description: 'Include code snippets. Deprecated — prefer detail.', default: true },
         detail: {
           type: 'string',
-          description: 'Code detail level: "full" (complete source, default), "signatures" (signature + docstring only, ~70% fewer tokens), "summary" (symbol list with locations, no code)',
+          description: 'Code verbosity: full, signatures, or summary',
           enum: ['full', 'signatures', 'summary'],
           default: 'full',
         },
-        projectPath: { type: 'string', description: 'Project root path (optional, defaults to current project)' },
+        projectPath: { type: 'string' },
       },
       required: ['task'],
     },
@@ -125,7 +125,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to find callers for' },
         limit: { type: 'number', description: 'Max results 1-100 (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['symbol'],
     },
@@ -138,39 +138,39 @@ export const tools: ToolDefinition[] = [
       properties: {
         symbol: { type: 'string', description: 'Symbol name to find callees for' },
         limit: { type: 'number', description: 'Max results 1-100 (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['symbol'],
     },
   },
   {
     name: 'kirograph_impact',
-    description: 'Analyze what code would be affected by changing a symbol. Use before making changes.',
+    description: 'Analyze what code would be affected by changing a symbol.',
     inputSchema: {
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'Symbol name to analyze impact for' },
         depth: { type: 'number', description: 'Traversal depth (default: 2)', default: 2 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['symbol'],
     },
   },
   {
     name: 'kirograph_node',
-    description: 'Get details about a specific symbol, optionally including its source code.',
+    description: 'Get details about a specific symbol.',
     inputSchema: {
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'Symbol name to look up' },
-        includeCode: { type: 'boolean', description: 'Include full source code (default: false). Deprecated — prefer detail.', default: false },
+        includeCode: { type: 'boolean', description: 'Include full source code. Deprecated — prefer detail.', default: false },
         detail: {
           type: 'string',
-          description: 'Code detail level: "summary" (name + location + qualified name, default), "signatures" (+ signature + docstring), "full" (+ complete source code)',
+          description: 'Output level: summary, signatures, or full',
           enum: ['summary', 'signatures', 'full'],
           default: 'summary',
         },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['symbol'],
     },
@@ -181,27 +181,27 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_files',
-    description: 'List the indexed file structure of the project. Supports filtering by path prefix, glob pattern, or depth.',
+    description: 'List indexed file structure with optional filtering.',
     inputSchema: {
       type: 'object',
       properties: {
         filterPath: { type: 'string', description: 'Filter by directory path prefix (e.g., "src/")' },
         pattern: { type: 'string', description: 'Filter by glob pattern (e.g., "**/*.ts")' },
-        maxDepth: { type: 'number', description: 'Limit tree depth' },
+        maxDepth: { type: 'number', description: 'Max directory depth to traverse' },
         format: {
           type: 'string',
           description: 'Output format: "tree" (default, visual tree), "flat" (one path per line), "grouped" (grouped by directory), "compact" (rtk-style summary with counts)',
           enum: ['tree', 'flat', 'grouped', 'compact'],
           default: 'tree',
         },
-        includeMetadata: { type: 'boolean', description: 'Include language and symbol count (default: true)', default: true },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        includeMetadata: { type: 'boolean', description: 'Include language and symbol count', default: true },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -212,7 +212,7 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max results 1-100 (default: 50)', default: 50 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -222,7 +222,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -234,54 +234,54 @@ export const tools: ToolDefinition[] = [
       properties: {
         from: { type: 'string', description: 'Source symbol name' },
         to: { type: 'string', description: 'Target symbol name' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['from', 'to'],
     },
   },
   {
     name: 'kirograph_architecture',
-    description: 'Get the high-level software architecture: packages, layers, and their dependencies. Requires enableArchitecture=true in config. Call this first on a new task to orient yourself without reading files.',
+    description: 'Show high-level architecture: packages, layers, dependencies.',
     inputSchema: {
       type: 'object',
       properties: {
         level: {
           type: 'string',
-          description: 'View level: "packages" (package graph), "layers" (architectural layers), or "both" (default)',
+          description: 'packages, layers, or both',
           enum: ['packages', 'layers', 'both'],
           default: 'both',
         },
-        includeFiles: { type: 'boolean', description: 'Include per-file package/layer assignments (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        includeFiles: { type: 'boolean', description: 'Include per-file package/layer assignments', default: false },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_coupling',
-    description: 'Show coupling metrics for packages: afferent (Ca), efferent (Ce), and instability (Ce/(Ca+Ce)). High instability = depends on many others; low instability = depended on by many. Requires enableArchitecture=true.',
+    description: 'Package coupling metrics: Ca, Ce, and instability (Ce/(Ca+Ce)).',
     inputSchema: {
       type: 'object',
       properties: {
         sortBy: {
           type: 'string',
-          description: 'Sort order: "instability" (default), "afferent", or "efferent"',
+          description: 'Sort by instability, ca, ce, or name',
           enum: ['instability', 'afferent', 'efferent'],
           default: 'instability',
         },
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_package',
-    description: 'Drill into one package: files it contains, symbols it exports, packages it depends on, and packages that depend on it. Requires enableArchitecture=true.',
+    description: 'Drill into a package: files, exports, and dependencies.',
     inputSchema: {
       type: 'object',
       properties: {
         package: { type: 'string', description: 'Package name or path (partial match accepted)' },
         includeFiles: { type: 'boolean', description: 'List files in the package (default: true)', default: true },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['package'],
     },
@@ -293,7 +293,7 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max results 1-100 (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -304,18 +304,18 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max results 1-100 (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_diff',
-    description: 'Compare the current graph against a saved snapshot. Shows added/removed symbols and relationships since the snapshot was taken. Use `kirograph snapshot` CLI command to save a snapshot first.',
+    description: 'Compare current graph against a saved snapshot.',
     inputSchema: {
       type: 'object',
       properties: {
-        snapshot: { type: 'string', description: 'Snapshot label to compare against. Omit to use the latest saved snapshot.' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        snapshot: { type: 'string', description: 'Snapshot label; omit for latest' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -326,7 +326,7 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         label: { type: 'string', description: 'Label for the snapshot (default: timestamp-based label)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -336,67 +336,67 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_type_hierarchy',
-    description: 'Traverse the type hierarchy of a class or interface (base types and derived types).',
+    description: 'Traverse base and derived types of a class or interface.',
     inputSchema: {
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'Class or interface name' },
         direction: {
           type: 'string',
-          description: 'Direction: "up" for base types, "down" for derived types, "both" for all (default)',
+          description: 'up=base, down=derived, both=all',
           enum: ['up', 'down', 'both'],
           default: 'both',
         },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['symbol'],
     },
   },
   {
     name: 'kirograph_exec',
-    description: 'Run a shell command and return token-optimized output. Automatically filters noise from git, test runners, linters, build tools, docker, and package managers. Use instead of raw shell for 60-90% token savings on verbose commands.',
+    description: 'Run a shell command with token-optimized, noise-filtered output.',
     inputSchema: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: 'Shell command to execute (e.g., "git status", "npm test", "cargo build")' },
-        cwd: { type: 'string', description: 'Working directory (default: project root)' },
+        command: { type: 'string', description: 'Shell command to execute' },
+        cwd: { type: 'string', description: 'Working directory' },
         level: {
           type: 'string',
           description: 'Compression level: "normal" (balanced), "aggressive" (more compact), "ultra" (maximum compression)',
           enum: ['normal', 'aggressive', 'ultra'],
           default: 'normal',
         },
-        timeout: { type: 'number', description: 'Timeout in seconds (default: 60)', default: 60 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        timeout: { type: 'number', description: 'Timeout in seconds', default: 60 },
+        projectPath: { type: 'string' },
       },
       required: ['command'],
     },
   },
   {
     name: 'kirograph_gain',
-    description: 'Show token savings statistics — both from graph tools (vs manual file reads/grep) and from kirograph_exec shell compression.',
+    description: 'Show token savings from graph tools and shell compression.',
     inputSchema: {
       type: 'object',
       properties: {
         period: {
           type: 'string',
-          description: 'Time period: "session" (current), "today", "week", or "all"',
+          description: 'Time window: session, hour, day, week, all',
           enum: ['session', 'today', 'week', 'all'],
           default: 'session',
         },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_read',
-    description: 'Read a file with caching and multiple modes. First read returns full content; subsequent reads of unchanged files return a compact "cached" marker (~13 tokens). Supports modes: full, map, signatures, diff, lines, imports, exports.',
+    description: 'Read a file with caching; unchanged files return cache marker.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -409,8 +409,8 @@ export const tools: ToolDefinition[] = [
         },
         start: { type: 'number', description: 'Start line (for lines mode)' },
         end: { type: 'number', description: 'End line (for lines mode)' },
-        noCache: { type: 'boolean', description: 'Force fresh read, bypass cache (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        noCache: { type: 'boolean', description: 'Force fresh read, bypass cache', default: false },
+        projectPath: { type: 'string' },
       },
       required: ['path'],
     },
@@ -422,19 +422,19 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         path: { type: 'string', description: 'File path to retrieve (absolute or relative to project root)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['path'],
     },
   },
   {
     name: 'kirograph_compress',
-    description: 'Compress text before sending to the model. Two engines: rtk-style shell filters (when command is provided) for structured output like git/npm/test logs, or caveman grammar rules (no command) for prose/observations. Returns compressed text and token savings.',
+    description: 'Compress text via rtk shell filters or caveman grammar engine.',
     inputSchema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'Text to compress' },
-        command: { type: 'string', description: 'Shell command that produced this output (e.g. "git log", "npm test"). Activates rtk-style structural filters. Omit for prose/text (uses caveman grammar).' },
+        command: { type: 'string', description: 'Shell command text came from (selects rtk engine)' },
         level: {
           type: 'string',
           description: 'Compression intensity: "lite" / "normal" (light), "full" / "aggressive" (default), "ultra" (maximum)',
@@ -447,50 +447,50 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'kirograph_budget',
-    description: 'Show current session context budget usage. Returns tokens consumed, remaining budget, and utilization percentage.',
+    description: 'Show session context budget: tokens used, remaining, utilization.',
     inputSchema: {
       type: 'object',
       properties: {
-        reset: { type: 'boolean', description: 'Reset session budget counters (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        reset: { type: 'boolean', description: 'Reset session budget counters', default: false },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_flows',
-    description: 'Trace execution flows from entry points (routes, handlers, main functions) through the call graph. Returns ordered call chains sorted by criticality.',
+    description: 'Trace execution flows from entry points through the call graph.',
     inputSchema: {
       type: 'object',
       properties: {
-        entryPoint: { type: 'string', description: 'Symbol name to trace from, or omit to auto-detect entry points' },
+        entryPoint: { type: 'string', description: 'Symbol to trace; omit to auto-detect' },
         maxFlows: { type: 'number', description: 'Max number of flows to return (default 10)' },
         maxDepth: { type: 'number', description: 'Max call chain depth (default 10)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_communities',
-    description: 'Detect code communities (clusters of related symbols) using graph-based community detection. Shows which code belongs together and how communities are coupled.',
+    description: 'Detect clusters of related symbols via graph community detection.',
     inputSchema: {
       type: 'object',
       properties: {
-        resolution: { type: 'number', description: 'Resolution parameter (default 1.0, higher = more communities)' },
+        resolution: { type: 'number', description: 'Granularity 0.1–2.0; higher=more smaller clusters' },
         limit: { type: 'number', description: 'Max communities to return (default 15)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_refactor',
-    description: 'Refactoring assistant. Use mode "rename" to preview all locations that reference a symbol (rename preview). Use mode "suggest" for community-driven refactoring suggestions.',
+    description: 'Rename preview (all references) or function summarization.',
     inputSchema: {
       type: 'object',
       properties: {
-        mode: { type: 'string', description: 'Mode: "rename" (preview references) or "suggest" (refactoring suggestions)', enum: ['rename', 'suggest'] },
+        mode: { type: 'string', description: 'rename=preview references, summarize=summary', enum: ['rename', 'suggest'] },
         symbol: { type: 'string', description: 'Symbol name (required for rename mode)' },
         limit: { type: 'number', description: 'Max results (default 10)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['mode'],
     },
@@ -498,7 +498,7 @@ export const tools: ToolDefinition[] = [
   // ── Memory tools (require enableMemory=true) ────────────────────────────────
   {
     name: 'kirograph_mem_search',
-    description: 'Search project memory for past decisions, errors, patterns, and context. Returns observations ranked by relevance.',
+    description: 'Search project memory for decisions, errors, patterns, context.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -511,14 +511,14 @@ export const tools: ToolDefinition[] = [
         limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
         sessionId: { type: 'string', description: 'Filter to specific session' },
         asOf: { type: 'number', description: 'Query facts valid at this timestamp (epoch ms). Filters out expired/superseded observations.' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['query'],
     },
   },
   {
     name: 'kirograph_mem_store',
-    description: 'Store an observation in project memory. Content is automatically compressed (if caveman mode is on) and linked to relevant code symbols.',
+    description: 'Store an observation in project memory.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -529,9 +529,9 @@ export const tools: ToolDefinition[] = [
           enum: ['decision', 'error', 'pattern', 'architecture', 'summary', 'note'],
           default: 'note',
         },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
         topicKey: { type: 'string', description: "Stable semantic key for this observation (e.g. 'architecture/auth-model'). Enables addressing by concept." },
-        reviewAfter: { type: 'number', description: 'Epoch ms: schedule this observation for re-evaluation after this timestamp.' },
+        reviewAfter: { type: 'number', description: 'ISO date to flag for review' },
       },
       required: ['content'],
     },
@@ -542,42 +542,42 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        limit: { type: 'number', description: 'Number of sessions to show (default: 5)', default: 5 },
+        limit: { type: 'number', description: 'Number of sessions to show', default: 5 },
         sessionId: { type: 'string', description: 'Show observations for a specific session' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_status',
-    description: 'Memory subsystem health: session count, observations, embedding coverage, storage size.',
+    description: 'Memory subsystem health: sessions, observations, embeddings, size.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   // ── Engram-parity mem tools ──────────────────────────────────────────────────
   {
     name: 'kirograph_mem_review',
-    description: 'List observations past their review_after date — stale facts the agent should re-evaluate, update, or supersede.',
+    description: 'List observations past their review_after date.',
     inputSchema: {
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_mark_reviewed',
-    description: 'Mark an observation as reviewed — clears its review_after date.',
+    description: 'Clear review_after date on an observation.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Observation ID' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['id'],
     },
@@ -592,9 +592,9 @@ export const tools: ToolDefinition[] = [
         observationB: { type: 'string', description: 'Second observation ID or topic_key' },
         relation: { type: 'string', enum: ['supersedes', 'conflicts_with', 'compatible', 'scoped', 'related', 'not_conflict'], description: 'Relation type' },
         confidence: { type: 'number', description: 'Confidence 0.0–1.0 (default: 1.0)' },
-        reason: { type: 'string', description: 'Explanation for the relation' },
+        reason: { type: 'string', description: 'Explanation of the relation' },
         evidence: { type: 'string', description: 'Supporting evidence text' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['observationA', 'observationB', 'relation'],
     },
@@ -608,102 +608,102 @@ export const tools: ToolDefinition[] = [
         relationId: { type: 'string', description: 'Relation ID (from kirograph_mem_compare or kirograph_mem_search)' },
         relation: { type: 'string', enum: ['supersedes', 'conflicts_with', 'compatible', 'scoped', 'related', 'not_conflict'], description: 'Final relation type' },
         confidence: { type: 'number', description: 'Final confidence 0.0–1.0' },
-        reason: { type: 'string', description: 'Reasoning for judgment' },
+        reason: { type: 'string', description: 'Reasoning' },
         evidence: { type: 'string', description: 'Supporting evidence' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['relationId', 'relation', 'confidence'],
     },
   },
   {
     name: 'kirograph_mem_capture',
-    description: 'Extract and store structured learnings from a freeform text block. Looks for ## Key Learnings, ## Observations, ## Decisions, ## Key Changes sections and saves each bullet as a separate observation.',
+    description: 'Extract and store structured learnings from freeform text.',
     inputSchema: {
       type: 'object',
       properties: {
         content: { type: 'string', description: 'Text block with structured sections' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['content'],
     },
   },
   {
     name: 'kirograph_mem_save_prompt',
-    description: 'Save the current user prompt to session memory for context reconstruction.',
+    description: 'Save the current user prompt to session memory.',
     inputSchema: {
       type: 'object',
       properties: {
-        content: { type: 'string', description: 'Prompt content to save' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        content: { type: 'string', description: 'The user prompt text to save' },
+        projectPath: { type: 'string' },
       },
       required: ['content'],
     },
   },
   {
     name: 'kirograph_mem_suggest_topic_key',
-    description: 'Suggest a stable topic_key for an observation based on its kind and content. Returns a deterministic slug like "architecture/auth-model".',
+    description: 'Suggest a stable topic_key slug for an observation.',
     inputSchema: {
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['decision', 'error', 'pattern', 'architecture', 'summary', 'note'], description: 'Observation kind' },
-        title: { type: 'string', description: 'Short title or first sentence of the observation' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        title: { type: 'string', description: 'Short description of the observation' },
+        projectPath: { type: 'string' },
       },
       required: ['kind', 'title'],
     },
   },
   {
     name: 'kirograph_mem_conflicts_scan',
-    description: 'Scan recent observations for potential conflicts using FTS similarity. Returns candidate pairs that may need a relation established via kirograph_mem_compare.',
+    description: 'Scan recent observations for potential conflicts using FTS.',
     inputSchema: {
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max observations to scan (default: 50)', default: 50 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_prune',
-    description: 'Remove old memory observations older than a given duration (e.g. "90d", "6m"). Frees storage from stale entries.',
+    description: 'Remove memory observations older than a given duration.',
     inputSchema: {
       type: 'object',
       properties: {
-        olderThan: { type: 'string', description: 'Duration threshold — e.g. "90d" (90 days) or "6m" (6 months). Default: "90d"', default: '90d' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        olderThan: { type: 'string', description: 'Duration threshold e.g. "90d" or "6m"', default: '90d' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_lint',
-    description: 'Health check on memory: find stale links, model mismatch, orphaned sessions. Returns counts and a flag for model mismatch.',
+    description: 'Health check: stale links, model mismatch, orphaned sessions.',
     inputSchema: {
       type: 'object',
       properties: {
-        fix: { type: 'boolean', description: 'Auto-remove stale links (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        fix: { type: 'boolean', description: 'Auto-remove stale links', default: false },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_conflicts_list',
-    description: 'List pending conflict relations between memory observations that need resolution.',
+    description: 'List pending conflict relations needing resolution.',
     inputSchema: {
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_mem_conflicts_ignore',
-    description: 'Ignore (dismiss) a pending conflict relation — marks it as not relevant.',
+    description: 'Dismiss a pending conflict relation as not relevant.',
     inputSchema: {
       type: 'object',
       properties: {
         relationId: { type: 'string', description: 'Relation ID to ignore (from kirograph_mem_conflicts_list)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['relationId'],
     },
@@ -711,71 +711,71 @@ export const tools: ToolDefinition[] = [
   // ── Wiki tools (require enableWiki=true) ────────────────────────────────────
   {
     name: 'kirograph_wiki_ingest',
-    description: 'Returns an ingest prompt (SCHEMA + MANIFEST + source content) for the LLM to produce a WIKI_DIFF. Call kirograph_wiki_apply_diff with the result.',
+    description: 'Build ingest prompt for LLM to produce a WIKI_DIFF.',
     inputSchema: {
       type: 'object',
       properties: {
         source: { type: 'string', description: 'Source content to ingest (markdown, notes, ADR text, etc.)' },
-        sourceName: { type: 'string', description: 'Name or path of the source (e.g. "ADR-001.md")', default: 'source' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        sourceName: { type: 'string', description: 'Name or path of the source', default: 'source' },
+        projectPath: { type: 'string' },
       },
       required: ['source'],
     },
   },
   {
     name: 'kirograph_wiki_apply_diff',
-    description: 'Apply a WIKI_DIFF string (produced by the LLM after kirograph_wiki_ingest) to the wiki filesystem and SQLite index.',
+    description: 'Apply a WIKI_DIFF to the wiki filesystem and SQLite index.',
     inputSchema: {
       type: 'object',
       properties: {
         diff: { type: 'string', description: 'WIKI_DIFF string with WIKI_DIFF_START/END blocks' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['diff'],
     },
   },
   {
     name: 'kirograph_wiki_search',
-    description: 'Full-text search over wiki pages. Returns page slugs, titles, and previews ranked by relevance.',
+    description: 'FTS over wiki pages; returns slugs, titles, previews.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query' },
         limit: { type: 'number', description: 'Max results (default: 5)', default: 5 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['query'],
     },
   },
   {
     name: 'kirograph_wiki_page',
-    description: 'Retrieve the full markdown content of a wiki page by slug.',
+    description: 'Retrieve full markdown of a wiki page by slug.',
     inputSchema: {
       type: 'object',
       properties: {
-        slug: { type: 'string', description: 'Page slug (e.g. "AuthService", "arch/auth-model")' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        slug: { type: 'string', description: 'Page slug (e.g. "arch/auth-model")' },
+        projectPath: { type: 'string' },
       },
       required: ['slug'],
     },
   },
   {
     name: 'kirograph_wiki_lint',
-    description: 'Health check the wiki for broken links, orphan pages, stale sources, and potential contradictions between pages.',
+    description: 'Check wiki for broken links, orphans, stale sources, contradictions.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_wiki_list',
-    description: 'List all wiki pages with slug, title, source count, and last updated date.',
+    description: 'List all wiki pages with slug, title, source count, date.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -785,7 +785,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -795,7 +795,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -805,7 +805,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -815,96 +815,96 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   // ── Docs tools (require enableDocs=true) ────────────────────────────────────
   {
     name: 'kirograph_docs_toc',
-    description: 'Get table of contents for a documentation file or the whole project. Returns section IDs, titles, levels, and summaries.',
+    description: 'Get TOC for a doc file or whole project (IDs, titles, levels, summaries).',
     inputSchema: {
       type: 'object',
       properties: {
         file: { type: 'string', description: 'Filter to a specific doc file (relative path). Omit for project-wide TOC.' },
-        tree: { type: 'boolean', description: 'Return nested tree structure (default: false, flat list)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        tree: { type: 'boolean', description: 'Return nested tree structure.', default: false },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_docs_search',
-    description: 'Search documentation sections by query. Returns matching sections ranked by relevance. Independent from kirograph_search (code-only).',
+    description: 'Search documentation sections by query, ranked by relevance.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query (natural language or keywords)' },
-        file: { type: 'string', description: 'Narrow search to a specific doc file (relative path)' },
+        file: { type: 'string', description: 'Limit search to a specific doc file.' },
         limit: { type: 'number', description: 'Max results (default: 10)', default: 10 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['query'],
     },
   },
   {
     name: 'kirograph_docs_section',
-    description: 'Retrieve full content of a documentation section by its stable ID. Use context=true to also get ancestor headings and child summaries.',
+    description: 'Retrieve full content of a doc section by its stable ID.',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Section ID (from kirograph_docs_toc or kirograph_docs_search results)' },
-        context: { type: 'boolean', description: 'Include ancestor heading chain and child summaries (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        id: { type: 'string', description: 'Section ID.' },
+        context: { type: 'boolean', description: 'Include ancestor headings and child summaries.', default: false },
+        projectPath: { type: 'string' },
       },
       required: ['id'],
     },
   },
   {
     name: 'kirograph_docs_outline',
-    description: 'Get the heading hierarchy for a single documentation file. Lighter than full TOC when you know which file is relevant.',
+    description: 'Get heading hierarchy for a single documentation file.',
     inputSchema: {
       type: 'object',
       properties: {
-        file: { type: 'string', description: 'Relative path to the doc file' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        file: { type: 'string', description: 'Documentation file path (relative to project root).' },
+        projectPath: { type: 'string' },
       },
       required: ['file'],
     },
   },
   {
     name: 'kirograph_docs_refs',
-    description: 'Find code symbols referenced by a doc section, or doc sections that reference a code symbol. Bidirectional lookup.',
+    description: 'Bidirectional lookup: doc section↔code symbol references.',
     inputSchema: {
       type: 'object',
       properties: {
-        sectionId: { type: 'string', description: 'Doc section ID (find code symbols it references)' },
-        nodeId: { type: 'string', description: 'Code symbol qualified name (find doc sections that reference it)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        sectionId: { type: 'string', description: 'Doc section ID to find referenced symbols.' },
+        nodeId: { type: 'string', description: 'Code symbol ID to find referencing doc sections.' },
+        projectPath: { type: 'string' },
       },
     },
   },
   // ── Data tools (require enableData=true) ────────────────────────────────────
   {
     name: 'kirograph_data_list',
-    description: 'List all indexed datasets with row counts, column counts, and file sizes.',
-    inputSchema: { type: 'object', properties: { projectPath: { type: 'string', description: 'Project root path (optional)' } } },
+    description: 'List all indexed datasets with row/column counts and file sizes.',
+    inputSchema: { type: 'object', properties: { projectPath: { type: 'string' } } },
   },
   {
     name: 'kirograph_data_describe',
-    description: 'Full schema profile of a dataset: column names, types, cardinality, null%, sample values. Use to orient on a dataset without reading any rows.',
+    description: 'Full schema profile: types, cardinality, null%, sample values.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID (from kirograph_data_list)' },
-        column: { type: 'string', description: 'Optional: deep-dive on a single column' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        column: { type: 'string', description: 'Deep-dive on a single column.' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
   },
   {
     name: 'kirograph_data_query',
-    description: 'Filtered row retrieval with structured operators. Returns only matching rows (max 500). Use instead of reading raw data files.',
+    description: 'Filtered row retrieval with structured operators (max 500 rows).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -913,14 +913,14 @@ export const tools: ToolDefinition[] = [
         columns: { type: 'array', description: 'Column projection (only return these columns)' },
         limit: { type: 'number', description: 'Max rows (default: 100, hard cap: 500)', default: 100 },
         offset: { type: 'number', description: 'Pagination offset', default: 0 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
   },
   {
     name: 'kirograph_data_aggregate',
-    description: 'Server-side GROUP BY aggregation. Computation runs in SQLite — only the result set enters context. Use for count, sum, avg, min, max questions.',
+    description: 'Server-side GROUP BY aggregation: count, sum, avg, min, max.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -928,27 +928,27 @@ export const tools: ToolDefinition[] = [
         groupBy: { type: 'array', description: 'Columns to group by' },
         metrics: { type: 'array', description: 'Array of {column, op} metrics. Ops: count, sum, avg, min, max, count_distinct' },
         filters: { type: 'array', description: 'Optional pre-filters (same format as kirograph_data_query)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset', 'groupBy', 'metrics'],
     },
   },
   {
     name: 'kirograph_data_search',
-    description: 'Search column names and sample values by keyword. Tells you which column holds the answer without loading data.',
+    description: 'Search column names and sample values by keyword.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID' },
         query: { type: 'string', description: 'Search keyword' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset', 'query'],
     },
   },
   {
     name: 'kirograph_data_join',
-    description: 'SQL JOIN across two indexed datasets. Combines data without loading either file into context.',
+    description: 'SQL JOIN across two indexed datasets.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -959,57 +959,57 @@ export const tools: ToolDefinition[] = [
         type: { type: 'string', description: 'Join type: inner (default), left, right', enum: ['inner', 'left', 'right'], default: 'inner' },
         columns: { type: 'array', description: 'Column projection (prefix with dataset ID)' },
         limit: { type: 'number', description: 'Max rows (default: 100, hard cap: 500)', default: 100 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['left', 'right', 'leftColumn', 'rightColumn'],
     },
   },
   {
     name: 'kirograph_data_correlations',
-    description: 'Pairwise Pearson correlations between numeric columns. Discovers hidden relationships without loading data.',
+    description: 'Pairwise Pearson correlations between numeric columns.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID' },
         threshold: { type: 'number', description: 'Min absolute correlation to include (default: 0.3)', default: 0.3 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
   },
   {
     name: 'kirograph_data_quality',
-    description: 'Data quality triage: rank columns by risk (null rate, cardinality anomalies, type issues). Identifies problematic columns without loading data.',
+    description: 'Rank columns by data quality risk: nulls, cardinality, type issues.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
   },
   {
     name: 'kirograph_data_drift',
-    description: 'Show schema drift between the last two index runs for a dataset. Detects added/removed columns, type changes, and row count deltas.',
+    description: 'Schema drift between last two index runs: columns, types, row counts.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID (from kirograph_data_list)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
   },
   {
     name: 'kirograph_data_history',
-    description: 'Show the history of schema snapshots for a dataset — timestamps, row counts, column counts, and schema hashes.',
+    description: 'History of schema snapshots: timestamps, row/column counts, hashes.',
     inputSchema: {
       type: 'object',
       properties: {
         dataset: { type: 'string', description: 'Dataset ID (from kirograph_data_list)' },
         limit: { type: 'number', description: 'Max snapshots to return (default: 10)', default: 10 },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['dataset'],
     },
@@ -1021,7 +1021,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -1032,7 +1032,7 @@ export const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         force: { type: 'boolean', description: 'Run even if below threshold (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -1042,7 +1042,7 @@ export const tools: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -1060,7 +1060,7 @@ export const tools: ToolDefinition[] = [
         },
         depth: { type: 'number', description: 'Max dependency traversal depth (default: 5)', default: 5 },
         testPattern: { type: 'string', description: 'Custom glob to identify test files (optional)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['files'],
     },
@@ -1068,17 +1068,17 @@ export const tools: ToolDefinition[] = [
   // ── Security tools (require enableSecurity=true) ────────────────────────────
   {
     name: 'kirograph_security',
-    description: 'Security overview: vulnerability counts, affected/not_affected verdicts, stale data warnings. Requires enableSecurity=true and enableArchitecture=true.',
+    description: 'Security overview: vuln counts, verdicts, stale data warnings.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_vulns',
-    description: 'List vulnerabilities with reachability verdicts, severity, and affected components. Supports on-demand refresh.',
+    description: 'List vulns with reachability verdicts, severity, affected components.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1086,13 +1086,13 @@ export const tools: ToolDefinition[] = [
         verdict: { type: 'string', description: 'Filter by reachability verdict', enum: ['affected', 'not_affected', 'under_investigation'] },
         limit: { type: 'number', description: 'Max results (default: 20)', default: 20 },
         refresh: { type: 'boolean', description: 'Trigger fresh vulnerability enrichment before listing (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_vuln_add',
-    description: 'Manually register a CVE against a dependency without querying external databases.',
+    description: 'Manually register a CVE against a dependency.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1101,178 +1101,178 @@ export const tools: ToolDefinition[] = [
         severity: { type: 'number', description: 'CVSS v3.1 base score (optional)' },
         summary: { type: 'string', description: 'Vulnerability summary (optional)' },
         fixedVersion: { type: 'string', description: 'Version that fixes the vulnerability (optional)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['cveId', 'package'],
     },
   },
   {
     name: 'kirograph_vuln_suppress',
-    description: 'Suppress a CVE so it no longer appears in vulnerability reports (mark as false positive or accepted risk). Suppressions are stored in .kirograph/security-suppressions.json.',
+    description: 'Suppress a CVE from vulnerability reports.',
     inputSchema: {
       type: 'object',
       properties: {
         cveId: { type: 'string', description: 'CVE identifier to suppress (e.g., "CVE-2024-1234")' },
         reason: { type: 'string', description: 'Reason for suppression (optional)' },
         expires: { type: 'string', description: 'Expiry date in ISO format after which the suppression is removed (e.g. "2026-12-31", optional)' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['cveId'],
     },
   },
   {
     name: 'kirograph_sbom',
-    description: 'Generate and return CycloneDX 1.5 SBOM JSON for the project.',
+    description: 'Generate CycloneDX 1.5 SBOM JSON for the project.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_vex',
-    description: 'Generate and return CycloneDX 1.5 VEX JSON with reachability verdicts.',
+    description: 'Generate CycloneDX 1.5 VEX JSON with reachability verdicts.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_reachability',
-    description: 'Check reachability for a specific dependency or vulnerability. Returns verdict, paths, and impact summary.',
+    description: 'Check reachability for a dependency or CVE.',
     inputSchema: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Dependency name or CVE ID to check reachability for' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
       required: ['target'],
     },
   },
   {
     name: 'kirograph_staleness',
-    description: 'Check dependency freshness — identifies packages significantly behind their latest published version.',
+    description: 'Check dependency freshness against latest published versions.',
     inputSchema: {
       type: 'object',
       properties: {
         threshold: { type: 'number', description: 'Only return packages with staleness_score >= threshold (default: 0.3)', default: 0.3 },
         refresh: { type: 'boolean', description: 'Fetch latest version info from registries before listing (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_licenses',
-    description: 'Show dependency licenses and check against the configured license policy (deny/warn lists). Supports wildcard patterns (e.g. GPL-* matches GPL-2.0, GPL-3.0-only).',
+    description: 'Show licenses and check against configured deny/warn policy.',
     inputSchema: {
       type: 'object',
       properties: {
         policy: { type: 'boolean', description: 'Return only policy violations (default: false)', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_attack_surface',
-    description: 'Map the attack surface: all HTTP routes and their paths to vulnerable dependencies, with hop count, authentication status, and risk score.',
+    description: 'Map HTTP routes to vulnerable deps with hop count and auth status.',
     inputSchema: {
       type: 'object',
       properties: {
         limit: { type: 'number', description: 'Max routes to return (default: 20)', default: 20 },
         publicOnly: { type: 'boolean', description: 'Only return public/unauthenticated routes', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_secrets',
-    description: 'Scan for hardcoded secrets and credentials, enriched with call-graph blast radius showing which entry points reach the secret.',
+    description: 'Scan for hardcoded secrets with call-graph blast radius.',
     inputSchema: {
       type: 'object',
       properties: {
         includeTests: { type: 'boolean', description: 'Include test files in scan', default: false },
         severity: { type: 'string', description: 'Filter by severity: critical, high, medium, low', enum: ['critical', 'high', 'medium', 'low'] },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_security_flows',
-    description: 'SAST-lite: detect dangerous data flows (SQL injection, dangerous eval, unsafe deserialization, path traversal, weak crypto). Each finding tagged with OWASP Top 10 category.',
+    description: 'SAST-lite: detect SQL injection, eval, deserialize, path, crypto flows.',
     inputSchema: {
       type: 'object',
       properties: {
         type: { type: 'string', description: 'Filter by type: sql, eval, deserialize, path, crypto, all', default: 'all' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_supply_chain',
-    description: 'Supply chain health: OpenSSF Scorecard scores, maintainer count, abandoned package detection for project dependencies.',
+    description: 'OpenSSF Scorecard scores, maintainer count, abandoned package detection.',
     inputSchema: {
       type: 'object',
       properties: {
         threshold: { type: 'string', description: 'Minimum risk level: critical, high, medium', enum: ['critical', 'high', 'medium'] },
         refresh: { type: 'boolean', description: 'Re-fetch from APIs', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_dep_confusion',
-    description: 'Detect dependency confusion vulnerabilities: internal package names that exist in public registries (typosquatting/supply chain attack vectors).',
+    description: 'Detect dependency confusion: internal names in public registries.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_remediation',
-    description: 'Remediation SLA tracking: which vulnerabilities are overdue for fixing based on severity thresholds (critical=7d, high=30d, medium=90d).',
+    description: 'Remediation SLA tracking: overdue vulns by severity thresholds.',
     inputSchema: {
       type: 'object',
       properties: {
         overdueOnly: { type: 'boolean', description: 'Show only overdue items', default: false },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   // ── Pattern tools (require enablePatterns=true) ─────────────────────────────
   {
     name: 'kirograph_pattern_coverage',
-    description: 'OWASP Top 10 coverage report: shows which vulnerability categories are covered by bundled pattern rules and how many matches exist in each.',
+    description: 'OWASP Top 10 coverage report: categories covered and match counts.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_pattern_save_baseline',
-    description: 'Save current pattern match counts as a baseline for future diffing.',
+    description: 'Save current pattern match counts as a baseline.',
     inputSchema: {
       type: 'object',
       properties: {
         label: { type: 'string', description: 'Baseline label (default: "default")', default: 'default' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
   {
     name: 'kirograph_pattern_diff',
-    description: 'Diff current pattern matches against a saved baseline. Shows new findings, resolved findings, and unchanged counts.',
+    description: 'Diff pattern matches against a saved baseline.',
     inputSchema: {
       type: 'object',
       properties: {
         label: { type: 'string', description: 'Baseline label (default: "default")', default: 'default' },
-        projectPath: { type: 'string', description: 'Project root path (optional)' },
+        projectPath: { type: 'string' },
       },
     },
   },
@@ -1295,7 +1295,7 @@ export const LIVE_SEARCH_TOOL_DEFINITION: ToolDefinition = {
       pattern: { type: 'string', description: 'ast-grep inline pattern (e.g. "eval($X)")' },
       language: { type: 'string', description: 'Language to search: javascript, typescript, python, go, rust, java, etc.' },
       limit: { type: 'number', description: 'Max results (default 20, max 100)', default: 20 },
-      projectPath: { type: 'string', description: 'Project root path (optional)' },
+      projectPath: { type: 'string' },
     },
   },
 };

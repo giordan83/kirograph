@@ -65,6 +65,8 @@
 
 - **`enableWatchmen` added to `McpFeatureFlags`** and passed to `writeMcpConfigFinal` in `kiro.ts`: the three watchmen tools are now correctly included/excluded from the Kiro `autoApprove` list based on the flag. Previously `enableWatchmen` existed in the config and installer but was silently absent from the MCP feature-flag plumbing.
 
+- **MCP tool list token optimization**: all 92 tool and parameter descriptions rewritten for brevity; `projectPath` inline descriptions stripped (parameter type already conveys the information). The tool list sent to the model on every MCP call dropped from ~12,863 to ~6,467 tokens — a **50% reduction** with no tools removed and no behavioral changes. Per-group cost with all flags on: core 8 tools ~472 tok, memory 16 tools ~746 tok, security 15 tools ~675 tok, data 10 tools ~519 tok, wiki 10 tools ~319 tok, docs 5 tools ~241 tok, code-health 7 tools ~309 tok, agent-utils 4 tools ~278 tok, advanced-analysis 4 tools ~210 tok, architecture 3 tools ~142 tok, watchmen 3 tools ~140 tok, patterns 3 tools ~93 tok, shell-exec 1 tool ~71 tok, compression 1 tool ~68 tok, call-sites 2 tools ~84 tok.
+
 ---
 
 ## [0.27.1]

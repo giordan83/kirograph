@@ -106,7 +106,7 @@
       <p>KiroGraph combines features from 14 separate open-source projects (160k+ combined ⭐) into a single integrated MCP server.</p>
     </div>
     <div style="overflow-x: auto; margin-top: 2rem;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+      <table style="border-collapse: collapse; font-size: 0.85rem; margin: 0 auto;">
         <thead>
           <tr style="border-bottom: 1px solid var(--border); text-align: center;">
             <th style="padding: 0.6rem; text-align: left;">Feature</th>
@@ -304,6 +304,7 @@
           <span class="card-version">v0.6.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">3 tools · ~142 tok</span>
           <p>Auto-detects packages and architectural layers (api, service, data, ui, shared). Computes coupling metrics (Ca, Ce, instability) across your entire package graph. Enable via <code>enableArchitecture</code>.</p>
         </div>
       </div>
@@ -346,6 +347,7 @@
           <span class="card-version">v0.15.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">16 tools · ~746 tok</span>
           <p>Cross-session observations stored locally with zero LLM tokens on write. Decisions, errors, and patterns are auto-linked to code symbols and surfaced in <code>kirograph_context</code> when relevant. Enable via <code>enableMemory</code>.</p>
           <ul>
             <li>Conflict detection with typed relations (<code>supersedes</code>, <code>conflicts_with</code>, <code>compatible</code>)</li>
@@ -368,6 +370,7 @@
           <span class="card-version">v0.16.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">5 tools · ~241 tok</span>
           <p>Indexes project docs by heading hierarchy for section-level retrieval. 9 format parsers, code ↔ docs cross-references, FTS search, and stable section IDs. 92–97% token savings vs reading full files. Enable via <code>enableDocs</code>.</p>
         </div>
         <div class="card-footer">
@@ -383,6 +386,7 @@
           <span class="card-version">v0.17.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">10 tools · ~519 tok</span>
           <p>Indexes tabular data files (CSV, TSV, JSONL, JSON, Excel, Parquet, PDF) for structured querying. Column profiling, server-side aggregations, and filtered row retrieval. 95–99% token savings vs reading raw data files. Enable via <code>enableData</code>.</p>
         </div>
         <div class="card-footer">
@@ -398,6 +402,7 @@
           <span class="card-version">v0.19.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">15 tools · ~675 tok</span>
           <p>14 ecosystems · OSV batch queries · EPSS scores · call-graph reachability · attack surface mapping · secrets detection · SAST-lite · supply chain health · license compliance · CycloneDX 1.5 SBOM/VEX · CI/CD SARIF. Enable via <code>enableSecurity</code>.</p>
         </div>
         <div class="card-footer">
@@ -413,6 +418,7 @@
           <span class="card-version">v0.20.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">3 tools · ~140 tok</span>
           <p>Auto-synthesizes accumulated memory observations into workspace briefs and skill files. Local model synthesis — zero API cost, no data leaves your machine. Enable via <code>enableWatchmen</code>.</p>
         </div>
         <div class="card-footer">
@@ -458,6 +464,7 @@
           <span class="card-version">v0.25.0</span>
         </div>
         <div class="card-body">
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">10 tools · ~319 tok</span>
           <p>Karpathy-style structured knowledge base that compounds across sessions. A two-step ingest flow (ingest prompt → WIKI_DIFF apply) gives the agent full control over what enters the wiki. Agent mode or local model synthesis (same Gemma 4 infra as Watchmen — zero API cost). FTS5 search, conflict detection, health lint. Enable via <code>enableWiki</code>.</p>
         </div>
         <div class="card-footer">

@@ -188,7 +188,7 @@ Show token savings statistics from compressed command outputs.
 
 ---
 
-## Agent Utilities *(require `enableAgentUtils: true`)*
+## Agent Utilities *(require `enableAgentUtils: true`)* — 4 tools · ~278 tok
 
 ### `kirograph_read`
 
@@ -223,7 +223,7 @@ Show current session context budget usage. Returns tokens consumed, remaining bu
 
 ---
 
-## General-purpose Compression *(require `enableGeneralCompression: true`)*
+## General-purpose Compression *(require `enableGeneralCompression: true`)* — 1 tool · ~68 tok
 
 ### `kirograph_compress`
 
@@ -251,7 +251,7 @@ On-demand compression for arbitrary text before it reaches the model. Routes to 
 
 ---
 
-## Architecture Tools *(require `enableArchitecture: true`)*
+## Architecture Tools *(require `enableArchitecture: true`)* — 3 tools · ~142 tok
 
 ### `kirograph_architecture`
 
@@ -287,7 +287,7 @@ Inspect the files and dependencies of a specific package.
 
 ---
 
-## Memory Tools *(require `enableMemory: true`)*
+## Memory Tools *(require `enableMemory: true`)* — 16 tools · ~746 tok
 
 ### `kirograph_mem_search`
 
@@ -433,7 +433,7 @@ Scan recent observations for potential conflicts using FTS similarity. Returns c
 
 ---
 
-## Documentation Tools *(require `enableDocs: true`)*
+## Documentation Tools *(require `enableDocs: true`)* — 5 tools · ~241 tok
 
 ### `kirograph_docs_toc`
 
@@ -487,7 +487,7 @@ Find code symbols referenced by a doc section, or doc sections that reference a 
 
 ---
 
-## Data Tools *(require `enableData: true`)*
+## Data Tools *(require `enableData: true`)* — 10 tools · ~519 tok
 
 ### `kirograph_data_list`
 
@@ -578,7 +578,7 @@ Data quality triage: rank columns by composite risk score (null rate, cardinalit
 
 ---
 
-## Security Tools *(require `enableSecurity: true` and `enableArchitecture: true`)*
+## Security Tools *(require `enableSecurity: true` and `enableArchitecture: true`)* — 15 tools · ~675 tok
 
 ### `kirograph_security`
 
@@ -662,7 +662,7 @@ Manually register a CVE against a dependency. Creates a Vulnerability_Node linke
 | `fixedVersion` | string | - | Version that fixes the vulnerability |
 | `projectPath` | string | cwd | Project root path |
 
-## Advanced Security Tools
+## Advanced Security Tools *(require `enableSecurity: true`)*
 
 ### `kirograph_attack_surface`
 
@@ -741,7 +741,7 @@ Check dependency freshness — identifies packages significantly behind their la
 
 ---
 
-## Pattern Search Tools *(require `enablePatterns: true` and `@ast-grep/napi` installed)*
+## Pattern Search Tools *(require `enablePatterns: true` and `@ast-grep/napi` installed)* — 3 tools · ~93 tok
 
 These tools only appear in the MCP tool list when both conditions are met. When either is false, they are not registered and cannot be called.
 

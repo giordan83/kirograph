@@ -57,6 +57,28 @@ The result is fewer tool calls, less context used, and faster responses on compl
 | <h4>Integration (KiroGraph-Integration core module)</h4> | |
 | 🔌 **Multi-tool Support** | Native Kiro + 32 experimental targets (Cursor, Copilot, Claude Code, Codex, Windsurf, Cline, and more) |
 
+## MCP Tool List Token Budget
+
+Each enabled flag adds tools to the model context on every MCP call. Total with all flags: **92 tools · ~4,367 tok**.
+
+| Flag | Tools | ~Tokens |
+|------|------:|--------:|
+| core (always-on) | 8 | ~472 |
+| `enableMemory` | 16 | ~746 |
+| `enableSecurity` | 15 | ~675 |
+| `enableData` | 10 | ~519 |
+| `enableWiki` | 10 | ~319 |
+| `enableCodeHealth` | 7 | ~309 |
+| `enableAgentUtils` | 4 | ~278 |
+| `enableAdvancedAnalysis` | 4 | ~210 |
+| `enableArchitecture` | 3 | ~142 |
+| `enableWatchmen` | 3 | ~140 |
+| `enablePatterns` | 3 | ~93 |
+| `trackCallSites` | 2 | ~84 |
+| `enableShellExec` | 1 | ~71 |
+| `enableGeneralCompression` | 1 | ~68 |
+| **Total** | **92** | **~4,367** |
+
 ## Quick Start
 
 ```bash
