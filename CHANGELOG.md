@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.28.0] - 2026-06-30: Code health tools, branch tracking, dev-ops CLIs + steering overhaul
+## [0.28.0] - 2026-07-01: Code health tools, branch tracking, dev-ops CLIs, interactive help + full test suite
 
 ### Added
 
@@ -64,6 +64,65 @@
   - `kirograph-debug.md`: Step 3 inserts `kirograph_diff_context()` when `enableGitContext` (replaces the manual diff snapshot approach); added tip noting diff_context as fastest regression spotter.
   - `kirograph-architecture.md`: added `kirograph_dsm()` and `kirograph_health()` steps when `enableComplexity`; expanded interpretation section.
   - `kirograph-security.md`: added Step 5b (`kirograph_live_search` for eval/SQL injection patterns when `enablePatterns`) and Step 5c (`kirograph_test_risk` for auth/payment/session code when `enableComplexity`); added interpretation table row for pattern matches.
+
+- **`kirograph help` — interactive TUI overhaul**: the help command now enters an alternate screen buffer (`\x1b[?1049h`) so navigation never scrolls the terminal. Groups expanded from 7 to 16 (Search, Insights, Code Health, Analysis, Git, Architecture, Edit, Branch, Memory, Agent, Docs, Data, Wiki, Security, Watchmen, Dev). Arrow keys navigate commands within a group; left/right (or `[`/`]`) switch groups; Enter prints the selected command; `q` exits. In interactive mode only the highlighted command's options are shown — examples are reserved for the static `--help` output.
+
+- **Integration test suite (`test/`)**: 9 new shell test scripts covering all commands not previously tested:
+  - `test/graph/` — `callers`, `callees`, `impact`, `circular-deps`, `snapshot save/list/diff`
+  - `test/insights/` — `annotations`, `dependency-depth`, `distribution`, `doc-coverage`, `gini`, `god-class`, `inheritance-depth`, `largest`, `module-api`, `rank`, `recursion`, `rename-preview`, `type-hierarchy`, `unused-imports`
+  - `test/health/` — `complexity`, `simplify-scan`, `health`, `dsm`, `test-risk`, `test-map`, `doctor`, `session start/end`
+  - `test/architecture/` — `architecture`, `coupling` (all sort orders), `package`, `manifest`
+  - `test/git/` — `diff-context`, `diff-context --staged`, `commit-context`, `pr-context` (text + json), `changelog`
+  - `test/edit/` — `str-replace`, `multi-replace`, `insert-at` (anchor + line), `ast-rewrite` (skipped if ast-grep absent)
+  - `test/branch/` — `branch list/add/remove/gc/diff/search`
+  - `test/security/` — full security CLI suite (18 command groups) + all 13 ecosystem parsers verified via SQLite; merges the previous `sec/` and `security-cli/` suites
+  - `test/agent/` — `caveman` (all modes), `compression` (all levels), `bench`, `cost`
+
+- **Test suite reorganisation**: all test folders moved from `scripts/<name>/` to `test/<name>/`. `package.json` gains a `test:<name>` script for each of the 16 suites and a `test:integration` script that builds once then runs all 16 suites sequentially with `--no-build` (watchmen uses `--skip-llm`).
+
+- **MCP test suite — 16 `mcp.sh` scripts, 99 tools, 478 assertions**: every feature group now has a companion `test/<group>/mcp.sh` that exercises all MCP tools in that group over a real indexed mock. Combined they form `npm run test:integration:mcp`, which chains all 16 scripts with `--no-build` and passes group-specific flags (`--skip-llm` for watchmen/wiki, `--skip-native` for turbovec). Coverage breakdown:
+  - `agent/mcp.sh` — `kirograph_read_file`, `kirograph_exec`, `kirograph_token_budget`, `kirograph_gain`, `kirograph_reset_gain` (5 tools)
+  - `architecture/mcp.sh` — `kirograph_architecture`, `kirograph_coupling`, `kirograph_package`, `kirograph_manifest` (4 tools)
+  - `branch/mcp.sh` — `kirograph_branch_list`, `kirograph_branch_diff`, `kirograph_branch_search` (3 tools)
+  - `data/mcp.sh` — `kirograph_data_list`, `kirograph_data_describe`, `kirograph_data_sample`, `kirograph_data_query`, `kirograph_data_stats`, `kirograph_data_distributions`, `kirograph_data_correlations`, `kirograph_data_pivot`, `kirograph_data_drift`, `kirograph_data_history` (10 tools)
+  - `edit/mcp.sh` — `kirograph_str_replace`, `kirograph_multi_replace`, `kirograph_insert_at`, `kirograph_edit_patch`, `kirograph_edit_multi` (5 tools)
+  - `git/mcp.sh` — `kirograph_diff_context`, `kirograph_commit_context`, `kirograph_pr_context`, `kirograph_changelog` (4 tools)
+  - `graph/mcp.sh` — `kirograph_search`, `kirograph_context`, `kirograph_node`, `kirograph_callers`, `kirograph_callees`, `kirograph_affected` (6 tools)
+  - `health/mcp.sh` — `kirograph_complexity`, `kirograph_health`, `kirograph_dsm`, `kirograph_test_risk`, `kirograph_simplify_scan` (5 tools)
+  - `insights/mcp.sh` — `kirograph_annotations`, `kirograph_dependency_depth`, `kirograph_distribution`, `kirograph_doc_coverage`, `kirograph_gini`, `kirograph_god_class`, `kirograph_inheritance_depth`, `kirograph_largest`, `kirograph_module_api`, `kirograph_rank`, `kirograph_recursion`, `kirograph_rename_preview`, `kirograph_type_hierarchy`, `kirograph_unused_imports` (14 tools)
+  - `mem/mcp.sh` — all 16 memory tools: `kirograph_mem_status`, `kirograph_mem_store`, `kirograph_mem_search`, `kirograph_mem_timeline`, `kirograph_mem_review`, `kirograph_mem_mark_reviewed`, `kirograph_mem_capture`, `kirograph_mem_save_prompt`, `kirograph_mem_suggest_topic_key`, `kirograph_mem_compare`, `kirograph_mem_judge`, `kirograph_mem_conflicts_scan`, `kirograph_mem_conflicts_list`, `kirograph_mem_conflicts_ignore`, `kirograph_mem_lint`, `kirograph_mem_prune`
+  - `patterns/mcp.sh` — `kirograph_live_search`, `kirograph_ast_query`, `kirograph_pattern_match` (3 tools)
+  - `security/mcp.sh` — 16 security tools across attack surface, vulns, sbom, secrets, dep-confusion, supply chain, vex, remediation, and CI report
+  - `turboquant/mcp.sh` — real embedding pipeline with `nomic-embed-text-v1.5`, verifies `turboquant.bin` + `turboquant-stats.json`, `kirograph_status` engine label, and semantic search (3 MCP tools, full pipeline assertion)
+  - `turbovec/mcp.sh` — real embedding pipeline with napi-rs Rust addon, verifies `turbovec.tvim` + `.tvim.ids`, engine label, semantic search; auto-compiles from Rust if addon not present (3 MCP tools, full pipeline assertion)
+  - `watchmen/mcp.sh` — `kirograph_watchmen_status`, `kirograph_watchmen_synthesize` (skipped), `kirograph_watchmen_reset` (3 tools)
+  - `wiki/mcp.sh` — `kirograph_wiki_init`, `kirograph_wiki_reindex`, `kirograph_wiki_status`, `kirograph_wiki_synthesize` (skipped), `kirograph_wiki_search`, `kirograph_wiki_page`, `kirograph_wiki_update`, `kirograph_wiki_delete`, `kirograph_wiki_apply_diff`, `kirograph_wiki_snapshot` (10 tools)
+
+- **`run_mcp()` bash helper pattern**: all 16 `mcp.sh` scripts use a shared inline helper that avoids `set -e` silent exits on non-zero MCP responses: `run_mcp() { local a; a="${2:-}"; [ -z "$a" ] && a="{}"; if OUT=$($MCP_BIN "$TEST_DIR" "$1" "$a" 2>&1); then EXIT=0; else EXIT=$?; fi; }`. The `if OUT=$(...); then` form is the only pattern that correctly captures both `$OUT` and `$EXIT` under `set -euo pipefail` — the previous `OUT=$(cmd); EXIT=$?` pattern caused silent script death because `set -e` fires on the assignment.
+
+- **`test/mcp-call.js`**: shared Node.js MCP client helper that speaks JSON-RPC 2.0 over stdio with a 30 s timeout. Sends `initialize` then `tools/call`, exits 0 on success, 1 when `isError: true`, 2 on protocol error or timeout.
+
+### Fixed
+
+- **`edges.kind` vs `edges.type` in `src/mcp/handlers/complexity.ts`**: three SQL queries used `WHERE type='calls'` / `WHERE type='circular_dep'` / `e.type = 'calls'`, but the DB schema uses `kind` for edge type. Fixed in `kirograph_health` (avg fan-in subquery and circular-dep count) and `kirograph_test_risk` (LEFT JOIN filter). Discovered by running the `health/mcp.sh` test suite.
+
+- **CJS dynamic import wrapping in `src/mcp/handlers/branch.ts`**: `const { Database } = await import('node-sqlite3-wasm') as any` gives `undefined` because `node-sqlite3-wasm` is a CJS module — dynamic import in an ESM context wraps its exports under `.default`. Fixed to `((await import('node-sqlite3-wasm')) as any).default` in both `kirograph_branch_diff` and `kirograph_branch_search`. Discovered by running `branch/mcp.sh`.
+
+- **`kirograph_mem_compare` crashes with "Unsupported type for binding: undefined"**: the handler passed `args.observationA` / `args.observationB` / `args.relation` directly to SQLite without checking they were present, causing a native crash on partial calls. Added a guard at the top of the `case` block. Discovered by `mem/mcp.sh`.
+
+- **`kirograph read` blocks when `enableEmbeddings: true`**: `KiroGraph.open()` always called `vectors.initialize()`, which loads the 250 MB transformer model even for read-only file operations. Added `opts?: { skipVectors?: boolean }` to `KiroGraph.open()` and set `skipVectors: true` in `src/bin/commands/read.ts`. The `read` command uses the graph solely for DB lookups (symbol names, types for signatures mode) and never needs the embedding pipeline. Command time: ~30–60 s → ~0.2 s.
+
+- **`test/turboquant/mcp.sh` and `test/turbovec/mcp.sh` — real embedding integration tests**: both suites previously indexed with `enableEmbeddings: true` but never verified the embedding pipeline ran. Rewritten to use a richer mock (8 TypeScript files, ~45 embeddable nodes across services/models/utils), invoke the actual `nomic-embed-text-v1.5` transformer, and assert: index binary exists on disk with non-zero size (`turboquant.bin` / `turbovec.tvim` + `.tvim.ids`), `turboquant-stats.json` has `count > 0`, `kirograph_status` reports the engine name + entry count with no fallback string, and `kirograph_search` returns semantically relevant results for auth/payment/notification queries. The `vectors` SQLite table is not used by either engine (TurboQuant writes a binary blob; TurboVec writes `.tvim`); checks against it were removed.
+
+- **`test/turboquant/test.sh` and `test/turbovec/test.sh` — stale mock references**: both CLI test scripts referenced `src/embedder.ts` and `src/vector-store.ts` (symbols `VectorStore`, `Embedder`) which no longer exist in the committed mock. Updated to use `src/services/AuthService.ts`, `src/models/User.ts`, symbols `AuthService` / `PaymentService` / `login`, and the context query `"user authentication login"`. `kirograph_status` calls in these tests also gained `enableNavigation: true` in the config (the tool is gated by that flag).
+
+---
+
+- **`kirograph read` blocks when `enableEmbeddings: true`**: `KiroGraph.open()` always called `vectors.initialize()`, which loads the 250 MB transformer model even for read-only file operations. Added `opts?: { skipVectors?: boolean }` to `KiroGraph.open()` and set `skipVectors: true` in `src/bin/commands/read.ts`. The `read` command uses the graph solely for DB lookups (symbol names, types for signatures mode) and never needs the embedding pipeline. Command time: ~30–60 s → ~0.2 s.
+
+- **`test/turboquant/mcp.sh` and `test/turbovec/mcp.sh` — real embedding integration tests**: both suites previously indexed with `enableEmbeddings: true` but never verified the embedding pipeline ran. Rewritten to use a richer mock (8 TypeScript files, ~45 embeddable nodes across services/models/utils), invoke the actual `nomic-embed-text-v1.5` transformer, and assert: index binary exists on disk with non-zero size (`turboquant.bin` / `turbovec.tvim` + `.tvim.ids`), `turboquant-stats.json` has `count > 0`, `kirograph_status` reports the engine name + entry count with no fallback string, and `kirograph_search` returns semantically relevant results for auth/payment/notification queries. The `vectors` SQLite table is not used by either engine (TurboQuant writes a binary blob; TurboVec writes `.tvim`); checks against it were removed.
+
+- **`test/turboquant/test.sh` and `test/turbovec/test.sh` — stale mock references**: both CLI test scripts referenced `src/embedder.ts` and `src/vector-store.ts` (symbols `VectorStore`, `Embedder`) which no longer exist in the committed mock. Updated to use `src/services/AuthService.ts`, `src/models/User.ts`, symbols `AuthService` / `PaymentService` / `login`, and the context query `"user authentication login"`. `kirograph_status` calls in these tests also gained `enableNavigation: true` in the config (the tool is gated by that flag).
 
 ---
 

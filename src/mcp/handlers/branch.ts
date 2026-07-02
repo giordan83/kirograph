@@ -52,7 +52,7 @@ export async function handleBranch(toolName: string, args: Record<string, unknow
         return `Branch database for "${branchB}" not found at ${pathB}.\nUse kirograph branch add ${branchB} to create it.`;
       }
 
-      const { Database } = await import('node-sqlite3-wasm') as any;
+      const { Database } = ((await import('node-sqlite3-wasm')) as any).default;
       const rawDbA = new Database(pathA);
       const rowsA = rawDbA.all('SELECT id, name, kind, file_path, qualified_name FROM nodes', []) as Array<{
         id: string; name: string; kind: string; file_path: string; qualified_name: string;
@@ -137,7 +137,7 @@ export async function handleBranch(toolName: string, args: Record<string, unknow
         return `Branch database for "${branch}" not found at ${dbPath}.\nUse kirograph branch add ${branch} to create it.`;
       }
 
-      const { Database } = await import('node-sqlite3-wasm') as any;
+      const { Database } = ((await import('node-sqlite3-wasm')) as any).default;
       const rawDb = new Database(dbPath);
       const pattern = `%${query}%`;
       const rows = rawDb.all(

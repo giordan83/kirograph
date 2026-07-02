@@ -113,7 +113,7 @@ export async function handleComplexity(toolName: string, args: Record<string, un
 
       // coupling_score (0–2500)
       const fanInRows = rawDb.all(
-        `SELECT AVG(cnt) as avg_fan_in FROM (SELECT target, COUNT(*) as cnt FROM edges WHERE type='calls' GROUP BY target)`,
+        `SELECT AVG(cnt) as avg_fan_in FROM (SELECT target, COUNT(*) as cnt FROM edges WHERE kind='calls' GROUP BY target)`,
         []
       );
       const avg_fan_in = (fanInRows[0] as any)?.avg_fan_in as number ?? 0;
@@ -125,7 +125,7 @@ export async function handleComplexity(toolName: string, args: Record<string, un
 
       // circular_score (0–2500)
       const circRows = rawDb.all(
-        `SELECT COUNT(DISTINCT source) as cnt FROM edges WHERE type='circular_dep'`,
+        `SELECT COUNT(DISTINCT source) as cnt FROM edges WHERE kind='circular_dep'`,
         []
       );
       const circCount = (circRows[0] as any)?.cnt as number ?? 0;
@@ -243,7 +243,7 @@ export async function handleComplexity(toolName: string, args: Record<string, un
                 n.complexity_cyclomatic as cc,
                 COUNT(e.source) as fan_in
          FROM nodes n
-         LEFT JOIN edges e ON e.target = n.id AND e.type = 'calls'
+         LEFT JOIN edges e ON e.target = n.id AND e.kind = 'calls'
          WHERE n.kind IN ('function','method')
            AND n.complexity_cyclomatic IS NOT NULL
          GROUP BY n.id

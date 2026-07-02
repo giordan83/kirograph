@@ -153,6 +153,9 @@ export async function handleMemory(toolName: string, args: Record<string, unknow
     }
 
     case 'kirograph_mem_compare': {
+      if (!args.observationA || !args.observationB || !args.relation) {
+        return 'Error: observationA, observationB, and relation are required.';
+      }
       const { loadConfig } = await import('../../config');
       const projectRoot = args.projectPath as string ?? cg.getProjectRoot();
       const config = await loadConfig(projectRoot);
