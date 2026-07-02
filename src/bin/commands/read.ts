@@ -38,7 +38,7 @@ export function register(program: Command): void {
           const KiroGraph = (await import('../../index')).default;
           const root = findNearestKiroGraphRoot(process.cwd());
           if (root) {
-            cg = await KiroGraph.open(root);
+            cg = await KiroGraph.open(root, undefined, { skipVectors: true });
           }
         } catch { /* no graph available */ }
 

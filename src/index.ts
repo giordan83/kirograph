@@ -83,6 +83,7 @@ export default class KiroGraph {
   static async open(
     projectRoot: string,
     onModelProgress?: (file: string, loaded: number, total: number, done: boolean) => void,
+    opts?: { skipVectors?: boolean },
   ): Promise<KiroGraph> {
     const resolved = path.resolve(projectRoot);
     validateProjectPath(resolved);
@@ -92,7 +93,9 @@ export default class KiroGraph {
     const cfg = await loadConfig(resolved);
     const db = new GraphDatabase(resolved);
     const kg = new KiroGraph(resolved, db, cfg);
-    await kg.vectors.initialize(onModelProgress);
+    if (!opts?.skipVectors) {
+      await kg.vectors.initialize(onModelProgress);
+    }
     return kg;
   }
 

@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/logo.png">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css">
+  <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
 </head>
 <body>
 
@@ -91,8 +93,16 @@
       <a href="changelog.html" class="btn btn-secondary">Changelog</a>
     </div>
 
-    <div class="hero-screenshot">
-      <img src="https://raw.githubusercontent.com/davide-desio-eleva/kirograph/main/assets/terminal.png" alt="KiroGraph terminal output">
+    <div class="hero-screenshot" style="background:#0d0d0d; padding:0;">
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 14px;background:#161616;border-bottom:1px solid #2a2a2a;">
+        <span style="width:12px;height:12px;border-radius:50%;background:#ff5f56;display:inline-block;flex-shrink:0;"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#ffbd2e;display:inline-block;flex-shrink:0;"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#27c93f;display:inline-block;flex-shrink:0;"></span>
+        <span style="flex:1;text-align:center;color:#555;font-size:11px;font-family:'JetBrains Mono',Menlo,monospace;letter-spacing:0.02em;">kirograph help</span>
+      </div>
+      <div style="padding:10px 12px 12px;">
+        <div id="hero-terminal"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -106,10 +116,10 @@
       <p>KiroGraph combines features from 14 separate open-source projects (160k+ combined ⭐) into a single integrated MCP server.</p>
     </div>
     <div style="overflow-x: auto; margin-top: 2rem;">
-      <table style="border-collapse: collapse; font-size: 0.85rem; margin: 0 auto;">
+      <table style="border-collapse: collapse; font-size: 0.85rem; margin: 0 auto; text-align: center;">
         <thead>
           <tr style="border-bottom: 1px solid var(--border); text-align: center;">
-            <th style="padding: 0.6rem; text-align: left;">Feature</th>
+            <th style="padding: 0.6rem; text-align: center;">Feature</th>
             <th style="padding: 0.6rem;">KiroGraph</th>
             <th style="padding: 0.6rem;">CodeGraph</th>
             <th style="padding: 0.6rem;">CRG</th>
@@ -120,22 +130,23 @@
             <th style="padding: 0.6rem;">lean-ctx</th>
             <th style="padding: 0.6rem;">headroom</th>
             <th style="padding: 0.6rem;">Engram</th>
+            <th style="padding: 0.6rem;">tokensave</th>
           </tr>
         </thead>
         <tbody>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Code graph + call analysis</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Architecture metrics</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">🔒 Vulnerability scanning + reachability</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Community detection</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Persistent memory</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Conflict detection + knowledge hygiene</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Documentation indexing</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">Shell + prose compression</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">File read caching + CCR</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">On-demand compression (any text)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">9 semantic engines</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem;">📖 LLM Wiki (ingest → WIKI_DIFF → search)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
-          <tr><td style="padding: 0.5rem 0.6rem;">Multi-platform (34 targets)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;">7</td><td style="padding:0.5rem;text-align:center;">13</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;">any</td><td style="padding:0.5rem;text-align:center;">28+</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Code graph + call analysis</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Architecture metrics</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">🔒 Vulnerability scanning + reachability</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Community detection</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Persistent memory</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Conflict detection + knowledge hygiene</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Documentation indexing</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">Shell + prose compression</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">File read caching + CCR</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">On-demand compression (any text)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">9 semantic engines</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 0.5rem 0.6rem; text-align: center;">📖 LLM Wiki (ingest → WIKI_DIFF → search)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
+          <tr><td style="padding: 0.5rem 0.6rem; text-align: center;">Multi-platform (34 targets)</td><td style="padding:0.5rem;text-align:center;color:#4caf50;">✅</td><td style="padding:0.5rem;text-align:center;">7</td><td style="padding:0.5rem;text-align:center;">13</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;">any</td><td style="padding:0.5rem;text-align:center;">28+</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td><td style="padding:0.5rem;text-align:center;opacity:0.3;">—</td></tr>
         </tbody>
       </table>
     </div>
@@ -192,7 +203,7 @@
       <div class="card" style="--card-color: 167, 139, 250;">
         <div class="card-header">
           <span class="card-icon"><i data-lucide="wrench"></i></span>
-          <h3>61 MCP Tools</h3>
+          <h3>126 MCP Tools</h3>
         </div>
         <div class="card-body">
           <p>Context building, symbol search, call graphs, type hierarchies, impact analysis, dead code, circular deps, architecture, coupling metrics, snapshots, memory, documentation navigation, data querying, security scanning, and more, all auto-approved in Kiro.</p>
@@ -304,7 +315,7 @@
           <span class="card-version">v0.6.0</span>
         </div>
         <div class="card-body">
-          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">3 tools · ~142 tok</span>
+          <span class="card-tok" style="display:inline-block;margin-bottom:0.6rem;">5 tools · ~205 tok</span>
           <p>Auto-detects packages and architectural layers (api, service, data, ui, shared). Computes coupling metrics (Ca, Ce, instability) across your entire package graph. Enable via <code>enableArchitecture</code>.</p>
         </div>
       </div>
@@ -496,7 +507,7 @@
   <div class="container">
     <div class="section-header">
       <span class="label">Changelog</span>
-      <h2>From v0.1 to v0.27 in three months</h2>
+      <h2>From v0.1 to v0.28 in three months</h2>
       <p>Drag or scroll to explore every release.</p>
     </div>
   </div>
@@ -550,6 +561,7 @@
       <div class="tl-item below major"><div class="tl-dot"></div><div class="tl-connector"></div><div class="tl-content"><span class="tl-ver">v0.27.0</span><span class="tl-title">Kiro IDE v1.0.0 Hooks</span></div></div>
       <div class="tl-item above"><div class="tl-content"><span class="tl-ver">v0.27.1</span><span class="tl-title">Hook Library</span></div><div class="tl-connector"></div><div class="tl-dot"></div></div>
       <div class="tl-item below major"><div class="tl-dot"></div><div class="tl-connector"></div><div class="tl-content"><span class="tl-ver">v0.27.2</span><span class="tl-title">Headroom Compression &amp; CLI/MCP Parity</span></div></div>
+      <div class="tl-item above major"><div class="tl-content"><span class="tl-ver">v0.28.0</span><span class="tl-title">Code Health, Branch Tracking &amp; Real Embedding Tests</span></div><div class="tl-connector"></div><div class="tl-dot"></div></div>
 
     </div>
   </div>
@@ -1121,6 +1133,374 @@
 </script>
 <style>
   #avatar-track::-webkit-scrollbar { display: none; }
+  #hero-terminal { text-align: left; }
+  #hero-terminal .xterm { padding: 0; }
+  #hero-terminal .xterm-viewport { overflow: hidden !important; }
+  #hero-terminal .xterm-screen canvas { display: block; }
 </style>
+<script>
+(function() {
+  var C = {
+    R:  '\x1b[0m',
+    B:  '\x1b[1m',
+    D:  '\x1b[2m',
+    U:  '\x1b[4m',
+    gr: '\x1b[32m',
+    gy: '\x1b[90m',
+    vi: '\x1b[38;5;99m',
+    pu: '\x1b[38;5;135m',
+    la: '\x1b[38;5;141m',
+    pa: '\x1b[38;5;183m',
+  };
+
+  var BANNER = [
+    '██╗  ██╗██╗██████╗  ██████╗  ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗',
+    '██║ ██╔╝██║██╔══██╗██╔═══██╗██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║',
+    '█████╔╝ ██║██████╔╝██║   ██║██║  ███╗██████╔╝███████║██████╔╝███████║',
+    '██╔═██╗ ██║██╔══██╗██║   ██║██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║',
+    '██║  ██╗██║██║  ██║╚██████╔╝╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║',
+    '╚═╝  ╚═╝╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝',
+  ];
+
+  var GROUPS = [
+    { icon: '🔧', tab: 'Setup',    title: 'Setup', commands: [
+      { name: 'install',       args: null,    desc: 'Wire up MCP/instructions for an agent workspace' },
+      { name: 'init',          args: '[path]', desc: 'Initialize KiroGraph in a project' },
+      { name: 'uninit',        args: '[path]', desc: 'Remove KiroGraph from a project' },
+      { name: 'hook',          args: null,    desc: 'Manage global Kiro hooks in ~/.kirograph/hooks/' },
+      { name: 'doctor',        args: '[path]', desc: 'Health check: index, config, hooks, and permissions' },
+    ], example: ['kirograph install', 'Wire up Kiro MCP + hooks + steering'] },
+    { icon: '📦', tab: 'Indexing', title: 'Indexing', commands: [
+      { name: 'index',          args: '[path]', desc: 'Full re-index of a project' },
+      { name: 'sync',           args: '[path]', desc: 'Incremental sync of changed files' },
+      { name: 'sync-if-dirty',  args: '[path]', desc: 'Sync only if a dirty marker is present' },
+      { name: 'mark-dirty',     args: '[path]', desc: 'Write a dirty marker for deferred sync' },
+      { name: 'unlock',         args: '[path]', desc: 'Force-release a stale lock file' },
+    ], example: ['kirograph sync', 'Incremental sync of changed files'] },
+    { icon: '🔍', tab: 'Search',   title: 'Search', commands: [
+      { name: 'status',   args: '[path]',       desc: 'Show index statistics and health' },
+      { name: 'query',    args: '<search>',      desc: 'Search for symbols by name' },
+      { name: 'context',  args: '<task>',        desc: 'Build relevant code context for a task' },
+      { name: 'files',    args: '[path]',        desc: 'Show project file structure' },
+      { name: 'path',     args: '<from> <to>',   desc: 'Shortest dependency path between two symbols' },
+      { name: 'affected', args: '[files...]',    desc: 'Find test files affected by changed source files' },
+      { name: 'callers',  args: '<symbol>',      desc: 'List symbols that call a given function or method' },
+      { name: 'callees',  args: '<symbol>',      desc: 'List symbols called by a given function or method' },
+      { name: 'impact',   args: '<symbol>',      desc: 'Show symbols affected by changing a given symbol' },
+    ], example: ['kirograph context "add dark mode"', 'Get relevant code context for a task'] },
+    { icon: '📊', tab: 'Insights', title: 'Insights', commands: [
+      { name: 'hotspots',      args: '[path]', desc: 'Most-connected symbols by edge degree' },
+      { name: 'surprising',    args: '[path]', desc: 'Non-obvious cross-file connections' },
+      { name: 'dead-code',     args: '[path]', desc: 'Unreferenced unexported symbols' },
+      { name: 'circular-deps', args: '[path]', desc: 'Find circular dependency cycles' },
+      { name: 'largest',       args: '[path]', desc: 'Symbols ranked by lines of code' },
+      { name: 'rank',          args: '[path]', desc: 'Symbols ranked by fan-in or fan-out edge count' },
+      { name: 'distribution',  args: '[dir]',  desc: 'Symbol-kind breakdown per file or directory' },
+      { name: 'god-class',     args: '[path]', desc: 'Classes ranked by member count (god-class risk)' },
+      { name: 'gini',          args: '[path]', desc: 'Gini inequality coefficient of a metric' },
+      { name: 'snapshot',      args: null,     desc: 'Save/list/diff graph snapshots' },
+      { name: 'export',        args: null,     desc: 'Interactive graph dashboard' },
+    ], example: ['kirograph hotspots --limit 10', 'Top 10 most-connected symbols'] },
+    { icon: '🏛️', tab: 'Arch',     title: 'Architecture', commands: [
+      { name: 'architecture',   args: '[path]',   desc: 'Package graph and layer map' },
+      { name: 'coupling',       args: '[path]',   desc: 'Coupling metrics per package' },
+      { name: 'package',        args: '<name>',   desc: 'Inspect a package' },
+      { name: 'type-hierarchy', args: '<symbol>', desc: 'Traverse base/derived types of a class or interface' },
+      { name: 'communities',    args: '[path]',   desc: 'Detect code communities (clusters of related symbols)' },
+      { name: 'manifest',       args: '[path]',   desc: 'Workspace manifest: packages, versions, licenses, drift' },
+    ], example: ['kirograph coupling --sort instability', 'Packages ranked by instability'] },
+    { icon: '🏥', tab: 'Health',   title: 'Code Health', commands: [
+      { name: 'module-api',        args: '[path]',   desc: 'List all exported symbols in a file or directory' },
+      { name: 'rename-preview',    args: '<symbol>', desc: 'Show all reference sites before renaming' },
+      { name: 'doc-coverage',      args: '[path]',   desc: 'Find exported symbols missing docstrings' },
+      { name: 'inheritance-depth', args: '[path]',   desc: 'Find deepest inheritance chains' },
+      { name: 'recursion',         args: '[path]',   desc: 'Find recursive and mutually-recursive functions' },
+      { name: 'annotations',       args: '[path]',   desc: 'Decorator/attribute histogram across the codebase' },
+      { name: 'unused-imports',    args: '[path]',   desc: 'Find import nodes with zero downstream edges' },
+      { name: 'dependency-depth',  args: '[path]',   desc: 'Topological depth of each file in the import graph' },
+      { name: 'session',           args: null,       desc: 'Save or compare session baselines for tracking changes' },
+      { name: 'refactor',          args: null,       desc: 'Refactoring tools: rename preview and suggestions' },
+    ], example: ['kirograph doc-coverage', 'Find undocumented exports'] },
+    { icon: '🔬', tab: 'Analysis', title: 'Analysis', commands: [
+      { name: 'complexity',     args: '[path]', desc: 'Rank functions by cyclomatic, cognitive, and maintainability score' },
+      { name: 'simplify-scan',  args: '[path]', desc: 'Find candidates for simplification by complexity and dead code' },
+      { name: 'health',         args: '[path]', desc: 'Composite codebase health score (0-10000) with grade' },
+      { name: 'dsm',            args: '[path]', desc: 'Design Structure Matrix — detect strongly coupled module groups' },
+      { name: 'test-risk',      args: '[path]', desc: 'Rank untested code by risk score (complexity × fan-in)' },
+      { name: 'test-coverage',  args: '[path]', desc: 'Show test coverage gaps from lcov/Istanbul reports' },
+    ], example: ['kirograph health', 'Get overall health score and grade'] },
+    { icon: '🌿', tab: 'Git',      title: 'Git', commands: [
+      { name: 'diff-context',   args: '[path]',        desc: 'Changed symbols, callers/callees, and affected tests' },
+      { name: 'commit-context', args: '[path]',        desc: 'Structured summary of staged changes for a commit message' },
+      { name: 'pr-context',     args: '<base> [head]', desc: 'Semantic diff between two git refs for PR descriptions' },
+      { name: 'changelog',      args: '<ref1> <ref2>', desc: 'Human-readable semantic diff between two git refs' },
+      { name: 'test-map',       args: '[symbol]',      desc: 'Map symbols to test files; show uncovered symbols' },
+    ], example: ['kirograph diff-context --staged', 'What does my staged diff actually change?'] },
+    { icon: '✏️', tab: 'Edit',     title: 'Edit', commands: [
+      { name: 'str-replace',   args: '<file> <old> <new>',    desc: 'Replace unique string anchor; fails on 0 or >1 matches' },
+      { name: 'multi-replace', args: '<file> <pairs-json>',   desc: 'Multiple replacements as an all-or-nothing transaction' },
+      { name: 'insert-at',     args: '<file> <anchor> <txt>', desc: 'Insert content before or after an anchor or line number' },
+      { name: 'ast-rewrite',   args: '<file> <pat> <rw>',     desc: 'Structural rewrite via ast-grep (requires ast-grep on PATH)' },
+    ], example: ['kirograph str-replace auth.ts "return null" "return undefined"', 'Safe replace a unique string'] },
+    { icon: '🌲', tab: 'Branch',   title: 'Branch', commands: [
+      { name: 'branch list',   args: null,         desc: 'List tracked branches with size and last-sync time' },
+      { name: 'branch add',    args: '[name]',     desc: 'Start tracking a branch (copies current index)' },
+      { name: 'branch remove', args: '<name>',     desc: 'Stop tracking a branch and delete its DB' },
+      { name: 'branch gc',     args: null,         desc: 'Remove DBs for branches that no longer exist in git' },
+      { name: 'branch diff',   args: '<a> <b>',    desc: 'Symbol diff between two tracked branch DBs' },
+      { name: 'branch search', args: '<name> <q>', desc: 'Search symbols in a branch DB without switching' },
+    ], example: ['kirograph branch diff main feature/auth', 'What symbols changed?'] },
+    { icon: '📚', tab: 'Docs',     title: 'Docs', commands: [
+      { name: 'docs toc',     args: '[file]',  desc: 'Table of contents for a file or the whole project' },
+      { name: 'docs search',  args: '<query>', desc: 'Full-text search over documentation sections' },
+      { name: 'docs section', args: '<id>',    desc: 'Print the full content of a section by ID' },
+      { name: 'docs outline', args: '<file>',  desc: 'Print heading hierarchy for a document' },
+      { name: 'docs refs',    args: '<id>',    desc: 'Show code-to-doc and doc-to-code cross-references' },
+      { name: 'docs reindex', args: null,      desc: 'Force re-index all documentation files' },
+      { name: 'docs lint',    args: null,      desc: 'Find broken refs, stale sections, FTS desync' },
+    ], example: ['kirograph docs search "authentication"', 'Find docs about auth'] },
+    { icon: '🗄️', tab: 'Data',     title: 'Data', commands: [
+      { name: 'data list',         args: null,             desc: 'List all indexed datasets' },
+      { name: 'data describe',     args: '<dataset>',      desc: 'Show schema and column profiles' },
+      { name: 'data query',        args: '<dataset>',      desc: 'Query rows with filters' },
+      { name: 'data aggregate',    args: '<dataset>',      desc: 'Server-side GROUP BY aggregation' },
+      { name: 'data search',       args: '<dataset> <q>',  desc: 'Search column names and sample values' },
+      { name: 'data join',         args: '<left> <right>', desc: 'SQL JOIN across two indexed datasets' },
+      { name: 'data correlations', args: '<dataset>',      desc: 'Pairwise Pearson correlations between numeric columns' },
+      { name: 'data quality',      args: '<dataset>',      desc: 'Data quality triage: rank columns by risk' },
+      { name: 'data drift',        args: '<dataset>',      desc: 'Show schema drift between last two indexes' },
+      { name: 'data history',      args: '<dataset>',      desc: 'Show history of schema changes for a dataset' },
+    ], example: ['kirograph data query orders --filter status:eq:shipped', 'Filter rows'] },
+    { icon: '📖', tab: 'Wiki',     title: 'Wiki', commands: [
+      { name: 'wiki init',       args: null,       desc: 'Initialize wiki: create SCHEMA.md and MANIFEST.md' },
+      { name: 'wiki ingest',     args: '[source]', desc: 'Print the ingest prompt for the LLM (reads file or stdin)' },
+      { name: 'wiki search',     args: '<query>',  desc: 'Full-text search over wiki pages' },
+      { name: 'wiki page',       args: '<slug>',   desc: 'Print the full content of a wiki page' },
+      { name: 'wiki list',       args: null,       desc: 'List all wiki pages' },
+      { name: 'wiki lint',       args: null,       desc: 'Health check the wiki for broken links and orphans' },
+      { name: 'wiki reindex',    args: null,       desc: 'Rebuild SQLite index from .kirograph/wiki/*.md files' },
+      { name: 'wiki status',     args: null,       desc: 'Wiki subsystem stats: page count, source count' },
+      { name: 'wiki synthesize', args: null,       desc: 'Run local-model wiki synthesis over the pending queue' },
+      { name: 'wiki apply-diff', args: '[diff]',   desc: 'Apply a WIKI_DIFF string to the wiki' },
+    ], example: ['kirograph wiki search "authentication flow"', 'Find wiki pages about auth'] },
+    { icon: '🧠', tab: 'Memory',   title: 'Memory', commands: [
+      { name: 'mem search',              args: '<query>', desc: 'Search past observations' },
+      { name: 'mem store',               args: '<text>',  desc: 'Store an observation' },
+      { name: 'mem capture',             args: '<text>',  desc: 'Extract multiple observations from free-form text' },
+      { name: 'mem timeline',            args: null,      desc: 'List recent sessions and observations' },
+      { name: 'mem status',              args: null,      desc: 'Memory health dashboard' },
+      { name: 'mem prune',               args: null,      desc: 'Remove old observations' },
+      { name: 'mem export',              args: null,      desc: 'Export observations (jsonl or md)' },
+      { name: 'mem lint',                args: null,      desc: 'Health check and auto-repair' },
+      { name: 'mem reembed',             args: null,      desc: 'Re-embed all observations after model change' },
+      { name: 'mem conflicts list',      args: null,      desc: 'List pending conflict relations' },
+      { name: 'mem conflicts ignore',    args: '<id>',    desc: 'Dismiss a pending conflict relation' },
+      { name: 'mem watchmen status',     args: null,      desc: 'Show watchmen counter and last synthesis time' },
+      { name: 'mem watchmen synthesize', args: null,      desc: 'Run watchmen synthesis: produce brief and/or skill files' },
+      { name: 'mem watchmen reset',      args: null,      desc: 'Reset the watchmen observation counter to zero' },
+    ], example: ['kirograph mem search "auth decision"', 'Search for past decisions'] },
+    { icon: '🔒', tab: 'Security', title: 'Security', commands: [
+      { name: 'security',           args: '[path]',    desc: 'Security overview: vulnerabilities, verdicts, stale-data warnings' },
+      { name: 'vulns',              args: '[path]',    desc: 'List vulnerabilities with reachability verdicts and severity' },
+      { name: 'reachability',       args: '<target>',  desc: 'Check reachability for a CVE or dependency' },
+      { name: 'vuln suppress',      args: '<cveId>',   desc: 'Mark a CVE as suppressed (false positive or accepted risk)' },
+      { name: 'vuln unsuppress',    args: '<cveId>',   desc: 'Remove a suppression' },
+      { name: 'vuln suppressions',  args: null,        desc: 'List all active suppressions' },
+      { name: 'licenses',           args: '[path]',    desc: 'Show dependency licenses and check against policy' },
+      { name: 'vex',                args: '[path]',    desc: 'Export a VEX document (Vulnerability Exploitability eXchange)' },
+      { name: 'sbom',               args: '[path]',    desc: 'Export a Software Bill of Materials' },
+      { name: 'staleness',          args: '[path]',    desc: 'Check dependency freshness — packages behind latest version' },
+      { name: 'security export',    args: '[path]',    desc: 'Generate HTML security dashboard' },
+      { name: 'security secrets',   args: '[path]',    desc: 'Scan for hardcoded secrets with call-graph blast radius' },
+      { name: 'security flows',     args: '[path]',    desc: 'SAST-lite: detect dangerous data flows' },
+      { name: 'security ci-report', args: '[path]',    desc: 'Generate CI/CD security report (JSON, SARIF, or text)' },
+      { name: 'attack-surface',     args: '[path]',    desc: 'Map attack surface: routes → vulnerable deps with hop count' },
+      { name: 'supply-chain',       args: '[path]',    desc: 'Supply chain health: OpenSSF Scorecard, maintainer count' },
+      { name: 'dep-confusion',      args: '[path]',    desc: 'Detect dependency confusion: internal packages in public registries' },
+      { name: 'remediation',        args: '[path]',    desc: 'Remediation SLA tracking: days open, fix available, overdue alerts' },
+      { name: 'pattern',            args: '[pattern]', desc: 'AST structural search: live pattern or library rule runner' },
+    ], example: ['kirograph vulns --severity critical --verdict affected', 'Critical confirmed vulnerabilities'] },
+    { icon: '⚙️', tab: 'Agent',    title: 'Agent', commands: [
+      { name: 'caveman',     args: '[mode]',       desc: 'Communication style (off | lite | full | ultra)' },
+      { name: 'compression', args: '[level]',      desc: 'Shell compression level (off | normal | aggressive | ultra)' },
+      { name: 'exec',        args: '<cmd>',        desc: 'Run command with token-optimized output' },
+      { name: 'gain',        args: null,           desc: 'Token savings statistics' },
+      { name: 'bench',       args: null,           desc: 'Run local token-efficiency benchmark across KiroGraph tools' },
+      { name: 'monitor',     args: null,           desc: 'Live tail of mcp-calls.jsonl — watch MCP tool usage in real time' },
+      { name: 'upgrade',     args: null,           desc: 'Update KiroGraph to the latest version' },
+      { name: 'cost',        args: '[sessionDir]', desc: 'Analyze MCP tool usage and token cost from session transcripts' },
+      { name: 'serve',       args: null,           desc: 'Start the MCP server' },
+    ], example: ['kirograph gain --graph', 'Show token savings graph'] },
+  ];
+
+  var term, gIdx = 0, cIdx = 0;
+  var centerCols = 96; // updated after layout to account for canvas vs container width gap
+
+  function sp(n) { return n > 0 ? new Array(n + 1).join(' ') : ''; }
+
+  function tabRow(from, to) {
+    var parts = [];
+    for (var i = from; i < to && i < GROUPS.length; i++) {
+      var g = GROUPS[i];
+      if (i === gIdx) {
+        parts.push(C.B + C.vi + C.U + g.icon + ' ' + g.tab + C.R);
+      } else {
+        parts.push(C.D + g.icon + ' ' + g.tab + C.R);
+      }
+    }
+    return parts.join('  ');
+  }
+
+  function renderFrame() {
+    var g = GROUPS[gIdx];
+    var buf = '\x1b[2J\x1b[H';
+
+    // ── ASCII Banner (centered relative to container width) ──────────
+    var bannerPad = sp(Math.max(0, Math.floor((centerCols - 69) / 2)));
+    for (var bi = 0; bi < BANNER.length; bi++) {
+      buf += (bi < 3 ? C.pu : C.vi) + bannerPad + BANNER[bi] + C.R + '\r\n';
+    }
+    var subtitle = 'Semantic code knowledge graph for Kiro — 100% local';
+    var subPad   = sp(Math.max(0, Math.floor((centerCols - subtitle.length) / 2)));
+    buf += C.D + subPad + subtitle + C.R + '\r\n';
+    buf += '\r\n';
+
+    // ── Tab rows (8 groups per row) ──────────────────────────────────
+    buf += '  ' + tabRow(0, 8) + '\r\n';
+    buf += '  ' + tabRow(8, 16) + '\r\n';
+    buf += '  ' + C.D + '← → switch groups  ·  ↑ ↓ select  ·  enter to use  ·  q quit' + C.R + '\r\n';
+    buf += '\r\n';
+
+    // ── COMMANDS ─────────────────────────────────────────────────────
+    buf += C.B + C.pa + 'COMMANDS' + C.R + '\r\n';
+    buf += '\r\n';
+
+    var nw = g.commands.reduce(function(m, c) {
+      return Math.max(m, c.name.length + (c.args ? 1 + c.args.length : 0));
+    }, 0) + 3;
+
+    // viewport: HEADER_ROWS = banner(6)+subtitle+blank+tab1+tab2+nav+blank+COMMANDS+blank = 14
+    var HEADER_ROWS = 14;
+    var avail = term.rows - HEADER_ROWS;
+    var total = g.commands.length;
+    var viewStart, viewEnd;
+    if (total <= avail) {
+      viewStart = 0;
+      viewEnd   = total;
+    } else {
+      var slots = avail - 2; // reserve 2 rows for scroll indicators
+      viewStart = Math.max(0, Math.min(cIdx - Math.floor(slots / 2), total - slots));
+      viewEnd   = viewStart + slots;
+    }
+
+    if (viewStart > 0) {
+      buf += C.D + '  ↑ ' + viewStart + ' more above' + C.R + '\r\n';
+    }
+
+    for (var i = viewStart; i < viewEnd; i++) {
+      var cmd = g.commands[i];
+      var hi  = i === cIdx;
+      var pre = hi ? C.gr + C.B + '❯' + C.R + ' ' : '  ';
+      var nm  = hi
+        ? (C.B + C.la + cmd.name + C.R + (cmd.args ? ' ' + C.B + cmd.args + C.R : ''))
+        : (C.la + cmd.name + C.R + (cmd.args ? ' ' + C.D + cmd.args + C.R : ''));
+      var sig = cmd.name + (cmd.args ? ' ' + cmd.args : '');
+      var p   = sp(Math.max(0, nw - sig.length));
+      buf += pre + nm + p + C.gy + cmd.desc + C.R + '\r\n';
+    }
+
+    if (viewEnd < total) {
+      buf += C.D + '  ↓ ' + (total - viewEnd) + ' more below' + C.R + '\r\n';
+    }
+
+    term.write(buf);
+  }
+
+  var autoTimer = null;
+  var manual = false;
+
+  function advance() {
+    cIdx++;
+    if (cIdx >= GROUPS[gIdx].commands.length) {
+      cIdx = 0;
+      gIdx = (gIdx + 1) % GROUPS.length;
+    }
+    renderFrame();
+  }
+
+  function stopAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    manual = true;
+  }
+
+  function handleKey(e) {
+    var key = e.key;
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown') return;
+    e.preventDefault();
+    stopAuto();
+    if (key === 'ArrowRight') {
+      gIdx = (gIdx + 1) % GROUPS.length;
+      cIdx = 0;
+    } else if (key === 'ArrowLeft') {
+      gIdx = (gIdx - 1 + GROUPS.length) % GROUPS.length;
+      cIdx = 0;
+    } else if (key === 'ArrowDown') {
+      cIdx = (cIdx + 1) % GROUPS[gIdx].commands.length;
+    } else if (key === 'ArrowUp') {
+      cIdx = (cIdx - 1 + GROUPS[gIdx].commands.length) % GROUPS[gIdx].commands.length;
+    }
+    renderFrame();
+  }
+
+  function init() {
+    if (typeof Terminal === 'undefined') return;
+    var el = document.getElementById('hero-terminal');
+    if (!el) return;
+
+    term = new Terminal({
+      cols:        96,
+      rows:        30,
+      fontSize:    13,
+      fontFamily:  '"JetBrains Mono","Cascadia Code","Fira Code",Menlo,monospace',
+      theme: {
+        background:  '#0d0d0d',
+        foreground:  '#d4c8f0',
+        cursor:      '#7c6f9e',
+        black:       '#1a1a1a',
+        brightBlack: '#3a3a3a',
+      },
+      cursorStyle: 'bar',
+      cursorBlink: false,
+      scrollback:  0,
+    });
+
+    term.open(el);
+
+    // Measure after layout so we know the gap between canvas and container,
+    // then use that to correctly center the banner relative to the container.
+    requestAnimationFrame(function() {
+      var screen = el.querySelector('.xterm-screen');
+      if (screen && el.parentElement) {
+        var canvasW    = screen.offsetWidth;
+        var containerW = el.parentElement.offsetWidth - 24; // minus 2×12px padding
+        if (canvasW > 0) {
+          var charW  = canvasW / term.cols;
+          centerCols = Math.floor(containerW / charW);
+        }
+      }
+      renderFrame();
+      autoTimer = setInterval(advance, 500);
+    });
+
+    document.addEventListener('keydown', handleKey);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
 </body>
 </html>
