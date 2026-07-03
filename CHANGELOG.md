@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.28.1] - 2026-07-03: Installer — semantic embeddings prompt available in every install mode
+
+### Changed
+
+- **`promptConfigOptions` (`src/bin/installer/config-prompt.ts`)**: extracted the Semantic Search question block (embeddings toggle, model selection, engine selection, and per-engine follow-ups for turboquant/turbovec/typesense/qdrant) into a standalone `promptEmbeddings()` helper.
+  - **Core install**: previously skipped embeddings entirely (`enableEmbeddings` left unset) — now prompts the user with the same Semantic Search question set as Custom.
+  - **Full install**: previously hardcoded `enableEmbeddings: true`, `embeddingModel: DEFAULT_EMBEDDING_MODEL`, `embeddingDim: 768` with no engine choice — now prompts the user instead of silently defaulting.
+  - **Profile install**: previously applied the profile's embedding settings with no way to override — now prompts the user after the profile patch is applied, so profile defaults can be overridden.
+  - **Custom install**: unchanged behavior, now sourced from the shared helper instead of inline code.
+  - New `EmbeddingPatch` type narrows `promptEmbeddings()`'s return shape to just the embedding-related `ConfigPatch` fields.
+
 ## [0.28.0] - 2026-07-01: Code health tools, branch tracking, dev-ops CLIs, interactive help + full test suite
 
 ### Added

@@ -95,6 +95,129 @@ const PRESET_MODELS = [
   },
 ] as const;
 
+type EmbeddingPatch = Pick<ConfigPatch,
+  'enableEmbeddings' | 'embeddingModel' | 'embeddingDim' | 'semanticEngine' | 'useVecIndex' |
+  'turboquantMemDocs' | 'turboquantBits' | 'turbovecMemDocs' | 'turbovecBits' |
+  'typesenseDashboard' | 'qdrantDashboard'
+>;
+
+/**
+ * Semantic embeddings are a core feature, not a "custom"-only extra — asked
+ * for every install mode (core, full, profiles, custom) so users always get
+ * to pick whether embeddings run and, if so, which model/engine.
+ */
+async function promptEmbeddings(rl: readline.Interface): Promise<EmbeddingPatch> {
+  printSection('🔍', 'Semantic Search');
+
+  const enableEmbeddings = await askToggle(
+    rl,
+    'Semantic embeddings (similarity search):',
+    'Enables natural-language code search via vector embeddings. A local model (~130MB) is downloaded on first use.',
+  );
+
+  const patch: EmbeddingPatch = {
+    enableEmbeddings,
+    semanticEngine: 'cosine',
+    useVecIndex: false,
+    turboquantMemDocs: false, turboquantBits: 3,
+    turbovecMemDocs: false, turbovecBits: 4,
+    typesenseDashboard: false, qdrantDashboard: false,
+  };
+
+  if (!enableEmbeddings) {
+    return patch;
+  }
+
+  // ── Model selection ────────────────────────────────────────────────────────
+  const modelChoice = await arrowSelect<string>(
+    rl,
+    'Embedding model:',
+    PRESET_MODELS.map(m => ({ value: m.value, label: m.label, description: m.description })),
+  );
+
+  let embeddingModel: string;
+  let embeddingDim: number;
+
+  if (modelChoice === '__other__') {
+    console.log(`\n  ${dim}Enter a HuggingFace model ID in the format org/model-name.${reset}`);
+    while (true) {
+      const raw = (await ask(rl, `  ${violet}Model identifier:${reset} `)).trim();
+      if (raw.includes('/')) { embeddingModel = raw; break; }
+      console.log(`  Expected a HuggingFace model ID in the format org/model-name (e.g. nomic-ai/nomic-embed-text-v1.5).`);
+    }
+    console.log(`\n  ${dim}Enter the embedding output dimension for this model (check the model card on HuggingFace).${reset}`);
+    while (true) {
+      const raw = (await ask(rl, `  ${violet}Embedding dimension (e.g. 768, 384):${reset} `)).trim();
+      const n = parseInt(raw, 10);
+      if (!isNaN(n) && n > 0) { embeddingDim = n; break; }
+      console.log(`  Expected a positive integer (e.g. 768, 384, 1536).`);
+    }
+  } else {
+    const preset = PRESET_MODELS.find(m => m.value === modelChoice)!;
+    embeddingModel = preset.value;
+    embeddingDim = preset.dim;
+  }
+
+  patch.embeddingModel = embeddingModel;
+  patch.embeddingDim = embeddingDim;
+
+  // ── Engine selection ───────────────────────────────────────────────────────
+  const semanticEngine = await arrowSelect<SemanticEngine>(rl, 'Vector search engine:', [
+    { value: 'cosine',      label: 'cosine',      description: 'In-process cosine similarity. No extra deps. Best for small/medium projects.' },
+    { value: 'turboquant',  label: 'turboquant',  description: 'ANN index, zero native deps. Compresses embeddings 20–30× (Google TurboQuant). ANN without native binaries — ideal for CI, ARM, restricted envs. Optional: npm install turboquant-js.' },
+    { value: 'turbovec',   label: 'turbovec',   description: 'ANN search via Rust/SIMD (napi-rs). Same TurboQuant algorithm but NEON on ARM and AVX-512BW on x86 — faster than turboquant-js at the cost of a one-time Rust build. Requires Rust toolchain. Build: cd native/turbovec-node && npm install && npm run build.' },
+    { value: 'sqlite-vec', label: 'sqlite-vec', description: 'ANN index. Sub-linear search. Best for large codebases. Needs: better-sqlite3, sqlite-vec (native).' },
+    { value: 'orama',      label: 'orama',      description: 'Hybrid search (full-text + vector). Pure JS. Needs: @orama/orama, @orama/plugin-data-persistence.' },
+    { value: 'pglite',     label: 'pglite',     description: 'Hybrid search via PostgreSQL + pgvector. Exact results. Pure WASM. Needs: @electric-sql/pglite.' },
+    { value: 'lancedb',    label: 'lancedb',    description: 'ANN search via LanceDB (Apache Lance columnar format). Pure JS. Needs: @lancedb/lancedb.' },
+    { value: 'qdrant',     label: 'qdrant',     description: 'ANN search via Qdrant embedded binary (HNSW index, Cosine). Needs: qdrant-local.' },
+    { value: 'typesense',  label: 'typesense',  description: 'ANN search via Typesense (auto-downloaded binary, HNSW, Cosine). Needs: typesense.' },
+  ]);
+  patch.semanticEngine = semanticEngine;
+  patch.useVecIndex = semanticEngine === 'sqlite-vec';
+
+  // TurboQuant for memory & docs: offer only when turboquant is the code-node engine
+  if (semanticEngine === 'turboquant') {
+    patch.turboquantMemDocs = await askToggle(rl,
+      'TurboQuant for memory & docs search (optional):',
+      'Replaces the default linear cosine scan in memory observations and doc sections with a compressed ANN index — no native deps required. Most useful when you accumulate many observations or large doc sets (1 000+ entries).',
+      false,
+    );
+  }
+
+  // TurboVec bit width
+  if (semanticEngine === 'turbovec') {
+    patch.turbovecBits = await arrowSelect<number>(rl, 'TurboVec bits per coordinate:', [
+      { value: 4, label: '4 bits (recommended)', description: 'Best quality, ~19× compression vs raw Float32. Default.' },
+      { value: 3, label: '3 bits',               description: 'Balanced — ~25× compression, slight quality drop.' },
+      { value: 2, label: '2 bits',               description: 'Highest compression (~38×), lowest accuracy.' },
+    ]);
+    patch.turbovecMemDocs = await askToggle(rl,
+      'TurboVec for memory & docs search (optional):',
+      'Replaces the default linear cosine scan in memory observations and doc sections with the TurboVec ANN index. Requires the addon to be built.',
+      false,
+    );
+  }
+
+  if (semanticEngine === 'typesense') {
+    patch.typesenseDashboard = await askToggle(rl,
+      'Typesense dashboard:',
+      'Serves the Typesense Dashboard locally and opens it in your browser after indexing completes.',
+      false,
+    );
+  }
+
+  if (semanticEngine === 'qdrant') {
+    patch.qdrantDashboard = await askToggle(rl,
+      'Qdrant dashboard:',
+      'Downloads the Qdrant Web UI (first time only) and opens it in your browser after indexing completes.',
+      false,
+    );
+  }
+
+  return patch;
+}
+
 export async function promptConfigOptions(
   rl: readline.Interface,
   opts: PromptConfigOptions = {},
@@ -125,13 +248,15 @@ export async function promptConfigOptions(
   };
 
   if (installMode === 'core') {
-    return { patch: basePatch, hooksToImport: null };
+    const embeddingPatch = await promptEmbeddings(rl);
+    return { patch: { ...basePatch, ...embeddingPatch }, hooksToImport: null };
   }
 
   if (installMode === 'full') {
+    const embeddingPatch = await promptEmbeddings(rl);
     const fullPatch: ConfigPatch = {
       ...basePatch,
-      enableEmbeddings: true, embeddingModel: DEFAULT_EMBEDDING_MODEL, embeddingDim: 768,
+      ...embeddingPatch,
       extractDocstrings: true, trackCallSites: true,
       enableArchitecture: true, shellCompressionLevel: 'normal',
       enableCodeHealth: true, enableNavigation: true, enableComplexity: true,
@@ -152,110 +277,14 @@ export async function promptConfigOptions(
       description: p.description,
     })));
     const profile = PROFILES[profileKey];
-    const patch: ConfigPatch = { ...basePatch, ...profile.patch };
+    const embeddingPatch = await promptEmbeddings(rl);
+    const patch: ConfigPatch = { ...basePatch, ...profile.patch, ...embeddingPatch };
     return { patch, hooksToImport: null };
   }
 
   // ── Custom: ask all questions individually ─────────────────────────────────
-  // ── Semantic Search ─────────────────────────────────────────────────────────
-  printSection('🔍', 'Semantic Search');
-
-  const enableEmbeddings = await askToggle(
-    rl,
-    'Semantic embeddings (similarity search):',
-    'Enables natural-language code search via vector embeddings. A local model (~130MB) is downloaded on first use.',
-  );
-
-  const patch: ConfigPatch = { ...basePatch, enableEmbeddings };
-
-  if (enableEmbeddings) {
-    // ── Model selection ────────────────────────────────────────────────────────
-    const modelChoice = await arrowSelect<string>(
-      rl,
-      'Embedding model:',
-      PRESET_MODELS.map(m => ({ value: m.value, label: m.label, description: m.description })),
-    );
-
-    let embeddingModel: string;
-    let embeddingDim: number;
-
-    if (modelChoice === '__other__') {
-      console.log(`\n  ${dim}Enter a HuggingFace model ID in the format org/model-name.${reset}`);
-      while (true) {
-        const raw = (await ask(rl, `  ${violet}Model identifier:${reset} `)).trim();
-        if (raw.includes('/')) { embeddingModel = raw; break; }
-        console.log(`  Expected a HuggingFace model ID in the format org/model-name (e.g. nomic-ai/nomic-embed-text-v1.5).`);
-      }
-      console.log(`\n  ${dim}Enter the embedding output dimension for this model (check the model card on HuggingFace).${reset}`);
-      while (true) {
-        const raw = (await ask(rl, `  ${violet}Embedding dimension (e.g. 768, 384):${reset} `)).trim();
-        const n = parseInt(raw, 10);
-        if (!isNaN(n) && n > 0) { embeddingDim = n; break; }
-        console.log(`  Expected a positive integer (e.g. 768, 384, 1536).`);
-      }
-    } else {
-      const preset = PRESET_MODELS.find(m => m.value === modelChoice)!;
-      embeddingModel = preset.value;
-      embeddingDim = preset.dim;
-    }
-
-    patch.embeddingModel = embeddingModel;
-    patch.embeddingDim = embeddingDim;
-
-    // ── Engine selection ───────────────────────────────────────────────────────
-    const semanticEngine = await arrowSelect<SemanticEngine>(rl, 'Vector search engine:', [
-      { value: 'cosine',      label: 'cosine',      description: 'In-process cosine similarity. No extra deps. Best for small/medium projects.' },
-      { value: 'turboquant',  label: 'turboquant',  description: 'ANN index, zero native deps. Compresses embeddings 20–30× (Google TurboQuant). ANN without native binaries — ideal for CI, ARM, restricted envs. Optional: npm install turboquant-js.' },
-      { value: 'turbovec',   label: 'turbovec',   description: 'ANN search via Rust/SIMD (napi-rs). Same TurboQuant algorithm but NEON on ARM and AVX-512BW on x86 — faster than turboquant-js at the cost of a one-time Rust build. Requires Rust toolchain. Build: cd native/turbovec-node && npm install && npm run build.' },
-      { value: 'sqlite-vec', label: 'sqlite-vec', description: 'ANN index. Sub-linear search. Best for large codebases. Needs: better-sqlite3, sqlite-vec (native).' },
-      { value: 'orama',      label: 'orama',      description: 'Hybrid search (full-text + vector). Pure JS. Needs: @orama/orama, @orama/plugin-data-persistence.' },
-      { value: 'pglite',     label: 'pglite',     description: 'Hybrid search via PostgreSQL + pgvector. Exact results. Pure WASM. Needs: @electric-sql/pglite.' },
-      { value: 'lancedb',    label: 'lancedb',    description: 'ANN search via LanceDB (Apache Lance columnar format). Pure JS. Needs: @lancedb/lancedb.' },
-      { value: 'qdrant',     label: 'qdrant',     description: 'ANN search via Qdrant embedded binary (HNSW index, Cosine). Needs: qdrant-local.' },
-      { value: 'typesense',  label: 'typesense',  description: 'ANN search via Typesense (auto-downloaded binary, HNSW, Cosine). Needs: typesense.' },
-    ]);
-    patch.semanticEngine = semanticEngine;
-    patch.useVecIndex = semanticEngine === 'sqlite-vec';
-
-    // TurboQuant for memory & docs: offer only when turboquant is the code-node engine
-    if (semanticEngine === 'turboquant') {
-      patch.turboquantMemDocs = await askToggle(rl,
-        'TurboQuant for memory & docs search (optional):',
-        'Replaces the default linear cosine scan in memory observations and doc sections with a compressed ANN index — no native deps required. Most useful when you accumulate many observations or large doc sets (1 000+ entries).',
-        false,
-      );
-    }
-
-    // TurboVec bit width
-    if (semanticEngine === 'turbovec') {
-      patch.turbovecBits = await arrowSelect<number>(rl, 'TurboVec bits per coordinate:', [
-        { value: 4, label: '4 bits (recommended)', description: 'Best quality, ~19× compression vs raw Float32. Default.' },
-        { value: 3, label: '3 bits',               description: 'Balanced — ~25× compression, slight quality drop.' },
-        { value: 2, label: '2 bits',               description: 'Highest compression (~38×), lowest accuracy.' },
-      ]);
-      patch.turbovecMemDocs = await askToggle(rl,
-        'TurboVec for memory & docs search (optional):',
-        'Replaces the default linear cosine scan in memory observations and doc sections with the TurboVec ANN index. Requires the addon to be built.',
-        false,
-      );
-    }
-
-    if (semanticEngine === 'typesense') {
-      patch.typesenseDashboard = await askToggle(rl,
-        'Typesense dashboard:',
-        'Serves the Typesense Dashboard locally and opens it in your browser after indexing completes.',
-        false,
-      );
-    }
-
-    if (semanticEngine === 'qdrant') {
-      patch.qdrantDashboard = await askToggle(rl,
-        'Qdrant dashboard:',
-        'Downloads the Qdrant Web UI (first time only) and opens it in your browser after indexing completes.',
-        false,
-      );
-    }
-  }
+  const embeddingPatch = await promptEmbeddings(rl);
+  const patch: ConfigPatch = { ...basePatch, ...embeddingPatch };
 
   // ── Graph Features ──────────────────────────────────────────────────────────
   printSection('📊', 'Graph Features');
